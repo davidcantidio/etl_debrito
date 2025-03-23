@@ -3,16 +3,25 @@ import numpy as np
 import logging
 
 class etl_geral_meta:
-    def __init__(self, df, mapeamento_id_campanha=None):
-        self.df = df
-        self.mapeamento_id_campanha = mapeamento_id_campanha or {}
+    def __init__(self, df, mapping_campanha=None, mapping_sigla=None):
+        """
+        Inicializa o ETL para os dados de META – Geral.
+        :param df: DataFrame lido da aba de origem (Meta – Geral)
+        :param mapping_campanha: dicionário que mapeia (lookup) o valor da coluna "Campaign name"
+                                 para o valor desejado para a coluna Campanha (obtido da BI_PARAMETRIZAÇÃO – coluna "CAMPANHA OBRIGATÓRIO")
+        :param mapping_sigla: dicionário que mapeia o valor da coluna "Campaign name" para o valor desejado para a coluna ID_Campanha
+                              (obtido da BI_PARAMETRIZAÇÃO – coluna "SIGLA")
+        """
+        self.df = df.copy()
+        self.mapping_campanha = mapping_campanha or {}
+        self.mapping_sigla = mapping_sigla or {}
 
         self.substituicoes = {
             'Campanha': {
-                # Substituições fixas (opcional)
+                # Substituições fixas adicionais, se necessárias.
             },
             'ID_Content': {
-                # Substituições fixas (opcional)
+                # Substituições para ID_Content, se houver.
             },
             'Objetivo': {
                 'OUTCOME_AWARENESS': 'Alcance',
@@ -45,31 +54,33 @@ class etl_geral_meta:
         self.etl_dicionario('Ad name', 'ID_Content', self.substituicoes['ID_Content'])
         self.etl_dicionario('Campaign objective', 'Objetivo', self.substituicoes['Objetivo'])
 
-    def aplicar_id_campanha_externo(self):
-        logging.info("Aplicando mapeamento externo para ID_Campanha...")
-        logging.info("Exemplo de valores em Campanha:")
-        logging.info(self.df["Campanha"].dropna().unique()[:10])
-        
-        # Normaliza as chaves do dicionário para letras maiúsculas e sem espaços extras
-        mapping = {str(k).strip().upper(): v for k, v in self.mapeamento_id_campanha.items()}
-        logging.info(f"Exemplos de chaves normalizadas no mapeamento: {list(mapping.keys())[:10]}")
+    def buscar_mapping(self, mapping, valor):
+        """
+        Busca no dicionário de mapping uma chave que esteja contida em 'valor' (após normalização).
+        Retorna o valor mapeado se encontrado; caso contrário, retorna "".
+        """
+        valor_norm = valor.strip().upper()
+        for chave, v in mapping.items():
+            if chave in valor_norm:
+                return v
+        return ""
 
-        def extrair_nome_base(campanha):
-            if not isinstance(campanha, str):
-                return ""
-            partes = campanha.split("_")
-            # Se os dois primeiros tokens são dígitos (ex.: "2025" e "2"), pegar o terceiro token
-            if len(partes) >= 3 and partes[0].isdigit() and partes[1].isdigit():
-                return partes[2].strip().upper()
-            return campanha.strip().upper()
-
-        # Aplica a função para extrair o nome base e mapeia para o ID_Campanha
-        self.df['ID_Campanha'] = self.df['Campanha'].apply(
-            lambda x: mapping.get(extrair_nome_base(x), "")
+    def aplicar_parametrizacao_campanha(self):
+        """
+        Realiza o cruzamento com a aba BI_PARAMETRIZAÇÃO.
+        Utiliza o valor da coluna "Campaign name" (normalizado) para buscar nos dicionários:
+          - mapping_campanha: para preencher a coluna "Campanha" (destino)
+          - mapping_sigla: para preencher a coluna "ID_Campanha" (destino)
+        Se não houver correspondência, mantém o valor original (ou vazio para ID_Campanha).
+        """
+        self.df["Campanha"] = self.df["Campaign name"].apply(
+            lambda x: self.buscar_mapping(self.mapping_campanha, x) or x
+        )
+        self.df["ID_Campanha"] = self.df["Campaign name"].apply(
+            lambda x: self.buscar_mapping(self.mapping_sigla, x)
         )
 
     def criar_veiculo(self):
-        # Inicializa com string vazia para evitar incompatibilidade de dtype
         self.df['Veiculo'] = ""
         self.df.loc[self.df['Placement'].str.contains('facebook', case=False, na=False), 'Veiculo'] = 'Facebook'
         self.df.loc[self.df['Placement'].str.contains('instagram', case=False, na=False), 'Veiculo'] = 'Instagram'
@@ -117,23 +128,24 @@ class etl_geral_meta:
         ]
         self.df = self.df[[col for col in ordem if col in self.df.columns]]
 
+    def gerar_id(self):
+        """
+        Gera uma coluna 'ID' única combinando várias colunas.
+        Neste exemplo, usamos a combinação de 'Data', 'ID_Content', 'Impressoes', 'Investimento' e 'Cliques_no_Link'.
+        """
+        self.df["ID"] = self.df.apply(
+            lambda row: f"{row['Data']}-{row['ID_Content']}-{row['Impressoes']}-{row['Investimento']}-{row['Cliques_no_Link']}-{row['ID_Content']}",
+            axis=1
+        )
+
     def processar(self):
         self.ajustar_tipos()
         self.aplicar_substituicoes()
-        self.aplicar_id_campanha_externo()
+        self.aplicar_parametrizacao_campanha()
         self.criar_veiculo()
         self.atribuir_id_veiculo()
         self.remover_colunas()
         self.renomear_colunas()
         self.reordenar_colunas()
-
-        # Formata as datas como "YYYY-MM-DD"
-        self.df['Inicio_da_Campanha'] = self.df['Inicio_da_Campanha'].dt.strftime('%Y-%m-%d')
-        self.df['Fim_da_Campanha'] = self.df['Fim_da_Campanha'].dt.strftime('%Y-%m-%d')
-
-        # Gera um campo ID único combinando várias colunas
-        self.df["ID"] = self.df.apply(
-            lambda row: f"{str(row['Data'])}-{str(row['ID_Content']).strip()}-{str(row['Impressoes']).strip()}-{str(row['Investimento']).strip()}-{str(row['Cliques_no_Link']).strip()}-{str(row['ID_Content']).strip()}",
-            axis=1
-        )
+        self.gerar_id()
         return self.df
