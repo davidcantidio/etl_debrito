@@ -1,0 +1,65 @@
+import os
+import logging
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from gspread_dataframe import set_with_dataframe
+from scripts.ELET_etl_geral_meta import etl_geral_meta
+from utils.google_sheets import carregar_aba_google_sheets
+
+def atualizar_planilha_destino(creds_path, spreadsheet_id, aba_destino, df):
+    """
+    Atualiza a aba de destino da planilha usando o ID da planilha,
+    insere apenas as linhas/colunas necessárias ao DataFrame.
+    """
+    scope = [
+        'https://spreadsheets.google.com/feeds',
+        'https://www.googleapis.com/auth/drive'
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+    client = gspread.authorize(creds)
+
+    sh = client.open_by_key(spreadsheet_id)
+    worksheet = sh.worksheet(aba_destino)
+    
+    # 1) Limpar o conteúdo existente
+    worksheet.clear()
+    
+    # 2) Inserir o DataFrame a partir da célula A1 (com cabeçalho)
+    set_with_dataframe(worksheet, df, row=1, col=1, include_column_header=True)
+
+    # 3) Redimensionar a aba para não ter linhas/colunas extras
+    # +1 no número de linhas porque set_with_dataframe inclui o header na primeira linha
+    num_rows = len(df) + 1
+    num_cols = len(df.columns)
+    worksheet.resize(rows=num_rows, cols=num_cols)
+
+    logging.info(f"Dados inseridos na aba '{aba_destino}' com sucesso. "
+                 f"Planilha redimensionada para {num_rows} linhas e {num_cols} colunas.")
+
+
+def main():
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+    # Parâmetros
+    creds_path = "creds.json"
+    
+    # Fonte (onde está a aba 'Meta - Geral')
+    fonte_sheet_url = "https://docs.google.com/spreadsheets/d/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/edit"
+    fonte_aba = "Meta - Geral"
+
+    # Destino (mesmo ou outro ID)
+    spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
+    aba_destino = "modeloGeral"
+
+    # 1) Ler dados de origem
+    df_origem = carregar_aba_google_sheets(creds_path, fonte_sheet_url, fonte_aba)
+
+    # 2) Aplicar ETL
+    etl = etl_geral_meta(df_origem)
+    df_tratado = etl.processar()
+
+    # 3) Inserir na planilha de destino
+    atualizar_planilha_destino(creds_path, spreadsheet_id, aba_destino, df_tratado)
+
+if __name__ == "__main__":
+    main()

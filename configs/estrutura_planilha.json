@@ -1,0 +1,54 @@
+{
+  "mapeamento_colunas": {
+    "Meta - Geral": {
+      "aba": "Meta - Geral",
+      "link": "https://docs.google.com/spreadsheets/d/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/edit",
+      "Veiculo": "",
+      "Date": "",
+      "Account name": "",
+      "Campaign name": "",
+      "Campaign ID": "",
+      "Ad set start time": "",
+      "Ad set end time": "",
+      "Campaign objective": "",
+      "Ad set name": "",
+      "Ad name": "",
+      "Ad creative image URL": "",
+      "Placement": "",
+      "Content (utm)": "",
+      "Impressions": "",
+      "Cost": "",
+      "Link clicks": "",
+      "Video play actions": "",
+      "Video watches at 25%": "",
+      "Video watches at 50%": "",
+      "Video watches at 75%": "",
+      "Video watches at 100%": "",
+      "Post reactions": "",
+      "Post shares": "",
+      "Post comments": ""
+    },
+    "Linkedin": {
+      "aba": "Linkedin",
+      "link": "https://docs.google.com/spreadsheets/d/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/edit",
+      "Date": "",
+      "Account name": "",
+      "Campaign name": "",
+      "Campaign ID": "",
+      "Total spent": "",
+      "Impressions": ""
+    },
+    "Tiktok": {
+      "aba": "Tiktok",
+      "link": "https://docs.google.com/spreadsheets/d/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/edit",
+      "Date": "",
+      "Advertiser name": "",
+      "Campaign name": "",
+      "Campaign ID": "",
+      "Cost": "",
+      "Impressions": "",
+      "Clicks": ""
+    }
+  }
+}
+
