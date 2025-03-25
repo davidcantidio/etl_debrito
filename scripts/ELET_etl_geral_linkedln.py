@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import re
 import unicodedata
+from utils.campanha_mapper import buscar_mapping
+
 
 class etl_geral_linkedin:
     def __init__(self, df):

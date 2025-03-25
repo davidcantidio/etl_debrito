@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import logging
+from utils.campanha_mapper import buscar_mapping
+
 
 class etl_alcance_meta:
     def __init__(self, df, mapping_campanha=None, mapping_sigla=None):

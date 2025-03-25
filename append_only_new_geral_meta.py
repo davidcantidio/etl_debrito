@@ -56,7 +56,7 @@ def carregar_parametrizacao_campanhas(creds_path, spreadsheet_id):
     """
     Lê a aba 'BI_PARAMETRIZAÇÃO' e retorna dois dicionários:
       - mapping_campanha: mapeia o valor da coluna de lookup "NOME CAMPANHA" para o valor desejado para a coluna "Campanha" (destino),
-        que vem da coluna que contenha "CAMPANHA OBRIGATÓRIO"
+        que vem da coluna que contenha "NOME CAMPANHA"
       - mapping_sigla: mapeia o valor da coluna de lookup "NOME CAMPANHA" para o valor desejado para a coluna "ID_Campanha" (destino),
         que vem da coluna que contenha "SIGLA"
     Considera que os cabeçalhos reais estão na linha 2 e os dados a partir da linha 3.
@@ -84,13 +84,13 @@ def carregar_parametrizacao_campanhas(creds_path, spreadsheet_id):
     if lookup not in df_param.columns:
         raise ValueError(f"A coluna de lookup '{lookup}' não foi encontrada na aba BI_PARAMETRIZAÇÃO.")
     
-    # Para o mapeamento de Campanha, usar a coluna que contenha "CAMPANHA OBRIGATÓRIO"
-    col_dest_campanha = next((col for col in df_param.columns if "CAMPANHA OBRIGATÓRIO" in col), lookup)
+    # Para o mapeamento de Campanha, usar a coluna que contenha "NOME CAMPANHA"
+    col_dest_campanha = next((col for col in df_param.columns if "NOME CAMPANHA" in col), lookup)
     # Para SIGLA, buscar a coluna que contenha "SIGLA"
     col_sigla = next((col for col in df_param.columns if "SIGLA" in col), None)
     
     if not col_dest_campanha or not col_sigla:
-        raise ValueError("As colunas 'CAMPANHA OBRIGATÓRIO' e/ou 'SIGLA' não foram encontradas após normalização.")
+        raise ValueError("As colunas 'NOME CAMPANHA' e/ou 'SIGLA' não foram encontradas após normalização.")
     
     logging.info(f"Coluna de lookup: '{lookup}'")
     logging.info(f"Coluna usada para Campanha (destino): '{col_dest_campanha}'")

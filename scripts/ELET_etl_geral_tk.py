@@ -3,11 +3,13 @@ import numpy as np
 import re
 import unicodedata
 import logging
+from utils.campanha_mapper import buscar_mapping
+
 
 class etl_geral_tk:
     def __init__(self, df):
         self.df = df.copy()
-        # Substituicoes agora contém somente 'Objetivo'
+        # Substituições agora contém somente 'Objetivo'
         self.substituicoes = {
             'Objetivo': {
                 'REACH': 'Alcance',
@@ -53,7 +55,6 @@ class etl_geral_tk:
         Aplica apenas as substituições existentes no dicionário self.substituicoes.
         Neste caso, apenas 'Objetivo'.
         """
-        # Substitui 'Campaign objective type' → 'Objetivo'
         if 'Campaign objective type' in self.df.columns:
             self.etl_dicionario('Campaign objective type', 'Objetivo', self.substituicoes['Objetivo'])
         else:
@@ -70,7 +71,6 @@ class etl_geral_tk:
             'Campaign ID', 
             'utm_content parameter value'
         ]
-        # Remove apenas as colunas que de fato existem
         cols_existentes = [col for col in remover_colunas if col in self.df.columns]
         self.df.drop(columns=cols_existentes, inplace=True)
 
@@ -133,36 +133,22 @@ class etl_geral_tk:
             'Engajamento_Total',
             'ID'
         ]
-        # Mantém apenas as colunas que de fato existem
         colunas_existentes = [c for c in nova_ordem_colunas if c in self.df.columns]
         self.df = self.df[colunas_existentes]
 
-    def buscar_mapping(self, mapping, valor):
-        """
-        Faz lookup parcial por substring em valor (uppercase).
-        Ex.: se 'CATALISA ICT' estiver em mapping, e valor contiver 'catalisa ict',
-        retorna o valor do mapping. Caso contrário, retorna string vazia.
-        """
-        valor_norm = str(valor).strip().upper()
-        for chave, v in mapping.items():
-            if chave in valor_norm:
-                return v
-        return ""
-
     def aplicar_parametrizacao_campanha_externa(self, mapping_campanha, mapping_sigla):
         """
-        Se desejar aplicar mapeamento externo para 'Campanha' e 'ID_Campanha',
-        usando a coluna 'Campaign name'.
+        Aplica mapeamento externo para 'Campanha' e 'ID_Campanha' usando a coluna 'Campaign name'.
         """
         if 'Campaign name' not in self.df.columns:
             logging.warning("'Campaign name' não está disponível para mapeamento externo.")
             return
 
         self.df["Campanha"] = self.df["Campaign name"].apply(
-            lambda x: self.buscar_mapping(mapping_campanha, x) or x
+            lambda x: buscar_mapping(mapping_campanha, x) or x
         )
         self.df["ID_Campanha"] = self.df["Campaign name"].apply(
-            lambda x: self.buscar_mapping(mapping_sigla, x)
+            lambda x: buscar_mapping(mapping_sigla, x)
         )
 
     def processar(self):

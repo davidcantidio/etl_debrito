@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import logging
+from utils.campanha_mapper import buscar_mapping
+
 
 class etl_geral_meta:
     def __init__(self, df, mapping_campanha=None, mapping_sigla=None):
@@ -39,31 +41,23 @@ class etl_geral_meta:
         self.df['Post reactions'] = pd.to_numeric(self.df['Post reactions'], errors='coerce')
         self.df['Post comments'] = pd.to_numeric(self.df['Post comments'], errors='coerce')
         self.df = self.df.fillna({'Post shares': 0, 'Post reactions': 0, 'Post comments': 0})
-        self.df['Engajamento_Total'] = self.df['Post shares'] + self.df['Post comments'] + self.df['Post reactions']
+        self.df['Engajamento_Total'] = (
+            self.df['Post shares'] + self.df['Post comments'] + self.df['Post reactions']
+        )
         self.df['Numero'] = np.nan
         self.df['ID'] = np.nan
 
     def etl_dicionario(self, coluna_origem, coluna_destino, substituicoes_coluna):
         self.df[coluna_destino] = self.df[coluna_origem].apply(
-            lambda x: next((valor for chave, valor in substituicoes_coluna.items() if chave in x), x)
-            if isinstance(x, str) else x
+            lambda x: next(
+                (valor for chave, valor in substituicoes_coluna.items() if chave in x), x
+            ) if isinstance(x, str) else x
         )
 
     def aplicar_substituicoes(self):
         self.etl_dicionario('Campaign name', 'Campanha', self.substituicoes['Campanha'])
         self.etl_dicionario('Ad name', 'ID_Content', self.substituicoes['ID_Content'])
         self.etl_dicionario('Campaign objective', 'Objetivo', self.substituicoes['Objetivo'])
-
-    def buscar_mapping(self, mapping, valor):
-        """
-        Busca no dicionário de mapping uma chave que esteja contida em 'valor' (após normalização).
-        Retorna o valor mapeado se encontrado; caso contrário, retorna "".
-        """
-        valor_norm = valor.strip().upper()
-        for chave, v in mapping.items():
-            if chave in valor_norm:
-                return v
-        return ""
 
     def aplicar_parametrizacao_campanha(self):
         """
@@ -74,10 +68,10 @@ class etl_geral_meta:
         Se não houver correspondência, mantém o valor original (ou vazio para ID_Campanha).
         """
         self.df["Campanha"] = self.df["Campaign name"].apply(
-            lambda x: self.buscar_mapping(self.mapping_campanha, x) or x
+            lambda x: buscar_mapping(self.mapping_campanha, x) or x
         )
         self.df["ID_Campanha"] = self.df["Campaign name"].apply(
-            lambda x: self.buscar_mapping(self.mapping_sigla, x)
+            lambda x: buscar_mapping(self.mapping_sigla, x)
         )
 
     def criar_veiculo(self):
@@ -87,8 +81,12 @@ class etl_geral_meta:
         self.df.loc[self.df['Placement'].str.contains('unknow', case=False, na=False), 'Veiculo'] = 'Não Classificado'
 
     def atribuir_id_veiculo(self):
-        self.df['ID_Veiculo'] = np.where(self.df['Placement'].str.contains('facebook', case=False, na=False), 2, np.nan)
-        self.df['ID_Veiculo'] = np.where(self.df['Placement'].str.contains('instagram', case=False, na=False), 3, self.df['ID_Veiculo'])
+        self.df['ID_Veiculo'] = np.where(
+            self.df['Placement'].str.contains('facebook', case=False, na=False), 2, np.nan
+        )
+        self.df['ID_Veiculo'] = np.where(
+            self.df['Placement'].str.contains('instagram', case=False, na=False), 3, self.df['ID_Veiculo']
+        )
 
     def remover_colunas(self):
         cols = ['Placement', 'Campaign objective', 'Campaign name', 'Campaign ID', 'Content (utm)']
