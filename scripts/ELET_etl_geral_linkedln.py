@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import re
 import unicodedata
+import logging
 from utils.campanha_mapper import buscar_mapping
 
 
@@ -57,9 +58,7 @@ class etl_geral_linkedin:
                 '2025_2_ALWAYS ON - INSTITUCIONAL_ALC_ENERGIA_QUE_NAO_PARA_INSTITUCIONAL_ALCANCE' : 'Always On - Institucional', 
                 '2025_2_ALWAYS ON - INSTITUCIONAL_VIEW_ENERGIA_QUE_NAO_PARA_INSTITUCIONAL_VISUALIZAÇÃO' : 'Always On - Institucional',
                 '2025_2_ALWAYS ON - COMERCIALIZAÇÃO_VIEW_ENERGIA_QUE_NAO_PARA_COMERCIALIZACAO_VISUALIZAÇÃO' : 'Always On - Comercialização'
-                           
             },
-
             'ID_Content': {
                 '2024_7_BR_VÍDEO_REELS - ATLETAS FLAMENGO OLIMPÍADAS - IMPULSIONADO_ACAO_ELET-AW0025':'art-elebr-2024-opn-fla0025',
                 '2024_6_BR_CARROSSEL_FUTURO_VERDE_CARROSSEL_ACAO_ELET-AW0011':'art-elebr-2024-aon-dma0011',
@@ -137,9 +136,7 @@ class etl_geral_linkedin:
                 'art_elebr_2025_seg0049' : 'art_elet_2025_seg0049',
                 'art_elebr_2025_seg0050' : 'art_elet_2025_seg0050',
                 'art_elebr_2025_seg0051' : 'art_elet_2025_seg0051',    
-               
              },
-
             'ID_Campanha':{
                 'Oportunidade - Makai': 'art-elebr-2024-opt-mak',
                 'Segurança Elétrica': 'art-elebr-2024-seg',
@@ -152,14 +149,13 @@ class etl_geral_linkedin:
                 'Segurança Elétrica': 'art-elebr-2024-seg',
                 'Always On - Comercialização':'art_elet_2025_awn_com',
                 'Always On - Institucional' : 'art_elet_2025_awn_inst'
-                
             },
             'Objetivo':{
                 'BRAND_AWARENESS': 'Alcance',
                 'WEBSITE_VISIT': 'Tráfego',
                 'VIDEO_VIEW': 'Engajamento',
                 'LEAD_GENERATION' : 'Conversão'
-                }
+            }
         }
 
     def ajustar_tipos(self):
@@ -171,47 +167,22 @@ class etl_geral_linkedin:
         self.df['Reactions'] = pd.to_numeric(self.df['Reactions'], errors='coerce')
         self.df['Comments'] = pd.to_numeric(self.df['Comments'], errors='coerce')
         self.df = self.df.fillna({'Shares': 0, 'Reactions': 0, 'Comments': 0})
-        self.df['Engajamento_Total'] = np.nan
         self.df['Engajamento_Total'] = self.df['Shares'] + self.df['Comments'] + self.df['Reactions'] 
         self.df['Numero'] = np.nan
         self.df.fillna({'Numero':0}, inplace=True)
         self.df['Veiculo'] = 'Linkedin'
         self.df['ID'] = np.nan
         self.df['Utm Content'] = np.nan
-        
 
     def etl_dicionario(self, coluna_origem, coluna_destino, substituicoes_coluna):
         self.df[coluna_destino] = self.df[coluna_origem].apply(
-            lambda x: next((valor for chave, valor in substituicoes_coluna.items() if chave in x), x)
+            lambda x: buscar_mapping(substituicoes_coluna, x)
         )
-
-    def extrair_IdContent(self, x):
-        if not isinstance(x, str):
-            return None  # Retorna None se x não for uma string
-
-        match_art = re.search(r'(ART_ELET_2025_SEG[A-Z]+[0-9]+)$', x)
-        if match_art:
-            return 'art-' + match_art.group(1).replace('-', '_').lower()
-
-        match_aw = re.search(r'(ART_ELET_2025_AWN_[A-Z]+[0-9]+)$', x)
-        if match_aw:
-            return match_aw.group(1).lower()
-
-        match_final = re.search(r'([A-Z0-9]+)$', x)
-        if match_final:
-            return match_final.group(1).lower()
-
-        return None
 
     def aplicar_substituicoes(self):
         self.etl_dicionario('Campaign name', 'Campanha', self.substituicoes['Campanha'])
         self.etl_dicionario('Campaign objective type', 'Objetivo', self.substituicoes['Objetivo'])
-        self.etl_dicionario('Campanha', 'ID_Campanha', self.substituicoes['ID_Campanha'])
-        
-   
-    def atribuir_id_veiculo(self):
-        self.df['ID_Veiculo'] = 4
-        
+        self.etl_dicionario('Campaign name', 'ID_Campanha', self.substituicoes['ID_Campanha'])
 
     def remover_colunas(self):
         remover_colunas = ['Campaign objective type', 'Campaign name', 'Campaign ID', 'Creative text']
@@ -238,7 +209,7 @@ class etl_geral_linkedin:
             'Reactions': 'Reacoes',
             'Shares': 'Compartilhamentos',
             'Comments': 'Comentarios'
-            }
+        }
         self.df.rename(columns=renomear_colunas, inplace=True)
     
     def reordenar_colunas(self):
@@ -276,8 +247,7 @@ class etl_geral_linkedin:
     def processar(self):
         self.ajustar_tipos()
         self.aplicar_substituicoes()
-        self.df['ID_Content'] = self.df['Creative Direct Sponsored Content name'].apply(self.extrair_IdContent)
-        self.atribuir_id_veiculo()
+        self.df['ID_Content'] = self.df['Creative text'].apply(lambda x: x.lower() if isinstance(x, str) else x)
         self.remover_colunas()
         self.renomear_colunas()
         self.reordenar_colunas()

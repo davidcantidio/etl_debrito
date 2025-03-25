@@ -3,7 +3,6 @@ import numpy as np
 import logging
 from utils.campanha_mapper import buscar_mapping
 
-
 class etl_alcance_meta:
     def __init__(self, df, mapping_campanha=None, mapping_sigla=None):
         """
@@ -17,7 +16,7 @@ class etl_alcance_meta:
                               (coluna "SIGLA")
         """
         self.df = df.copy()
-        # Normalize os nomes das colunas removendo espaços extras
+        # Normaliza os nomes das colunas removendo espaços extras
         self.df.columns = [col.strip() for col in self.df.columns]
         self.mapping_campanha = mapping_campanha or {}
         self.mapping_sigla = mapping_sigla or {}
@@ -54,17 +53,6 @@ class etl_alcance_meta:
         else:
             self.df["Impressões"] = 0
 
-    def buscar_mapping(self, mapping, valor):
-        """
-        Busca no dicionário de mapping uma chave que esteja contida em 'valor' (normalizado para uppercase).
-        Retorna o valor mapeado se encontrado; caso contrário, retorna "".
-        """
-        valor_norm = valor.strip().upper()
-        for chave, v in mapping.items():
-            if chave in valor_norm:
-                return v
-        return ""
-        
     def aplicar_parametrizacao_campanha(self):
         """
         Preenche as colunas 'Campanha' e 'ID_Campanha' a partir dos mapeamentos externos.
@@ -72,10 +60,10 @@ class etl_alcance_meta:
         Se não houver correspondência, mantém o valor original (para Campanha) e preenche com vazio para ID_Campanha.
         """
         self.df["Campanha"] = self.df["Campaign name"].apply(
-            lambda x: self.buscar_mapping(self.mapping_campanha, x) or x
+            lambda x: buscar_mapping(self.mapping_campanha, x) or x
         )
         self.df["ID_Campanha"] = self.df["Campaign name"].apply(
-            lambda x: self.buscar_mapping(self.mapping_sigla, x)
+            lambda x: buscar_mapping(self.mapping_sigla, x)
         )
 
     def renomear_colunas(self):
