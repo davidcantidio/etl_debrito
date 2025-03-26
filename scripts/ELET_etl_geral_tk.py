@@ -5,11 +5,16 @@ import unicodedata
 import logging
 from utils.campanha_mapper import buscar_mapping
 
-
 class etl_geral_tk:
     def __init__(self, df):
+        """
+        Inicializa o ETL para os dados do Tiktok.
+
+        Parâmetros:
+            df (pandas.DataFrame): DataFrame lido da aba de origem (Tiktok)
+        """
         self.df = df.copy()
-        # Substituições agora contém somente 'Objetivo'
+        # Dicionário para substituir valores da coluna 'Objetivo'
         self.substituicoes = {
             'Objetivo': {
                 'REACH': 'Alcance',
@@ -20,6 +25,11 @@ class etl_geral_tk:
         }
 
     def ajustar_tipos(self):
+        """
+        Converte os tipos das colunas, formata datas e valores numéricos,
+        e calcula o engajamento total a partir de Paid shares, Paid likes e Paid comments.
+        Também define valores fixos para algumas colunas.
+        """
         self.df['Date'] = pd.to_datetime(self.df['Date'], errors='coerce')
         self.df['Schedule start time'] = pd.to_datetime(self.df['Schedule start time'], errors='coerce')
         self.df['Schedule end time'] = pd.to_datetime(self.df['Schedule end time'], errors='coerce')
@@ -30,30 +40,36 @@ class etl_geral_tk:
         self.df['Paid comments'] = pd.to_numeric(self.df['Paid comments'], errors='coerce')
         self.df.fillna({'Paid shares': 0, 'Paid likes': 0, 'Paid comments': 0}, inplace=True)
 
-        self.df['Engajamento_Total'] = self.df['Paid shares'] + self.df['Paid comments'] + self.df['Paid likes']
-
+        # Calcula o engajamento total
+        self.df['Engajamento_Total'] = (
+            self.df['Paid shares'] + self.df['Paid comments'] + self.df['Paid likes']
+        )
+        # Cria coluna "Numero" como zero (ou nula) e define o veículo fixo
         self.df['Numero'] = np.nan
         self.df.fillna({'Numero': 0}, inplace=True)
-
         self.df['Veiculo'] = 'Tiktok'
+        # Inicializa a coluna ID (identificador único)
         self.df['ID'] = pd.Series(dtype='str')
 
     def atribuir_id_veiculo(self):
-        # Atribui o ID_Veiculo fixo para Tiktok
+        """
+        Atribui o ID_Veiculo fixo para Tiktok.
+        """
         self.df['ID_Veiculo'] = 5
 
     def etl_dicionario(self, coluna_origem, coluna_destino, substituicoes_coluna):
         """
-        Substitui valores em coluna_destino, caso encontre a chave em coluna_origem.
+        Substitui valores em 'coluna_destino' com base nas chaves encontradas em 'coluna_origem'
+        e usando o dicionário de substituições.
         """
         self.df[coluna_destino] = self.df[coluna_origem].apply(
             lambda x: next((valor for chave, valor in substituicoes_coluna.items() if chave in x), x)
+            if isinstance(x, str) else x
         )
 
     def aplicar_substituicoes(self):
         """
-        Aplica apenas as substituições existentes no dicionário self.substituicoes.
-        Neste caso, apenas 'Objetivo'.
+        Aplica as substituições para a coluna 'Objetivo', utilizando o dicionário definido.
         """
         if 'Campaign objective type' in self.df.columns:
             self.etl_dicionario('Campaign objective type', 'Objetivo', self.substituicoes['Objetivo'])
@@ -62,23 +78,23 @@ class etl_geral_tk:
 
     def remover_colunas(self):
         """
-        Remove colunas desnecessárias do DataFrame.
+        Remove colunas desnecessárias que não fazem parte do modelo de destino.
         """
-        remover_colunas = [
+        remover = [
             'AG Placement', 
             'Campaign objective type', 
             'Campaign name', 
             'Campaign ID', 
             'utm_content parameter value'
         ]
-        cols_existentes = [col for col in remover_colunas if col in self.df.columns]
+        cols_existentes = [col for col in remover if col in self.df.columns]
         self.df.drop(columns=cols_existentes, inplace=True)
 
     def renomear_colunas(self):
         """
-        Renomeia colunas para o modelo final.
+        Renomeia as colunas para o padrão do modelo de destino.
         """
-        renomear_colunas = {
+        renomear = {
             'Date': 'Data',
             'Advertiser name': 'Nome_da_Conta',
             'Ad group name': 'Nome_do_Conjunto_de_Anuncio',
@@ -98,13 +114,21 @@ class etl_geral_tk:
             'Paid shares': 'Compartilhamentos',
             'Paid comments': 'Comentarios'
         }
-        self.df.rename(columns=renomear_colunas, inplace=True)
+        self.df.rename(columns=renomear, inplace=True)
 
     def reordenar_colunas(self):
         """
-        Reordena as colunas para o modelo final: modeloGeral.
+        Reordena as colunas do DataFrame para que fiquem alinhadas com o modelo de destino.
+        Se alguma coluna estiver ausente, ela é criada com valor vazio.
+        
+        Modelo de destino:
+          Numero, Data, Nome_da_Conta, Campanha, ID_Campanha, Veiculo, ID_Veiculo,
+          Nome_do_Conjunto_de_Anuncio, Nome_do_Anuncio, Inicio_da_Campanha, Fim_da_Campanha,
+          Objetivo, URL_do_Anuncio, ID_Content, Investimento, Impressoes, Cliques_no_Link,
+          Video_Play, Visualizacoes_ate_25, Visualizacoes_ate_50, Visualizacoes_ate_75,
+          Visualizacoes_ate_100, Reacoes, Compartilhamentos, Comentarios, Engajamento_Total, ID
         """
-        nova_ordem_colunas = [
+        ordem = [
             'Numero',
             'Data',
             'Nome_da_Conta',
@@ -133,17 +157,21 @@ class etl_geral_tk:
             'Engajamento_Total',
             'ID'
         ]
-        colunas_existentes = [c for c in nova_ordem_colunas if c in self.df.columns]
-        self.df = self.df[colunas_existentes]
+        # Cria colunas ausentes com valor vazio
+        for col in ordem:
+            if col not in self.df.columns:
+                self.df[col] = ""
+        # Reordena conforme a ordem definida
+        self.df = self.df[ordem]
 
     def aplicar_parametrizacao_campanha_externa(self, mapping_campanha, mapping_sigla):
         """
-        Aplica mapeamento externo para 'Campanha' e 'ID_Campanha' usando a coluna 'Campaign name'.
+        Preenche as colunas 'Campanha' e 'ID_Campanha' utilizando os mapeamentos externos,
+        com base no valor da coluna "Campaign name". Se não houver correspondência, mantém o valor original.
         """
         if 'Campaign name' not in self.df.columns:
             logging.warning("'Campaign name' não está disponível para mapeamento externo.")
             return
-
         self.df["Campanha"] = self.df["Campaign name"].apply(
             lambda x: buscar_mapping(mapping_campanha, x) or x
         )
@@ -151,9 +179,28 @@ class etl_geral_tk:
             lambda x: buscar_mapping(mapping_sigla, x)
         )
 
+    def gerar_id(self):
+        """
+        Gera uma coluna 'ID' única concatenando os valores de Data, Campanha, Impressoes,
+        Investimento e Cliques_no_Link.
+        Essa coluna serve como identificador único para cada registro.
+        """
+        self.df["ID"] = self.df.apply(
+            lambda row: f"{row['Data']}-{row['Campanha']}-{row['Impressoes']}-{row['Investimento']}-{row['Cliques_no_Link']}",
+            axis=1
+        )
+
     def processar(self):
         """
-        Executa o pipeline principal do ETL para Tiktok, gerando o modelo final.
+        Executa o pipeline completo do ETL para Tiktok:
+          1. Ajusta os tipos de dados.
+          2. Aplica as substituições internas.
+          3. Atribui o ID_Veiculo.
+          4. Remove colunas desnecessárias.
+          5. Renomeia as colunas.
+          6. Reordena as colunas conforme o modelo de destino.
+          7. Gera o identificador único (ID).
+        Retorna o DataFrame processado.
         """
         self.ajustar_tipos()
         self.aplicar_substituicoes()
@@ -161,4 +208,5 @@ class etl_geral_tk:
         self.remover_colunas()
         self.renomear_colunas()
         self.reordenar_colunas()
+        self.gerar_id()
         return self.df
