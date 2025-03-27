@@ -22,6 +22,9 @@ def main():
         f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit",
         source_sheet
     )
+    logging.debug("Colunas do DataFrame da aba Tiktok:")
+    logging.debug(df_origin.columns.tolist())
+
     if "Date" in df_origin.columns:
         df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
     logging.info(f"Dados carregados da origem '{source_sheet}': {df_origin.shape[0]} linhas.")
@@ -32,13 +35,26 @@ def main():
     
     # 3. Executar o ETL para Tiktok
     logging.info("Executando ETL para Tiktok...")
-    etl_instance = etl_geral_tk(df_origin)
+    etl_instance = etl_geral_tk(df_origin, mapping_campanha, mapping_sigla)
     df_processed = etl_instance.processar()
+    logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
     
     # 4. Aplicar a parametrização externa
     etl_instance.aplicar_parametrizacao_campanha_externa(mapping_campanha, mapping_sigla)
     df_processed = etl_instance.df
     logging.info(f"ETL concluído: {df_processed.shape[0]} linhas tratadas.")
+    logging.debug("Colunas do df_processed:")
+    logging.debug(df_processed.columns.tolist())
+
+    logging.debug("Primeiras 5 linhas (df_processed):")
+    logging.debug("\n" + df_processed.head(5).to_string())
+
+    if "Campaign name" in df_processed.columns:
+        logging.debug("Exemplos de Campaign name no DF final:")
+        logging.debug(df_processed["Campaign name"].head(5).tolist())
+        logging.debug("Campanha e ID_Campanha (amostra):")
+        logging.debug(df_processed[["Campaign name", "Campanha", "ID_Campanha"]].head(5).to_string())
+
     
     if "ID" in df_processed.columns:
         unique_ids = df_processed["ID"].dropna().astype(str).str.strip().unique()

@@ -1,6 +1,6 @@
 import logging
 
-def setup_logging(level=logging.INFO):
+def setup_logging(level=logging.DEBUG):
     """
     Configura o log do projeto com o nível especificado e um formato padrão.
     
