@@ -2,6 +2,18 @@ import json
 import os
 import unicodedata
 
+
+
+def carregar_caches_padrao():
+    path_estados = "/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils/cache_estados.json"
+    path_municipios = "/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils/cache_municipios_estados.json"
+
+    cache_estados = carregar_cache_estados(path_estados)
+    cache_municipios = carregar_cache_municipios(path_municipios)
+    return cache_estados, cache_municipios
+
+
+
 # -----------------------------------------------------------------------------
 # Normalização de strings (remoção de acentos e caracteres especiais)
 def normalize_string(s: str) -> str:
