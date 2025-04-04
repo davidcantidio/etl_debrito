@@ -10,7 +10,7 @@ from utils.get_google_client import get_google_client
 from utils.geolocalizacao import carregar_caches_padrao
 
 # Importa as subclasses de ETL específicas
-from scripts.etl_regiao import TiktokRegiaoETL, MetaRegiaoETL, LinkedinRegiaoETL
+from scripts.etl_regiao import TiktokRegiaoETL, MetaRegiaoETL, LinkedinRegiaoETL, PinterestRegiaoETL
 
 def get_id_veiculo_from_source(creds_path, spreadsheet_url, nome_veiculo):
     df_source = carregar_aba_google_sheets(creds_path, spreadsheet_url, "SOURCE")
@@ -29,7 +29,7 @@ def main():
     spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
 
     # Definição da aba a ser processada
-    source_sheet = "linkedinRegiao"
+    source_sheet = "pinterestRegiao"
     target_sheet = "modeloRegiao"
     plataforma = source_sheet.lower().replace("regiao", "").strip()
 
@@ -43,6 +43,9 @@ def main():
     elif plataforma == "linkedin":
         etl_class = LinkedinRegiaoETL
         veiculo_nome = "Linkedin"
+    elif plataforma == "pinterest":
+        etl_class = PinterestRegiaoETL
+        veiculo_nome = "Pinterest"
     else:
         raise ValueError(f"Não há subclasse de ETL definida para a plataforma '{plataforma}'")
 

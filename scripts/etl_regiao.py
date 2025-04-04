@@ -163,6 +163,10 @@ class MetaRegiaoETL(BaseRegiaoETL):
     pass
 
 
+class PinterestRegiaoETL(BaseRegiaoETL):
+    pass
+
+
 class LinkedinRegiaoETL(BaseRegiaoETL):
     def renomear_colunas(self):
         super().renomear_colunas()
