@@ -63,4 +63,4 @@ def get_campaign_parameterization(creds_path, spreadsheet_id):
     logging.info(f"Total de campanhas mapeadas: {len(mapping_campanha)}")
     logging.info(f"Exemplos de chaves no mapping (Campanha): {list(mapping_campanha.keys())[:10]}")
     
-    return mapping_campanha, mapping_sigla
+    return mapping_sigla, mapping_campanha

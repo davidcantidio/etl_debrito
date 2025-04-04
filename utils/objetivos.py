@@ -1,0 +1,25 @@
+# utils/objetivos.py
+SUBSTITUICOES_OBJETIVO = {
+    'AWARENESS' : 'Alcance',
+    'COMMUNITY_INTERACTION': 'Engajamento',
+    'APP_PROMOTION' : 'Promoção do app',
+    'REACH': 'Alcance',
+    'VIDEO_VIEWS': 'Visualização',
+    'TRAFFIC': 'Tráfego',
+    'CONVERSIONS': 'Conversões',
+    'LEAD_GENERATION': 'Geração de Leads',
+    'OUTCOME_AWARENESS': 'Alcance',
+    'OUTCOME_TRAFFIC': 'Tráfego',
+    'OUTCOME_ENGAGEMENT': 'Engajamento',
+    'OUTCOME_SALES' : "Vendas",
+    'OUTCOME_APP+PROMOTION' : 'Promoção do app',
+    'BRAND_AWARENESS' : 'Alcance', 
+    'WEBSITE_VISITS' : 'Tráfego',
+    'ENGAGEMENT' : 'Engajamento',
+    'VIDEO_VIEWS' : 'Visualização',
+    'WEBSITE_CONVERSIONS' : 'Conversões',
+    'CONSIDERATION' : 'Tráfego',
+    'CATALOG_SALES' : 'Vendas',
+    'TRAFFIC' : 'Tráfego',
+    
+}
