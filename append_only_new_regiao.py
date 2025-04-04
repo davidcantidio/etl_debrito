@@ -9,8 +9,8 @@ from utils.append_records_to_sheet import append_records_to_sheet
 from utils.get_google_client import get_google_client
 from utils.geolocalizacao import carregar_caches_padrao
 
-# Importa suas subclasses
-from scripts.etl_regiao import TiktokRegiaoETL, MetaRegiaoETL
+# Importa as subclasses de ETL específicas
+from scripts.etl_regiao import TiktokRegiaoETL, MetaRegiaoETL, LinkedinRegiaoETL
 
 def get_id_veiculo_from_source(creds_path, spreadsheet_url, nome_veiculo):
     df_source = carregar_aba_google_sheets(creds_path, spreadsheet_url, "SOURCE")
@@ -28,20 +28,21 @@ def main():
     spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
     spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
 
-    # Exemplo de aba de origem (pode vir de sys.argv)
-    source_sheet = "metaRegiao"
+    # Definição da aba a ser processada
+    source_sheet = "linkedinRegiao"
     target_sheet = "modeloRegiao"
-
-    # Extrai 'Meta' ou 'Tiktok' etc. (primeira palavra)
     plataforma = source_sheet.lower().replace("regiao", "").strip()
 
-    # Escolhe a subclasse certa
+    # Mapeamento de plataforma → classe ETL e nome do veículo
     if plataforma == "tiktok":
         etl_class = TiktokRegiaoETL
         veiculo_nome = "Tiktok"
     elif plataforma == "meta":
         etl_class = MetaRegiaoETL
         veiculo_nome = "Meta"
+    elif plataforma == "linkedin":
+        etl_class = LinkedinRegiaoETL
+        veiculo_nome = "Linkedin"
     else:
         raise ValueError(f"Não há subclasse de ETL definida para a plataforma '{plataforma}'")
 
@@ -88,7 +89,7 @@ def main():
 
     logging.info(f"Processo de atualizacao para '{target_sheet}' concluido com sucesso.")
 
-    # Se tiver um método de exibição da correspondência
+    # Se tiver correspondência de região, imprime
     if hasattr(etl_instance, "exibir_correspondencia_regiao"):
         print("\n--- Dicionario de correspondencia Regiao ---")
         etl_instance.exibir_correspondencia_regiao()
