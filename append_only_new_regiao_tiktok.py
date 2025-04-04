@@ -9,8 +9,8 @@ from utils.append_records_to_sheet import append_records_to_sheet
 from utils.get_google_client import get_google_client
 from utils.geolocalizacao import carregar_caches_padrao
 
-# Supondo que você tenha a classe 'RegiaoETL' (subclasse de 'BaseETL') em "scripts/etl_regiao.py"
-from scripts.etl_regiao import RegiaoETL
+# Importa suas subclasses
+from scripts.etl_regiao import TiktokRegiaoETL, MetaRegiaoETL
 
 def get_id_veiculo_from_source(creds_path, spreadsheet_url, nome_veiculo):
     df_source = carregar_aba_google_sheets(creds_path, spreadsheet_url, "SOURCE")
@@ -28,15 +28,22 @@ def main():
     spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
     spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
 
-    # Exemplo: "Tiktok Regiao", "Meta Regiao", "Linkedin Regiao" etc.
-    # Se quiser, pode ler esse valor de sys.argv ou input() para facilitar testes
-    source_sheet = "tiktokRegiao"
+    # Exemplo de aba de origem (pode vir de sys.argv)
+    source_sheet = "metaRegiao"
     target_sheet = "modeloRegiao"
-    veiculo_nome = "Tiktok"
 
-    # Extrai a plataforma do nome da aba (ex.: "Tiktok" ou "Meta")
-    # Se houver mais palavras, pega a primeira
-    plataforma = source_sheet.split()[0]
+    # Extrai 'Meta' ou 'Tiktok' etc. (primeira palavra)
+    plataforma = source_sheet.lower().replace("regiao", "").strip()
+
+    # Escolhe a subclasse certa
+    if plataforma == "tiktok":
+        etl_class = TiktokRegiaoETL
+        veiculo_nome = "Tiktok"
+    elif plataforma == "meta":
+        etl_class = MetaRegiaoETL
+        veiculo_nome = "Meta"
+    else:
+        raise ValueError(f"Não há subclasse de ETL definida para a plataforma '{plataforma}'")
 
     logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
     df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
@@ -49,20 +56,19 @@ def main():
     logging.info("Carregando caches de geolocalizacao...")
     cache_estados, cache_municipios = carregar_caches_padrao()
 
-    logging.info(f"Buscando ID_Veiculo da aba SOURCE para '{plataforma}'...")
+    logging.info(f"Buscando ID_Veiculo da aba SOURCE para '{veiculo_nome}'...")
     id_veiculo = get_id_veiculo_from_source(creds_path, spreadsheet_url, veiculo_nome)
 
     logging.info(f"Executando ETL de Região para '{plataforma}'...")
-    etl_instance = RegiaoETL(
+    etl_instance = etl_class(
         df=df_origin,
         id_veiculo=id_veiculo,
-        veiculo=plataforma,
-        mapping_campanha=mapping_campanha,  # nome correto
-        mapping_sigla=mapping_sigla,        # nome correto
+        veiculo=veiculo_nome,
+        mapping_campanha=mapping_campanha,
+        mapping_sigla=mapping_sigla,
         cache_estados=cache_estados,
         cache_municipios=cache_municipios
     )
-
 
     df_processed = etl_instance.processar()
 
@@ -82,7 +88,7 @@ def main():
 
     logging.info(f"Processo de atualizacao para '{target_sheet}' concluido com sucesso.")
 
-    # Se tiver um método para exibir a correspondência de 'Province name' → Estado
+    # Se tiver um método de exibição da correspondência
     if hasattr(etl_instance, "exibir_correspondencia_regiao"):
         print("\n--- Dicionario de correspondencia Regiao ---")
         etl_instance.exibir_correspondencia_regiao()

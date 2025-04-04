@@ -6,7 +6,7 @@ from utils.campanha_mapper import buscar_mapping
 from utils.geolocalizacao import obter_estado_de_regiao
 from utils.objetivos import SUBSTITUICOES_OBJETIVO
 
-class BaseETL:
+class BaseRegiaoETL:
     def __init__(
         self,
         df: pd.DataFrame,
@@ -88,6 +88,11 @@ class BaseETL:
         }
         self.df.rename(columns=col_mapping, inplace=True)
 
+        if 'Nome_do_Conjunto_de_Anuncio' not in self.df.columns:
+            self.df['Nome_do_Conjunto_de_Anuncio'] = ""
+        if 'Nome_do_Anuncio' not in self.df.columns:
+            self.df['Nome_do_Anuncio'] = ""
+
     def gerar_numeracao(self, numero_inicial: int = 1):
         self.df['Numero'] = list(range(numero_inicial, numero_inicial + len(self.df)))
 
@@ -122,11 +127,6 @@ class BaseETL:
         return self.df
 
     def executar_etapa_especifica(self):
-        raise NotImplementedError("Este método deve ser implementado pelas subclasses")
-
-
-class RegiaoETL(BaseETL):
-    def executar_etapa_especifica(self):
         col_province = 'Province name'
         if col_province not in self.df.columns:
             logging.warning(f"Coluna '{col_province}' nao encontrada. Nao sera possivel identificar estado/regiao.")
@@ -153,3 +153,18 @@ class RegiaoETL(BaseETL):
             print("Dicionario de correspondencia (Province name -> Estado/Regiao):")
             for k, v in self._dict_correspondencia_regiao.items():
                 print(f"  '{k}' => '{v}'")
+
+
+class TiktokRegiaoETL(BaseRegiaoETL):
+    pass
+
+
+class MetaRegiaoETL(BaseRegiaoETL):
+    pass
+
+
+class LinkedinRegiaoETL(BaseRegiaoETL):
+    def renomear_colunas(self):
+        super().renomear_colunas()
+        self.df['Nome_do_Conjunto_de_Anuncio'] = ""
+        self.df['Nome_do_Anuncio'] = ""
