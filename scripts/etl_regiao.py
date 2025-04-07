@@ -1,3 +1,5 @@
+# etl_regiao.py
+
 import pandas as pd
 import numpy as np
 import logging
@@ -5,6 +7,7 @@ import logging
 from utils.campanha_mapper import buscar_mapping
 from utils.geolocalizacao import obter_estado_de_regiao
 from utils.objetivos import SUBSTITUICOES_OBJETIVO
+from utils.numeracao import gerar_numeracao
 
 class BaseRegiaoETL:
     def __init__(
@@ -32,6 +35,7 @@ class BaseRegiaoETL:
         self._dict_correspondencia_regiao = {}
 
     def ajustar_tipos(self):
+        # Converte a coluna Date para objeto date (apenas a parte da data)
         self.df['Date'] = pd.to_datetime(self.df['Date'], errors='coerce').dt.date
         self.df['Cost'] = pd.to_numeric(self.df['Cost'], errors='coerce').round(2)
         self.df['Impressions'] = pd.to_numeric(self.df['Impressions'], errors='coerce')
@@ -53,12 +57,12 @@ class BaseRegiaoETL:
                 mask = self.df[col_obj] == old_val
                 self.df.loc[mask, col_obj] = new_val
         else:
-            logging.warning("Coluna 'Campaign objective type' nao encontrada para substituicoes de Objetivo.")
+            logging.warning("Coluna 'Campaign objective type' não encontrada para substituições de Objetivo.")
 
     def aplicar_parametrizacao_campanha_externa(self):
         col_campaign = 'Campaign name'
         if col_campaign not in self.df.columns:
-            logging.warning("Coluna 'Campaign name' nao existe. Parametrizacao de campanha nao sera aplicada.")
+            logging.warning("Coluna 'Campaign name' não existe. Parametrização de campanha não será aplicada.")
             return
 
         self.df['ID_Campanha'] = self.df[col_campaign].apply(lambda x: buscar_mapping(self.mapping_sigla, x))
@@ -94,6 +98,7 @@ class BaseRegiaoETL:
             self.df['Nome_do_Anuncio'] = ""
 
     def gerar_numeracao(self, numero_inicial: int = 1):
+        # Método antigo; a nova versão será aplicada no processar() diretamente
         self.df['Numero'] = list(range(numero_inicial, numero_inicial + len(self.df)))
 
     def gerar_id_unico(self):
@@ -105,7 +110,7 @@ class BaseRegiaoETL:
     def reordenar_colunas(self):
         desired_order = [
             'Numero', 'Data', 'Nome_da_Conta', 'Veiculo', 'ID_Veiculo', 'Campanha', 'ID_Campanha',
-            'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio', 'Objetivo', 'Regiao', 'Impressoes', 'Investimento',
+            'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio', 'Regiao', 'Impressoes', 'Investimento',
             'Cliques_no_Link', 'Visualizacoes_ate_100', 'ID'
         ]
         for col in desired_order:
@@ -113,7 +118,20 @@ class BaseRegiaoETL:
                 self.df[col] = ""
         self.df = self.df[desired_order]
 
-    def processar(self, numero_inicial: int = 1) -> pd.DataFrame:
+    def processar(self, df_destino=None) -> pd.DataFrame:
+        """
+        Executa o pipeline completo do ETL para dados regionais:
+        1. Ajusta os tipos.
+        2. Aplica substituições no campo 'Campaign objective type'.
+        3. Aplica parametrização de campanha.
+        4. Executa etapa específica de processamento (lookup/região).
+        5. Atribui ID_Veiculo.
+        6. Remove colunas desnecessárias.
+        7. Renomeia colunas para o modelo final.
+        8. Gera a numeração sequencial de forma inteligente (usando df_destino, se fornecido).
+        9. Reordena as colunas.
+        10. Gera o ID único.
+        """
         self.ajustar_tipos()
         self.aplicar_substituicoes_objetivo()
         self.aplicar_parametrizacao_campanha_externa()
@@ -121,16 +139,18 @@ class BaseRegiaoETL:
         self.atribuir_id_veiculo()
         self.remover_colunas_desnecessarias()
         self.renomear_colunas()
-        self.gerar_numeracao(numero_inicial)
+        # Aqui usamos a função inteligente para numeração:
+        self.df = gerar_numeracao(self.df, df_destino=df_destino, linha_insercao=2, coluna='Numero')
         self.reordenar_colunas()
         self.gerar_id_unico()
         return self.df
 
+
     def executar_etapa_especifica(self):
         col_province = 'Province name'
         if col_province not in self.df.columns:
-            logging.warning(f"Coluna '{col_province}' nao encontrada. Nao sera possivel identificar estado/regiao.")
-            self.df['Estado'] = 'Nao identificado'
+            logging.warning(f"Coluna '{col_province}' não encontrada. Não será possível identificar estado/região.")
+            self.df['Estado'] = 'Não identificado'
             return
 
         estados_calculados = []
@@ -150,7 +170,7 @@ class BaseRegiaoETL:
         if como_retorno:
             return self._dict_correspondencia_regiao
         else:
-            print("Dicionario de correspondencia (Province name -> Estado/Regiao):")
+            print("Dicionário de correspondência (Province name -> Estado/Região):")
             for k, v in self._dict_correspondencia_regiao.items():
                 print(f"  '{k}' => '{v}'")
 

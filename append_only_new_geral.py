@@ -10,7 +10,7 @@ from utils.get_missing_records import get_missing_records
 from utils.append_records_to_sheet import append_records_to_sheet
 from utils.get_google_client import get_google_client
 
-# Import das classes do novo etl_geral.py, incluindo a Meta que já faz o ajuste do Preview Link FB
+# Import das classes do novo etl_geral.py
 from scripts.etl_geral import (
     MetaGeralETL,
     TiktokGeralETL,
@@ -72,27 +72,46 @@ def main():
     logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
     mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
 
+    # Se a plataforma for LinkedIn, carrega também o mapping_preview a partir da aba BI_PARAMETRIZAÇÃO
+    mapping_preview = {}
+    if plataforma == "linkedin":
+        from utils.preview_links import construir_mapping_preview_parametrizacao
+        df_parametrizacao = carregar_aba_google_sheets(creds_path, spreadsheet_url, "BI_PARAMETRIZAÇÃO")
+        mapping_preview = construir_mapping_preview_parametrizacao(df_parametrizacao)
+
     logging.info(f"Buscando ID_Veiculo para '{veiculo_nome}' na aba SOURCE...")
     id_veiculo = get_id_veiculo_from_source(creds_path, spreadsheet_url, veiculo_nome)
 
-    # Executa o ETL usando a classe apropriada.
-    # No caso de Meta, o método processar() já aplica a lógica para ajustar o preview link.
-    logging.info(f"Executando ETL Geral para '{plataforma}'...")
-    etl_instance = etl_class(
-        df=df_origin,
-        id_veiculo=id_veiculo,
-        veiculo=veiculo_nome,
-        mapping_campanha=mapping_campanha,
-        mapping_sigla=mapping_sigla
-    )
-    df_processed = etl_instance.processar()
-    logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
+    # Instancia a classe ETL adequada, passando mapping_preview se for LinkedIn
+    if plataforma == "linkedin":
+        etl_instance = etl_class(
+            df=df_origin,
+            id_veiculo=id_veiculo,
+            veiculo=veiculo_nome,
+            mapping_campanha=mapping_campanha,
+            mapping_sigla=mapping_sigla,
+            mapping_preview=mapping_preview
+        )
+    else:
+        etl_instance = etl_class(
+            df=df_origin,
+            id_veiculo=id_veiculo,
+            veiculo=veiculo_nome,
+            mapping_campanha=mapping_campanha,
+            mapping_sigla=mapping_sigla
+        )
+
 
     # Lê o DataFrame de destino para comparação
     client = get_google_client(creds_path)
     logging.info(f"Lendo dados da aba de destino '{target_sheet}'...")
     df_target = read_sheet_as_dataframe(client, spreadsheet_id, target_sheet, offset_col=0)
     logging.info(f"Aba de destino '{target_sheet}' contém {df_target.shape[0]} linhas.")
+
+
+    logging.info(f"Executando ETL Geral para '{plataforma}'...")
+    df_processed = etl_instance.processar(df_destino=df_target)
+    logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
 
     # Verifica quais registros ainda não estão no destino
     missing_records = get_missing_records(df_processed, df_target)

@@ -21,5 +21,6 @@ SUBSTITUICOES_OBJETIVO = {
     'CONSIDERATION' : 'Tráfego',
     'CATALOG_SALES' : 'Vendas',
     'TRAFFIC' : 'Tráfego',
+     'WEBSITE_VISIT' : 'Tráfego'
     
 }

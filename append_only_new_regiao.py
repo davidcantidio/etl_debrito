@@ -1,5 +1,6 @@
 import logging
 import sys
+import pandas as pd
 from utils.google_sheets import carregar_aba_google_sheets
 from utils.setup_logging import setup_logging
 from utils.get_campaign_parameterization import get_campaign_parameterization
@@ -9,7 +10,7 @@ from utils.append_records_to_sheet import append_records_to_sheet
 from utils.get_google_client import get_google_client
 from utils.geolocalizacao import carregar_caches_padrao
 
-# Importa as subclasses de ETL específicas
+# Importa as subclasses de ETL específicas de região
 from scripts.etl_regiao import TiktokRegiaoETL, MetaRegiaoETL, LinkedinRegiaoETL, PinterestRegiaoETL
 
 def get_id_veiculo_from_source(creds_path, spreadsheet_url, nome_veiculo):
@@ -18,8 +19,7 @@ def get_id_veiculo_from_source(creds_path, spreadsheet_url, nome_veiculo):
     id_val = df_source.loc[filtro, 'ID_Veiculo']
     if not id_val.empty:
         return int(id_val.values[0])
-    raise ValueError(f"ID_Veiculo para '{nome_veiculo}' nao encontrado na aba SOURCE")
-
+    raise ValueError(f"ID_Veiculo para '{nome_veiculo}' não encontrado na aba SOURCE")
 
 def main():
     setup_logging(level=logging.INFO)
@@ -28,12 +28,14 @@ def main():
     spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
     spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
 
-    # Definição da aba a ser processada
-    source_sheet = "pinterestRegiao"
+    # Definição da aba de origem e destino
+    source_sheet = "metaRegiao"
     target_sheet = "modeloRegiao"
+
+    # Identifica a plataforma com base no nome da aba (remove "regiao" e espaços)
     plataforma = source_sheet.lower().replace("regiao", "").strip()
 
-    # Mapeamento de plataforma → classe ETL e nome do veículo
+    # Mapeamento de plataforma para a classe ETL e nome do veículo
     if plataforma == "tiktok":
         etl_class = TiktokRegiaoETL
         veiculo_nome = "Tiktok"
@@ -57,7 +59,7 @@ def main():
     logging.info("Carregando mapeamentos de campanha...")
     mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
 
-    logging.info("Carregando caches de geolocalizacao...")
+    logging.info("Carregando caches de geolocalização...")
     cache_estados, cache_municipios = carregar_caches_padrao()
 
     logging.info(f"Buscando ID_Veiculo da aba SOURCE para '{veiculo_nome}'...")
@@ -74,27 +76,32 @@ def main():
         cache_municipios=cache_municipios
     )
 
-    df_processed = etl_instance.processar()
-
-    logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
-
+    # Lê o DataFrame de destino (aba de destino)
     client = get_google_client(creds_path)
     logging.info(f"Lendo dados da aba de destino '{target_sheet}'...")
     df_target = read_sheet_as_dataframe(client, spreadsheet_id, target_sheet, offset_col=0)
-    logging.info(f"Aba de destino '{target_sheet}' contem {df_target.shape[0]} linhas.")
+    # Garante que df_target esteja definido, mesmo que vazio
+    if df_target is None or df_target.empty:
+        df_target = pd.DataFrame()
+    logging.info(f"Aba de destino '{target_sheet}' contém {df_target.shape[0]} linhas.")
 
+    # Processa os dados regionais, passando df_target para a numeração inteligente
+    df_processed = etl_instance.processar(df_destino=df_target)
+    logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
+
+    # Identifica os registros faltantes entre os dados processados e o destino
     missing_records = get_missing_records(df_processed, df_target)
     if missing_records.empty:
-        logging.info("Nao ha registros faltantes para inserir. Processo encerrado.")
+        logging.info("Não há registros faltantes para inserir. Processo encerrado.")
     else:
-        logging.info(f"Serao inseridos {missing_records.shape[0]} registros faltantes.")
+        logging.info(f"Serão inseridos {missing_records.shape[0]} registros faltantes.")
         append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, missing_records)
 
-    logging.info(f"Processo de atualizacao para '{target_sheet}' concluido com sucesso.")
+    logging.info(f"Processo de atualização para '{target_sheet}' concluído com sucesso.")
 
-    # Se tiver correspondência de região, imprime
+    # Se houver correspondência de região, exibe o dicionário
     if hasattr(etl_instance, "exibir_correspondencia_regiao"):
-        print("\n--- Dicionario de correspondencia Regiao ---")
+        print("\n--- Dicionário de correspondência Região ---")
         etl_instance.exibir_correspondencia_regiao()
 
 if __name__ == "__main__":
