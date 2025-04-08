@@ -50,7 +50,7 @@ def main():
     spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
     spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
 
-    source_sheet = "linkedinGeral"
+    source_sheet = "pinterestGeral"
     target_sheet = "modeloGeral"
 
     plataforma = source_sheet.lower().replace("geral", "").strip()

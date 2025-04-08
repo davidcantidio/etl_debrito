@@ -8,7 +8,8 @@ import logging
 from utils.campanha_mapper import buscar_mapping
 from utils.objetivos import SUBSTITUICOES_OBJETIVO
 from utils.numeracao import gerar_numeracao
-
+from utils.datas import transformar_para_date
+from utils.preview_links import construir_preview_link_pinterest
 # Funções de normalização
 from utils.normalize import normalize_columns, normalize_parametrizacao_values
 
@@ -247,11 +248,39 @@ class LinkedinGeralETL(BaseGeralETL):
 
 
 ######################################################################
+######################################################################
 class PinterestGeralETL(BaseGeralETL):
+    def executar_etapa_especifica(self):
+        logging.debug(">>> In PinterestGeralETL.executar_etapa_especifica")
+
+        # Converte as datas de início e fim
+        if 'start' in self.df.columns:
+            logging.debug(f"Start column sample before: {self.df['start'].head(3)}")
+            self.df['Inicio_da_Campanha'] = self.df['start'].apply(transformar_para_date)
+            logging.debug(f"Inicio_da_Campanha after transform: {self.df['Inicio_da_Campanha'].head(3)}")
+        else:
+            logging.warning("Coluna 'start' não encontrada.")
+            self.df['Inicio_da_Campanha'] = ""
+
+        if 'end' in self.df.columns:
+            logging.debug(f"End column sample before: {self.df['end'].head(3)}")
+            self.df['Fim_da_Campanha'] = self.df['end'].apply(transformar_para_date)
+            logging.debug(f"Fim_da_Campanha after transform: {self.df['Fim_da_Campanha'].head(3)}")
+        else:
+            logging.warning("Coluna 'end' não encontrada.")
+            self.df['Fim_da_Campanha'] = ""
+
+        # Constrói o link de preview do Pinterest usando o ID do pin presente na coluna 'Ad name'
+        if 'Ad name' in self.df.columns:
+            logging.debug(f"Ad name column sample: {self.df['Ad name'].head(3)}")
+            self.df['URL_do_Anuncio'] = self.df['Ad name'].apply(construir_preview_link_pinterest)
+            logging.debug(f"URL_do_Anuncio after transform: {self.df['URL_do_Anuncio'].head(3)}")
+        else:
+            logging.warning("Coluna 'Ad name' não encontrada.")
+            self.df['URL_do_Anuncio'] = ""
+
     def ajustes_preview(self):
-        logging.debug(">>> In PinterestGeralETL.ajustes_preview")
-        # Exemplo de preview para Pinterest, se precisar
-        pass
+        self.executar_etapa_especifica()
 
 ######################################################################
 class TiktokGeralETL(BaseGeralETL):
