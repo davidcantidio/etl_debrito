@@ -3,7 +3,7 @@
 import pandas as pd
 import numpy as np
 import logging
-
+from utils.normalize import inferir_veiculo_meta_por_placement
 from utils.campanha_mapper import buscar_mapping
 from utils.geolocalizacao import obter_estado_de_regiao
 from utils.objetivos import SUBSTITUICOES_OBJETIVO
@@ -166,7 +166,10 @@ class TiktokRegiaoETL(BaseRegiaoETL):
 
 
 class MetaRegiaoETL(BaseRegiaoETL):
-    pass
+    def criar_veiculo(self):
+        logging.debug(">>> In MetaGeralETL.criar_veiculo (usando Placement)")
+        self.df = inferir_veiculo_meta_por_placement(self.df)
+        self.df['ID_Veiculo'] = self.id_veiculo
 
 
 class PinterestRegiaoETL(BaseRegiaoETL):

@@ -54,3 +54,35 @@ def normalize_parametrizacao_values(df: pd.DataFrame, cols: list[str] = None) ->
             df[col] = df[col].apply(normaliza_valor)
 
     return df
+
+def normalizar_faixa_etaria(idade: str) -> str:
+    """
+    Normaliza a faixa etária: transforma '55-64' e '65+' em '55+'
+    """
+    if idade in ["55-64", "65+"]:
+        return "55+"
+    return idade
+
+
+def inferir_veiculo_meta_por_placement(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Define a coluna 'Veiculo' com base no conteúdo da coluna 'Placement'.
+    Regras:
+        - Se contiver 'facebook' ou 'audience': 'Facebook'
+        - Se contiver 'instagram': 'Instagram'
+        - Caso contrário: 'Meta'
+    """
+    def extrair_veiculo(placement):
+        if not isinstance(placement, str):
+            return "Meta"
+        placement = placement.lower()
+        if "facebook" in placement or "audience" in placement:
+            return "Facebook"
+        elif "instagram" in placement:
+            return "Instagram"
+        return "Facebook"
+
+    df = df.copy()
+    df['Veiculo'] = df.get('Placement', "").apply(extrair_veiculo)
+    return df
+
