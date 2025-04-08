@@ -270,17 +270,24 @@ class PinterestGeralETL(BaseGeralETL):
             logging.warning("Coluna 'end' não encontrada.")
             self.df['Fim_da_Campanha'] = ""
 
-        # Constrói o link de preview do Pinterest usando o ID do pin presente na coluna 'Ad name'
-        if 'Ad name' in self.df.columns:
-            logging.debug(f"Ad name column sample: {self.df['Ad name'].head(3)}")
-            self.df['URL_do_Anuncio'] = self.df['Ad name'].apply(construir_preview_link_pinterest)
+        # Detecta a coluna que contém o ID do Pin (usaremos 'Preview Link')
+        colunas_originais = list(self.df.columns)
+        logging.debug(f"Colunas disponíveis: {colunas_originais}")
+
+        # A coluna pode vir com espaçamento, conferimos usando lower/strip
+        match_col = [col for col in colunas_originais if col.strip().lower() == 'preview link']
+        if match_col:
+            col_id_pin = match_col[0]
+            logging.debug(f"Coluna encontrada para ID do pin: {col_id_pin}")
+            self.df['URL_do_Anuncio'] = self.df[col_id_pin].apply(construir_preview_link_pinterest)
             logging.debug(f"URL_do_Anuncio after transform: {self.df['URL_do_Anuncio'].head(3)}")
         else:
-            logging.warning("Coluna 'Ad name' não encontrada.")
+            logging.warning("Coluna correspondente a 'Preview Link' não encontrada.")
             self.df['URL_do_Anuncio'] = ""
 
     def ajustes_preview(self):
         self.executar_etapa_especifica()
+
 
 ######################################################################
 class TiktokGeralETL(BaseGeralETL):
