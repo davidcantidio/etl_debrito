@@ -29,7 +29,7 @@ def main():
     spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
 
     # Definição da aba de origem e destino
-    source_sheet = "metaRegiao"
+    source_sheet = "tiktokRegiao"
     target_sheet = "modeloRegiao"
 
     # Identifica a plataforma com base no nome da aba (remove "regiao" e espaços)
@@ -76,20 +76,30 @@ def main():
         cache_municipios=cache_municipios
     )
 
-    # Lê o DataFrame de destino (aba de destino)
     client = get_google_client(creds_path)
     logging.info(f"Lendo dados da aba de destino '{target_sheet}'...")
     df_target = read_sheet_as_dataframe(client, spreadsheet_id, target_sheet, offset_col=0)
-    # Garante que df_target esteja definido, mesmo que vazio
-    if df_target is None or df_target.empty:
-        df_target = pd.DataFrame()
-    logging.info(f"Aba de destino '{target_sheet}' contém {df_target.shape[0]} linhas.")
+    if not df_target.empty:
+        logging.info("Primeiras linhas da aba de destino:")
+        logging.info(df_target.head().to_string())
+    if 'Numero' in df_target.columns:
+        logging.info("Últimos valores em 'Numero': " + str(df_target['Numero'].tail().tolist()))
+    else:
+        logging.warning("Coluna 'Numero' não encontrada na aba destino!")
 
-    # Processa os dados regionais, passando df_target para a numeração inteligente
+    # Verificação de df_target:
+    logging.info("Colunas do df_target: " + str(df_target.columns.tolist()))
+    logging.info("Exemplo de valores na coluna 'Numero': " + str(df_target["Numero"].head().tolist() if "Numero" in df_target.columns else "Coluna 'Numero' não encontrada"))
+    logging.info(f"Número de linhas em df_target: {df_target.shape[0]}")
+    
+    # Se df_target for vazio, garantimos que seja um DataFrame vazio (isso já está sendo feito, mas aqui fica explícito)
+    if df_target is None or df_target.empty:
+        logging.warning("df_target está vazio. A numeração dos novos registros iniciará no valor padrão.")
+        df_target = pd.DataFrame()
+    
     df_processed = etl_instance.processar(df_destino=df_target)
     logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
 
-    # Identifica os registros faltantes entre os dados processados e o destino
     missing_records = get_missing_records(df_processed, df_target)
     if missing_records.empty:
         logging.info("Não há registros faltantes para inserir. Processo encerrado.")
@@ -99,7 +109,6 @@ def main():
 
     logging.info(f"Processo de atualização para '{target_sheet}' concluído com sucesso.")
 
-    # Se houver correspondência de região, exibe o dicionário
     if hasattr(etl_instance, "exibir_correspondencia_regiao"):
         print("\n--- Dicionário de correspondência Região ---")
         etl_instance.exibir_correspondencia_regiao()

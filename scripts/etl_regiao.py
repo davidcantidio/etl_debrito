@@ -119,19 +119,6 @@ class BaseRegiaoETL:
         self.df = self.df[desired_order]
 
     def processar(self, df_destino=None) -> pd.DataFrame:
-        """
-        Executa o pipeline completo do ETL para dados regionais:
-        1. Ajusta os tipos.
-        2. Aplica substituições no campo 'Campaign objective type'.
-        3. Aplica parametrização de campanha.
-        4. Executa etapa específica de processamento (lookup/região).
-        5. Atribui ID_Veiculo.
-        6. Remove colunas desnecessárias.
-        7. Renomeia colunas para o modelo final.
-        8. Gera a numeração sequencial de forma inteligente (usando df_destino, se fornecido).
-        9. Reordena as colunas.
-        10. Gera o ID único.
-        """
         self.ajustar_tipos()
         self.aplicar_substituicoes_objetivo()
         self.aplicar_parametrizacao_campanha_externa()
@@ -139,7 +126,6 @@ class BaseRegiaoETL:
         self.atribuir_id_veiculo()
         self.remover_colunas_desnecessarias()
         self.renomear_colunas()
-        # Aqui usamos a função inteligente para numeração:
         self.df = gerar_numeracao(self.df, df_destino=df_destino, linha_insercao=2, coluna='Numero')
         self.reordenar_colunas()
         self.gerar_id_unico()

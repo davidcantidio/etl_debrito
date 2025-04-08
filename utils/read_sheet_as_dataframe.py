@@ -1,29 +1,45 @@
-import pandas as pd
-
-def read_sheet_as_dataframe(client, spreadsheet_id, sheet_name, offset_col=0):
+def read_sheet_as_dataframe_range(
+    client,
+    spreadsheet_id: str,
+    sheet_name: str,
+    range_str: str = "A1:ZZ",
+    header_row_index: int = 0
+):
     """
-    Lê uma aba da planilha Google e retorna um DataFrame limpo.
-
-    Parâmetros:
-        client (gspread.Client): Cliente autenticado do Google Sheets.
-        spreadsheet_id (str): ID da planilha.
-        sheet_name (str): Nome da aba a ser lida.
-        offset_col (int, opcional): Se maior que 0, indica que os dados começam a partir dessa coluna. Padrão: 0.
-
-    Retorna:
-        pandas.DataFrame: DataFrame contendo os dados da aba, com as linhas vazias removidas
-                          e, se presente, filtrando registros com a coluna "ID" vazia.
+    Lê um intervalo específico (ex.: 'A1:AM') e converte em DataFrame,
+    garantindo que todas as linhas tenham o mesmo tamanho, preenchendo com ''
+    ou cortando ao máximo.
     """
-    sh = client.open_by_key(spreadsheet_id)
-    worksheet = sh.worksheet(sheet_name)
-    data = worksheet.get_all_values()
-    if not data:
+    from googleapiclient.errors import HttpError
+    import pandas as pd
+
+    try:
+        sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
+        data = sheet.get(range_str)  # matriz de strings
+    except HttpError as e:
+        print(f"Erro ao ler '{sheet_name}': {e}")
         return pd.DataFrame()
-    df = pd.DataFrame(data[1:], columns=data[0])
-    if offset_col > 0 and df.columns[0].strip() == "":
-        df = df.iloc[:, offset_col:]
-    df = df.dropna(how="all")
-    if "ID" in df.columns:
-        df["ID"] = df["ID"].astype(str)
-        df = df[df["ID"].str.strip() != ""]
+
+    if not data or len(data) <= header_row_index:
+        return pd.DataFrame()
+
+    # 1) Determina o número máximo de colunas
+    max_cols = max(len(row) for row in data)
+
+    # 2) Ajusta cada linha para ter exat. 'max_cols'
+    for i, row in enumerate(data):
+        if len(row) < max_cols:
+            # preenche com strings vazias
+            data[i] = row + [""] * (max_cols - len(row))
+        elif len(row) > max_cols:
+            # corta o excedente
+            data[i] = row[:max_cols]
+
+    # 3) Extrai a linha de cabeçalho
+    headers = data[header_row_index]
+    body = data[header_row_index + 1 :]
+
+    # 4) Constrói o DataFrame
+    df = pd.DataFrame(body, columns=headers)
+
     return df

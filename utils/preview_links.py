@@ -12,28 +12,35 @@ def ajustar_preview_link(url_anuncio, preview_link_fb):
 
 def construir_mapping_preview_parametrizacao(df_parametrizacao):
     """
-    Constrói um dicionário de mapeamento de preview link para LinkedIn a partir da aba BI_PARAMETRIZAÇÃO.
+    Constrói um dicionário {Content (utm) → PREVIEW}, usando o campo 'ID' da BI_PARAMETRIZAÇÃO
+    como ponto de correspondência com o valor vindo de 'Content (utm)' da aba de origem.
 
-    Usa o valor da coluna 'utm_content' como chave e o valor da coluna 'PREVIEW' como destino.
-    Se as colunas necessárias não existirem, retorna um dicionário vazio.
+    Exemplo:
+        - 'Content (utm)' na aba linkedinGeral = 'abc123'
+        - Busca linha na BI_PARAMETRIZAÇÃO onde ID == 'abc123'
+        - Pega o valor de PREVIEW nessa linha
+        - Resultado: mapping['abc123'] = preview correspondente
 
     Args:
         df_parametrizacao (pd.DataFrame): DataFrame da aba BI_PARAMETRIZAÇÃO.
 
     Returns:
-        dict: dicionário {utm_content -> PREVIEW} ou vazio se as colunas não existirem.
+        dict: dicionário {Content (utm) → PREVIEW}
     """
     mapping = {}
-    if 'utm_content' not in df_parametrizacao.columns or 'PREVIEW' not in df_parametrizacao.columns:
+    required_cols = {'ID', 'PREVIEW'}
+
+    colunas_atuais = set(df_parametrizacao.columns)
+    if not required_cols.issubset(colunas_atuais):
         import logging
-        logging.warning("Colunas 'utm_content' e/ou 'PREVIEW' não encontradas na aba BI_PARAMETRIZAÇÃO. Retornando mapping vazio.")
+        logging.warning("Colunas 'ID' e/ou 'PREVIEW' não encontradas na aba BI_PARAMETRIZAÇÃO.")
         return mapping
 
     for _, row in df_parametrizacao.iterrows():
-        chave = str(row['utm_content']).strip()
-        valor = str(row['PREVIEW']).strip() if row.get('PREVIEW') is not None else ""
-        if chave and chave not in mapping:
-            mapping[chave] = valor
+        id_val = str(row.get("ID", "")).strip()
+        preview = str(row.get("PREVIEW", "")).strip()
+        if id_val:
+            mapping[id_val] = preview
     return mapping
 
 
