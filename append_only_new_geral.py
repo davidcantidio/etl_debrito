@@ -1,5 +1,10 @@
 import logging
-from utils.google_sheets import carregar_aba_google_sheets
+from utils.google_sheets import (
+    carregar_aba_google_sheets,
+    CREDS_PATH as creds_path,
+    SPREADSHEET_ID as spreadsheet_id,
+    SPREADSHEET_URL as spreadsheet_url,
+)
 from utils.setup_logging import setup_logging
 from utils.get_campaign_parameterization import get_campaign_parameterization
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
@@ -7,19 +12,6 @@ from utils.get_missing_records import get_missing_records
 from utils.append_records_to_sheet import append_records_to_sheet
 from utils.get_google_client import get_google_client
 
-# Funções de normalização
-from utils.normalize import (
-    normalize_columns,
-    normalize_parametrizacao_values,
-)
-
-# Função para construir o mapping ID->PREVIEW
-from utils.preview_links import construir_mapping_preview_parametrizacao
-
-# Funções para construir e usar o mapping utm_content->CRIATIVO
-from utils.get_nome_campanha import carregar_mapeamento_nome_creativo
-
-# Importa as classes do etl_geral
 from scripts.etl_geral import (
     MetaGeralETL,
     TiktokGeralETL,
@@ -27,17 +19,15 @@ from scripts.etl_geral import (
     PinterestGeralETL,
 )
 
+# IMPORT FEITO AQUI, APÓS A IMPORTAÇÃO DOS ETLs, PARA EVITAR LOOP CIRCULAR
+from utils.common_linkedin import preparar_kwargs_linkedin
+
 
 def main():
     setup_logging(level=logging.DEBUG)
 
-    creds_path = "creds.json"
-    spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
-    spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
-
     source_sheet = "metaGeral"
     target_sheet = "modeloGeral"
-
     plataforma = source_sheet.lower().replace("geral", "").strip()
 
     if plataforma == "meta":
@@ -62,25 +52,14 @@ def main():
         df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
     logging.debug(f"df_origin shape após remoção de linhas com Date vazio: {df_origin.shape}")
 
-    logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO) ...")
+    logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
     mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
 
     extra_kwargs = {}
     if plataforma == "linkedin":
-        client = get_google_client(creds_path)
-        df_parametrizacao = read_sheet_as_dataframe_range(
-            client, spreadsheet_id, sheet_name="BI_PARAMETRIZAÇÃO", range_str="A2:ZZ", header_row_index=0
-        )
-        df_parametrizacao.columns = normalize_columns(df_parametrizacao.columns)
-        df_parametrizacao = normalize_parametrizacao_values(df_parametrizacao)
-        mapping_preview = construir_mapping_preview_parametrizacao(df_parametrizacao)
-        mapping_criativo = carregar_mapeamento_nome_creativo(df_parametrizacao)
-        extra_kwargs["mapping_preview"] = mapping_preview
-        extra_kwargs["mapping_criativo"] = mapping_criativo
-    else:
-        client = get_google_client(creds_path)
+        extra_kwargs.update(preparar_kwargs_linkedin())
 
-    id_veiculo = None  # Sempre atribuído dinamicamente pelos próprios ETLs
+    id_veiculo = None  # Sempre atribuído dinamicamente pelos ETLs
 
     etl_instance = etl_class(
         df=df_origin,
@@ -92,7 +71,14 @@ def main():
     )
 
     logging.info(f"Lendo dados da aba de destino '{target_sheet}'...")
-    df_target = read_sheet_as_dataframe_range(client, spreadsheet_id, sheet_name=target_sheet, range_str="A1:AM", header_row_index=0)
+    client = get_google_client(creds_path)
+    df_target = read_sheet_as_dataframe_range(
+        client,
+        spreadsheet_id,
+        sheet_name=target_sheet,
+        range_str="A1:AM",
+        header_row_index=0
+    )
 
     logging.info(f"Executando ETL Geral para '{plataforma}'...")
     df_processed = etl_instance.processar(df_destino=df_target)
@@ -103,8 +89,10 @@ def main():
         logging.info("Não há registros faltantes para inserir.")
     else:
         append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, missing_records)
+        logging.info(f"Inseridos {missing_records.shape[0]} novos registros na aba '{target_sheet}'.")
 
     logging.info(f"Processo de atualização para '{target_sheet}' concluído com sucesso.")
+
 
 if __name__ == "__main__":
     main()

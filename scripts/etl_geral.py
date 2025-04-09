@@ -10,6 +10,7 @@ from utils.preview_links import construir_preview_link_pinterest, ajustar_previe
 from utils.get_nome_campanha import obter_nome_por_utm_content
 from utils.normalize import inferir_veiculo_meta_por_placement
 from utils.google_sheets import carregar_aba_google_sheets
+from utils.common_linkedin import carregar_mapeamentos_linkedin, buscar_nome_criativo_com_log
 from utils.atribuicao_veiculo_nome_e_id import (
     atribuir_veiculo_e_id_meta,
     atribuir_id_veiculo_generico,
@@ -79,9 +80,9 @@ class BaseGeralETL:
         self.df['ID_Campanha'] = self.df['Campaign_name'].apply(lambda x: buscar_mapping(self.mapping_sigla, x))
 
     def criar_veiculo(self):
-        logging.debug(">>> In criar_veiculo (default)")
+        logging.debug(">>> In criar_veiculo (default) com atribuição genérica")
         self.df['Veiculo'] = self.veiculo
-        self.df['ID_Veiculo'] = self.id_veiculo
+        self.df = atribuir_id_veiculo_generico(self.df)
 
     def remover_colunas_indesejadas(self):
         for col in ['Placement', 'Campaign_ID', 'Campaign_name', 'Content_utm']:
@@ -124,6 +125,7 @@ class BaseGeralETL:
     def ajustes_preview(self):
         pass
 
+
 class MetaGeralETL(BaseGeralETL):
     def ajustes_preview(self):
         if 'Preview Link FB' in self.df.columns:
@@ -134,7 +136,7 @@ class MetaGeralETL(BaseGeralETL):
             )
 
     def criar_veiculo(self):
-        logging.debug(">>> In MetaIdadeETL.criar_veiculo")
+        logging.debug(">>> In MetaGeralETL.criar_veiculo")
         self.df = atribuir_veiculo_e_id_meta(self.df)
 
 
@@ -154,15 +156,9 @@ class LinkedinGeralETL(BaseGeralETL):
         self.df['URL_do_Anuncio'] = self.df['ID_Content'].apply(
             lambda x: self.mapping_preview.get(str(x).strip(), "")
         )
-
-        def debug_nome(utm):
-            utm_str = str(utm).strip()
-            nome = obter_nome_por_utm_content(utm_str, self.mapping_criativo)
-            if not nome:
-                logging.debug(f"utm_content '{utm_str}' N\u00c3O encontrado no mapping_criativo.")
-            return nome
-
-        self.df['Nome_do_Anuncio'] = self.df['ID_Content'].apply(debug_nome)
+        self.df['Nome_do_Anuncio'] = self.df['ID_Content'].apply(
+            lambda utm: buscar_nome_criativo_com_log(utm, self.mapping_criativo)
+        )
         self.df['Nome_do_Conjunto_de_Anuncio'] = self.df['Nome_do_Anuncio']
 
 
@@ -190,4 +186,3 @@ class TiktokGeralETL(BaseGeralETL):
         logging.debug(">>> In TiktokGeralETL.ajustes_preview")
         logging.debug(f"Inicio_da_Campanha preview: {self.df['Inicio_da_Campanha'].dropna().head(3) if 'Inicio_da_Campanha' in self.df.columns else 'Não encontrada'}")
         logging.debug(f"Fim_da_Campanha preview: {self.df['Fim_da_Campanha'].dropna().head(3) if 'Fim_da_Campanha' in self.df.columns else 'Não encontrada'}")
-

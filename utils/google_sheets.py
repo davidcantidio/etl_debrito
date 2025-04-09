@@ -19,3 +19,8 @@ def carregar_aba_google_sheets(creds_path, sheet_url, nome_aba):
 
     df = get_as_dataframe(aba, dtype=str, na_filter=False)
     return df
+
+# Configuração central do projeto
+CREDS_PATH = "creds.json"
+SPREADSHEET_ID = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
+SPREADSHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit"
