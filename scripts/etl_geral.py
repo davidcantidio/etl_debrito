@@ -92,7 +92,8 @@ class BaseGeralETL:
             'Reacoes', 'Compartilhamentos', 'Comentarios', 'Engajamento_Total', 'ID'
         ]
         for col in ordem:
-            self.df[col] = self.df.get(col, "")
+            if col not in self.df.columns:
+                self.df[col] = ""
         self.df = self.df[ordem]
 
     def gerar_id(self):
@@ -189,4 +190,8 @@ class PinterestGeralETL(BaseGeralETL):
 
 
 class TiktokGeralETL(BaseGeralETL):
-    pass
+    def ajustes_preview(self):
+        logging.debug(">>> In TiktokGeralETL.ajustes_preview")
+        logging.debug(f"Inicio_da_Campanha preview: {self.df['Inicio_da_Campanha'].dropna().head(3) if 'Inicio_da_Campanha' in self.df.columns else 'Não encontrada'}")
+        logging.debug(f"Fim_da_Campanha preview: {self.df['Fim_da_Campanha'].dropna().head(3) if 'Fim_da_Campanha' in self.df.columns else 'Não encontrada'}")
+
