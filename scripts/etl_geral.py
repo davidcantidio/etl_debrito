@@ -10,6 +10,11 @@ from utils.preview_links import construir_preview_link_pinterest, ajustar_previe
 from utils.get_nome_campanha import obter_nome_por_utm_content
 from utils.normalize import inferir_veiculo_meta_por_placement
 from utils.google_sheets import carregar_aba_google_sheets
+from utils.atribuicao_veiculo_nome_e_id import (
+    atribuir_veiculo_e_id_meta,
+    atribuir_id_veiculo_generico,
+)
+
 
 class BaseGeralETL:
     def __init__(self, df, id_veiculo, veiculo, mapping_campanha=None, mapping_sigla=None):
@@ -129,17 +134,8 @@ class MetaGeralETL(BaseGeralETL):
             )
 
     def criar_veiculo(self):
-        logging.debug(">>> In MetaGeralETL.criar_veiculo (inferindo Veiculo e ID_Veiculo via Placement e SOURCE)")
-        self.df = inferir_veiculo_meta_por_placement(self.df)
-
-        try:
-            df_source = carregar_aba_google_sheets("creds.json", "https://docs.google.com/spreadsheets/d/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/edit", "SOURCE")
-            df_source['Descrição da Mídia'] = df_source['Descrição da Mídia'].str.strip().str.lower()
-            mapping = dict(zip(df_source['Descrição da Mídia'], df_source['ID_Veiculo']))
-            self.df['ID_Veiculo'] = self.df['Veiculo'].str.strip().str.lower().map(mapping).fillna("")
-        except Exception as e:
-            logging.warning(f"Falha ao buscar ID_Veiculo da aba SOURCE: {e}")
-            self.df['ID_Veiculo'] = ""
+        logging.debug(">>> In MetaIdadeETL.criar_veiculo")
+        self.df = atribuir_veiculo_e_id_meta(self.df)
 
 
 class LinkedinGeralETL(BaseGeralETL):

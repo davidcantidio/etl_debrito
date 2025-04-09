@@ -3,7 +3,7 @@ from utils.campanha_mapper import buscar_mapping
 import pandas as pd
 import logging
 from utils.objetivos import SUBSTITUICOES_OBJETIVO
-from utils.normalize import inferir_veiculo_meta_por_placement
+from utils.atribuicao_veiculo_nome_e_id import atribuir_veiculo_e_id_meta
 
 class BaseIdadeETL:
     def __init__(self, df, mapping_campanha=None, mapping_sigla=None, veiculo=""):
@@ -87,21 +87,25 @@ class BaseIdadeETL:
         self.renomear_colunas()
         self.aplicar_normalizacoes()
         self.aplicar_parametrizacao_campanha_externa()
+
+        # Chamar criar_veiculo caso a subclasse implemente
+        if hasattr(self, "criar_veiculo"):
+            self.criar_veiculo()
+
         self.remover_colunas()
         self.reordenar_colunas()
         self.gerar_id()
-        self.df['Veiculo'] = self.veiculo
         return self.df
 
 
+
+
 class MetaIdadeETL(BaseIdadeETL):
-    def __init__(self, df, mapping_campanha=None, mapping_sigla=None):
-        super().__init__(df, mapping_campanha, mapping_sigla, veiculo='Meta')
-    
     def criar_veiculo(self):
-        logging.debug(">>> In MetaGeralETL.criar_veiculo (usando Placement)")
-        self.df = inferir_veiculo_meta_por_placement(self.df)
-        self.df['ID_Veiculo'] = self.id_veiculo 
+        logging.debug(">>> In MetaIdadeETL.criar_veiculo")
+        self.df = atribuir_veiculo_e_id_meta(self.df)
+
+
 
 class TikTokIdadeETL(BaseIdadeETL):
     def __init__(self, df, mapping_campanha=None, mapping_sigla=None):

@@ -27,17 +27,6 @@ from scripts.etl_geral import (
     PinterestGeralETL,
 )
 
-def get_id_veiculo_from_source(creds_path, spreadsheet_url, nome_veiculo):
-    """
-    Lê a aba SOURCE e obtém o ID_Veiculo (coluna 'ID_Veiculo') associado
-    ao 'nome_veiculo' (coluna 'Descrição da Mídia').
-    """
-    df_source = carregar_aba_google_sheets(creds_path, spreadsheet_url, "SOURCE")
-    filtro = df_source['Descrição da Mídia'].str.strip().str.lower() == nome_veiculo.lower()
-    id_val = df_source.loc[filtro, 'ID_Veiculo']
-    if not id_val.empty:
-        return int(id_val.values[0])
-    raise ValueError(f"ID_Veiculo para '{nome_veiculo}' não encontrado na aba SOURCE")
 
 def main():
     setup_logging(level=logging.DEBUG)
@@ -46,7 +35,7 @@ def main():
     spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
     spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
 
-    source_sheet = "pinterestGeral"
+    source_sheet = "metaGeral"
     target_sheet = "modeloGeral"
 
     plataforma = source_sheet.lower().replace("geral", "").strip()
@@ -91,10 +80,7 @@ def main():
     else:
         client = get_google_client(creds_path)
 
-    if veiculo_nome:
-        id_veiculo = get_id_veiculo_from_source(creds_path, spreadsheet_url, veiculo_nome)
-    else:
-        id_veiculo = None
+    id_veiculo = None  # Sempre atribuído dinamicamente pelos próprios ETLs
 
     etl_instance = etl_class(
         df=df_origin,
