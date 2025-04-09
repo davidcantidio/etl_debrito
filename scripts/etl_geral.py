@@ -6,12 +6,10 @@ from utils.campanha_mapper import buscar_mapping
 from utils.objetivos import SUBSTITUICOES_OBJETIVO
 from utils.numeracao import gerar_numeracao
 from utils.datas import transformar_para_date
-from utils.preview_links import (
-    construir_preview_link_pinterest,
-    ajustar_preview_link
-)
+from utils.preview_links import construir_preview_link_pinterest, ajustar_preview_link
 from utils.get_nome_campanha import obter_nome_por_utm_content
 from utils.normalize import inferir_veiculo_meta_por_placement
+from utils.google_sheets import carregar_aba_google_sheets
 
 class BaseGeralETL:
     def __init__(self, df, id_veiculo, veiculo, mapping_campanha=None, mapping_sigla=None):
@@ -43,15 +41,12 @@ class BaseGeralETL:
         logging.debug(f"Colunas após renomear: {list(self.df.columns)}")
 
     def ajustar_tipos_e_calculos(self):
-        logging.debug(">>> In ajustar_tipos_e_calculos")
         if 'Data' in self.df.columns:
             self.df['Data'] = pd.to_datetime(self.df['Data'], errors='coerce')
 
-        numericas = [
-            'Impressoes', 'Investimento', 'Cliques_no_Link', 'Video_Play',
-            'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
-            'Reacoes', 'Compartilhamentos', 'Comentarios'
-        ]
+        numericas = ['Impressoes', 'Investimento', 'Cliques_no_Link', 'Video_Play',
+                     'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
+                     'Reacoes', 'Compartilhamentos', 'Comentarios']
         for col in numericas:
             if col in self.df.columns:
                 self.df[col] = pd.to_numeric(self.df[col], errors='coerce').fillna(0)
@@ -63,18 +58,14 @@ class BaseGeralETL:
 
         self.df['Numero'] = self.df.get('Numero', np.nan)
         self.df['ID'] = self.df.get('ID', np.nan)
-        logging.debug(f"DataFrame shape após ajustes: {self.df.shape}")
 
     def aplicar_substituicoes_objetivo(self):
-        logging.debug(">>> In aplicar_substituicoes_objetivo")
         if 'Objetivo' in self.df.columns:
             for old, new in self.substituicoes['Objetivo'].items():
                 self.df.loc[self.df['Objetivo'] == old, 'Objetivo'] = new
 
     def aplicar_parametrizacao_campanha_externa(self):
-        logging.debug(">>> In aplicar_parametrizacao_campanha_externa")
         if 'Campaign_name' not in self.df.columns:
-            logging.warning("Coluna 'Campaign_name' não encontrada.")
             self.df['Campanha'] = ""
             self.df['ID_Campanha'] = ""
             return
@@ -83,18 +74,16 @@ class BaseGeralETL:
         self.df['ID_Campanha'] = self.df['Campaign_name'].apply(lambda x: buscar_mapping(self.mapping_sigla, x))
 
     def criar_veiculo(self):
-        logging.debug(">>> In criar_veiculo")
+        logging.debug(">>> In criar_veiculo (default)")
         self.df['Veiculo'] = self.veiculo
         self.df['ID_Veiculo'] = self.id_veiculo
 
     def remover_colunas_indesejadas(self):
-        logging.debug(">>> In remover_colunas_indesejadas")
         for col in ['Placement', 'Campaign_ID', 'Campaign_name', 'Content_utm']:
             if col in self.df.columns:
                 self.df.drop(columns=col, inplace=True)
 
     def reordenar_colunas_para_modelo(self):
-        logging.debug(">>> In reordenar_colunas_para_modelo")
         ordem = [
             'Numero', 'Data', 'Nome_da_Conta', 'Campanha', 'ID_Campanha', 'Veiculo', 'ID_Veiculo',
             'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio', 'Inicio_da_Campanha', 'Fim_da_Campanha',
@@ -107,7 +96,6 @@ class BaseGeralETL:
         self.df = self.df[ordem]
 
     def gerar_id(self):
-        logging.debug(">>> In gerar_id")
         self.df['ID'] = self.df.apply(
             lambda row: f"{row['Data']}-{row['Campanha']}-{row['Impressoes']}-{row['Investimento']}-{row['Cliques_no_Link']}",
             axis=1
@@ -132,29 +120,25 @@ class BaseGeralETL:
 
 class MetaGeralETL(BaseGeralETL):
     def ajustes_preview(self):
-        logging.debug(">>> In MetaGeralETL.ajustes_preview")
         if 'Preview Link FB' in self.df.columns:
             self.df.rename(columns={'Preview Link FB': 'Preview_Link_FB'}, inplace=True)
         if 'URL_do_Anuncio' in self.df.columns and 'Preview_Link_FB' in self.df.columns:
             self.df['URL_do_Anuncio'] = self.df.apply(
-                lambda row: ajustar_preview_link(row['URL_do_Anuncio'], row['Preview_Link_FB']),
-                axis=1
+                lambda row: ajustar_preview_link(row['URL_do_Anuncio'], row['Preview_Link_FB']), axis=1
             )
 
     def criar_veiculo(self):
-        logging.debug(">>> In MetaGeralETL.criar_veiculo (inferindo via Placement)")
-        # Inferir o veículo via Placement
+        logging.debug(">>> In MetaGeralETL.criar_veiculo (inferindo Veiculo e ID_Veiculo via Placement e SOURCE)")
         self.df = inferir_veiculo_meta_por_placement(self.df)
 
-        # Agora o ID_Veiculo será atribuído dinamicamente baseado no valor de 'Veiculo'
-        if 'Veiculo' in self.df.columns:
-            # Aqui inferimos o ID_Veiculo com base no valor de 'Veiculo' após a inferência
-            self.df['ID_Veiculo'] = self.df['Veiculo'].apply(
-                lambda x: self.id_veiculo if pd.notna(x) else None  # Caso o veiculo seja nulo, mantemos o valor de None
-            )
-        else:
-            logging.warning("Coluna 'Veiculo' não encontrada após inferência de Placement")
-            self.df['ID_Veiculo'] = None  # Caso o veículo não tenha sido inferido
+        try:
+            df_source = carregar_aba_google_sheets("creds.json", "https://docs.google.com/spreadsheets/d/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/edit", "SOURCE")
+            df_source['Descrição da Mídia'] = df_source['Descrição da Mídia'].str.strip().str.lower()
+            mapping = dict(zip(df_source['Descrição da Mídia'], df_source['ID_Veiculo']))
+            self.df['ID_Veiculo'] = self.df['Veiculo'].str.strip().str.lower().map(mapping).fillna("")
+        except Exception as e:
+            logging.warning(f"Falha ao buscar ID_Veiculo da aba SOURCE: {e}")
+            self.df['ID_Veiculo'] = ""
 
 
 class LinkedinGeralETL(BaseGeralETL):
