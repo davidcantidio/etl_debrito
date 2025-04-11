@@ -3,7 +3,7 @@ import logging
 from utils.normalize import normalizar_faixa_etaria
 from utils.campanha_mapper import buscar_mapping
 from utils.objetivos import SUBSTITUICOES_OBJETIVO
-from utils.atribuicao_veiculo_nome_e_id import atribuir_veiculo_e_id_meta
+from utils.atribuicao_veiculo_nome_e_id import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico
 from utils.numeracao import gerar_numeracao
 
 
@@ -87,6 +87,11 @@ class BaseIdadeETL:
                 self.df[col] = ""
         self.df = self.df[ordem]
 
+    def criar_veiculo(self):
+        logging.debug(">>> In criar_veiculo (default genérico)")
+        self.df = atribuir_id_veiculo_generico(self.df)
+
+
     def gerar_id(self):
         logging.debug(">>> In gerar_id")
         self.df['ID'] = self.df.apply(
@@ -139,6 +144,16 @@ class LinkedinIdadeETL(BaseIdadeETL):
         super().__init__(df, mapping_campanha, mapping_sigla, veiculo='LinkedIn')
 
 
+from utils.common_pinterest import preencher_campos_com_campanha
+
 class PinterestIdadeETL(BaseIdadeETL):
     def __init__(self, df, mapping_campanha=None, mapping_sigla=None):
         super().__init__(df, mapping_campanha, mapping_sigla, veiculo='Pinterest')
+
+    def aplicar_parametrizacao_campanha_externa(self):
+        logging.debug(">>> In PinterestIdadeETL.aplicar_parametrizacao_campanha_externa")
+        # Primeiro preenche os campos a partir de 'Campaign name'
+        self.df = preencher_campos_com_campanha(self.df)
+
+        # Depois aplica os mapeamentos externos normalmente
+        super().aplicar_parametrizacao_campanha_externa()
