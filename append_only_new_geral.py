@@ -26,7 +26,7 @@ from utils.common_linkedin import preparar_kwargs_linkedin
 def main():
     setup_logging(level=logging.DEBUG)
 
-    source_sheet = "metaGeral"
+    source_sheet = "linkedinGeral"
     target_sheet = "modeloGeral"
     plataforma = source_sheet.lower().replace("geral", "").strip()
 

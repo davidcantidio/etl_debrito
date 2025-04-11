@@ -2,6 +2,7 @@
 
 import unicodedata
 import pandas as pd
+import logging
 
 def normalize_campaign_name(value):
     if not isinstance(value, str):
@@ -55,13 +56,23 @@ def normalize_parametrizacao_values(df: pd.DataFrame, cols: list[str] = None) ->
 
     return df
 
-def normalizar_faixa_etaria(idade: str) -> str:
+def normalizar_faixa_etaria(valor) -> str:
     """
-    Normaliza a faixa etária: transforma '55-64' e '65+' em '55+'
+    Normaliza faixas etárias para uso em dashboards e relatórios:
+    - Converte '55-64' e '65+' em '55+'
+    - Converte None, '', 'unknown', 'others', 'none' para 'Não classificado'
+    - Retorna o valor limpo nos demais casos
     """
-    if idade in ["55-64", "65+"]:
+    if not isinstance(valor, str):
+        return "Não classificado"
+
+    valor = valor.strip().lower()
+    if valor in {"", "none", "unknown", "others"}:
+        return "Não classificado"
+    if valor in {"55-64", "65+"}:
         return "55+"
-    return idade
+    return valor
+
 
 
 def inferir_veiculo_meta_por_placement(df: pd.DataFrame) -> pd.DataFrame:
@@ -86,3 +97,31 @@ def inferir_veiculo_meta_por_placement(df: pd.DataFrame) -> pd.DataFrame:
     df['Veiculo'] = df.get('Placement', "").apply(extrair_veiculo)
     return df
 
+
+def atribuir_veiculo_por_criativo(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Faz lookup do campo 'Ad name' (que representa o CRIATIVO) na aba BI_PARAMETRIZAÇÃO
+    e preenche o campo 'Veiculo' com base na coluna 'VEÍCULOS'.
+    """
+    logging.debug(">>> In atribuir_veiculo_por_criativo (via Ad name → CRIATIVO)")
+
+    from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_URL
+
+    # Carrega a aba BI_PARAMETRIZAÇÃO (começando da linha 2)
+    df_param = carregar_aba_google_sheets(CREDS_PATH, SPREADSHEET_URL, "BI_PARAMETRIZAÇÃO", header_row_index=1)
+
+    # Normaliza as colunas para facilitar acesso
+    df_param.columns = [col.strip().upper() for col in df_param.columns]
+
+    if 'CRIATIVO' not in df_param.columns or 'VEÍCULOS' not in df_param.columns:
+        logging.warning("Colunas 'CRIATIVO' ou 'VEÍCULOS' não encontradas em BI_PARAMETRIZAÇÃO.")
+        df['Veiculo'] = ""
+        return df
+
+    # Cria dicionário de mapeamento: CRIATIVO → VEÍCULO
+    mapping = dict(zip(df_param['CRIATIVO'].astype(str).str.strip(), df_param['VEÍCULOS'].astype(str).str.strip()))
+
+    # Aplica mapeamento ao campo 'Ad name'
+    df['Veiculo'] = df['Ad name'].astype(str).str.strip().map(mapping).fillna("")
+
+    return df
