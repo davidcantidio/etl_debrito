@@ -125,3 +125,34 @@ def atribuir_veiculo_por_criativo(df: pd.DataFrame) -> pd.DataFrame:
     df['Veiculo'] = df['Ad name'].astype(str).str.strip().map(mapping).fillna("")
 
     return df
+
+def normalizar_genero(valor) -> str:
+    """
+    Normaliza valores de gênero:
+    - 'female', 'feminino' → 'Mulher'
+    - 'male', 'masculino' → 'Homem'
+    - vazios, 'unknown', 'others', 'none', '-' → 'Não classificado'
+    - outros valores → capitalizados
+    """
+    if not isinstance(valor, str):
+        return "Não classificado"
+
+    valor = valor.strip().lower()
+    if valor in {"female", "feminino"}:
+        return "Mulher"
+    elif valor in {"male", "masculino"}:
+        return "Homem"
+    elif valor in {"", "unknown", "others", "none", "-"}:
+        return "Não classificado"
+    return valor.capitalize()
+
+
+
+def converter_colunas_numericas(df, colunas):
+    """
+    Converte colunas especificadas para tipo numérico, preenchendo com zero os valores inválidos.
+    """
+    for col in colunas:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    return df

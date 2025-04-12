@@ -1,0 +1,1306 @@
+# utils/__init__.py
+
+
+
+# utils/append_records_to_sheet.py
+
+import logging
+import gspread
+from gspread_dataframe import set_with_dataframe
+from utils.get_google_client import get_google_client
+
+def append_records_to_sheet(creds_path, spreadsheet_id, sheet_name, df):
+    """
+    Insere os registros do DataFrame na aba de destino, a partir da coluna B,
+    e redimensiona a planilha para acomodar os dados inseridos.
+
+    Parâmetros:
+        creds_path (str): Caminho para o arquivo de credenciais.
+        spreadsheet_id (str): ID da planilha.
+        sheet_name (str): Nome da aba de destino.
+        df (pandas.DataFrame): DataFrame contendo os registros a serem inseridos.
+    """
+    # Obtém o cliente autenticado do Google Sheets
+    client = get_google_client(creds_path)
+    sh = client.open_by_key(spreadsheet_id)
+    worksheet = sh.worksheet(sheet_name)
+    
+    # Determina a próxima linha disponível e se deve incluir cabeçalho
+    data = worksheet.get_all_values()
+    if not data:
+        next_row = 1
+        include_header = True
+    else:
+        next_row = len(data) + 1
+        include_header = False
+
+    # Insere o DataFrame na aba, iniciando na coluna B (col=1)
+    set_with_dataframe(worksheet, df, row=next_row, col=1, include_column_header=include_header)
+    
+    # Redimensiona a planilha de acordo com os dados atuais
+    data = worksheet.get_all_values()
+    total_rows = len(data)
+    total_cols = max(len(row) for row in data) if data else 0
+    worksheet.resize(rows=total_rows, cols=total_cols)
+    
+    logging.info(f"Inseridos {df.shape[0]} registros na aba '{sheet_name}' a partir da linha {next_row}.")
+    logging.info(f"Planilha redimensionada para {total_rows} linhas e {total_cols} colunas.")
+
+
+# utils/atribuicoes_via_lookup.py
+
+# utils/atribuicoes_via_lookup.py
+
+import logging
+from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_ID, SPREADSHEET_URL
+from utils.normalize import inferir_veiculo_meta_por_placement
+import pandas as pd
+
+def atribuir_id_veiculo_generico(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Atribui 'ID_Veiculo' com base no valor da coluna 'Veiculo',
+    buscando a correspondência na aba SOURCE.
+    """
+    logging.debug(">>> In atribuir_id_veiculo_generico")
+    try:
+        df_source = carregar_aba_google_sheets(
+            CREDS_PATH,
+            SPREADSHEET_URL,
+            "SOURCE"
+        )
+        df_source['Descrição da Mídia'] = df_source['Descrição da Mídia'].str.strip().str.lower()
+        mapping = dict(zip(df_source['Descrição da Mídia'], df_source['ID_Veiculo']))
+        df['ID_Veiculo'] = df['Veiculo'].str.strip().str.lower().map(mapping).fillna("")
+    except Exception as e:
+        logging.warning(f"Falha ao mapear ID_Veiculo via SOURCE: {e}")
+        df['ID_Veiculo'] = ""
+    return df
+
+def atribuir_veiculo_e_id_meta(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Inferência de Veiculo + ID_Veiculo para META com base em 'Placement' e aba SOURCE.
+    """
+    logging.debug(">>> In atribuir_veiculo_e_id_meta")
+    df = inferir_veiculo_meta_por_placement(df)
+    return atribuir_id_veiculo_generico(df)
+
+def atribuir_veiculo_por_criativo(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Faz lookup do campo 'Ad name' (que representa o CRIATIVO) na aba BI_PARAMETRIZAÇÃO
+    e preenche o campo 'Veiculo' com base na coluna 'VEÍCULOS'.
+    """
+    logging.debug(">>> In atribuir_veiculo_por_criativo (via Ad name → CRIATIVO)")
+
+    df_param = carregar_aba_google_sheets(CREDS_PATH, SPREADSHEET_URL, "BI_PARAMETRIZAÇÃO", header_row_index=1)
+    df_param.columns = [col.strip().upper() for col in df_param.columns]
+
+    if 'CRIATIVO' not in df_param.columns or 'VEÍCULOS' not in df_param.columns:
+        logging.warning("Colunas 'CRIATIVO' ou 'VEÍCULOS' não encontradas em BI_PARAMETRIZAÇÃO.")
+        df['Veiculo'] = ""
+        return df
+
+    mapping = dict(zip(df_param['CRIATIVO'].astype(str).str.strip(), df_param['VEÍCULOS'].astype(str).str.strip()))
+    df['Veiculo'] = df['Ad name'].astype(str).str.strip().map(mapping).fillna("")
+    return df
+
+def preencher_campos_com_campanha(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Para plataformas como Pinterest onde não há Ad Name,
+    replica 'Campaign name' nos campos de destino:
+    - Campanha
+    - Nome_do_Anuncio
+    - Nome_do_Conjunto_de_Anuncio
+    """
+    logging.debug(">>> In preencher_campos_com_campanha (Pinterest)")
+
+    if 'Campaign name' not in df.columns:
+        logging.warning("Coluna 'Campaign name' não encontrada. Não será possível preencher campos derivados.")
+        df['Campanha'] = ""
+        df['Nome_do_Anuncio'] = ""
+        df['Nome_do_Conjunto_de_Anuncio'] = ""
+        return df
+
+    df['Campanha'] = df['Campaign name']
+    df['Nome_do_Anuncio'] = df['Campaign name']
+    df['Nome_do_Conjunto_de_Anuncio'] = df['Campaign name']
+    return df
+
+
+def aplicar_parametrizacao_campanha(df: pd.DataFrame, mapping_campanha: dict, mapping_sigla: dict) -> pd.DataFrame:
+    """
+    Preenche as colunas 'Campanha' e 'ID_Campanha' com base na coluna 'Campaign_name',
+    utilizando dicionários de mapeamento externos.
+    """
+    if 'Campaign_name' not in df.columns:
+        df['Campanha'] = ""
+        df['ID_Campanha'] = ""
+        return df
+
+    df['Campanha'] = df['Campaign_name'].apply(
+        lambda x: buscar_mapping(mapping_campanha, x) or x
+    )
+    df['ID_Campanha'] = df['Campaign_name'].apply(
+        lambda x: buscar_mapping(mapping_sigla, x)
+    )
+    return df
+
+
+# utils/campanha_mapper.py
+
+# campanha_mapper.py
+from utils.normalize import normalize_campaign_name
+
+def buscar_mapping(mapping, valor):
+    """
+    Recebe um dicionário 'mapping' e uma string 'valor' representando o nome da campanha.
+    Normaliza o valor removendo espaços e convertendo para maiúsculas, e verifica se alguma chave
+    do dicionário está contida no valor normalizado.
+    
+    Se encontrada, retorna o valor mapeado; caso contrário, retorna o próprio valor original.
+    """
+    if not isinstance(valor, str):
+        return valor
+    valor_norm = normalize_campaign_name(valor)
+    for chave, mapped_value in mapping.items():
+        # Se a chave (presumidamente maiúscula) estiver contida em valor_norm, retorna o mapeamento
+        if chave in valor_norm:
+            return mapped_value
+    return valor
+
+
+# utils/campos_calculados.py
+
+import pandas as pd
+import logging
+
+def calcular_engajamento_total(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula o campo 'Engajamento_Total' como a soma de Reacoes, Compartilhamentos e Comentarios.
+    """
+    logging.debug(">>> In calcular_engajamento_total")
+    if all(col in df.columns for col in ['Reacoes', 'Compartilhamentos', 'Comentarios']):
+        df['Engajamento_Total'] = df['Reacoes'] + df['Compartilhamentos'] + df['Comentarios']
+    else:
+        df['Engajamento_Total'] = 0
+    return df
+
+def inicializar_colunas_auxiliares(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Garante que as colunas auxiliares 'Numero' e 'ID' existam no DataFrame.
+    """
+    logging.debug(">>> In inicializar_colunas_auxiliares")
+    df['Numero'] = df.get('Numero', pd.NA)
+    df['ID'] = df.get('ID', pd.NA)
+    return df
+
+
+def remover_colunas_indesejadas(self):
+    for col in ['Placement', 'Campaign_ID', 'Campaign_name', 'Content_utm']:
+        if col in self.df.columns:
+            self.df.drop(columns=col, inplace=True)
+
+# utils/common_linkedin.py
+
+import logging
+from utils.get_google_client import get_google_client
+from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+from utils.normalize import normalize_columns, normalize_parametrizacao_values
+from utils.preview_links import construir_mapping_preview_parametrizacao
+from utils.get_nome_campanha import carregar_mapeamento_nome_creativo, obter_nome_por_utm_content
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+
+def carregar_mapeamentos_linkedin():
+    """
+    Carrega os mapeamentos de preview e criativo da aba BI_PARAMETRIZAÇÃO
+    para uso nos ETLs do LinkedIn.
+    """
+    logging.info("Carregando mapeamentos do LinkedIn (preview e criativo)...")
+
+    client = get_google_client(CREDS_PATH)
+
+    df_parametrizacao = read_sheet_as_dataframe_range(
+        client,
+        SPREADSHEET_ID,
+        sheet_name="BI_PARAMETRIZAÇÃO",
+        range_str="A2:ZZ",
+        header_row_index=0
+    )
+
+    df_parametrizacao.columns = normalize_columns(df_parametrizacao.columns)
+    df_parametrizacao = normalize_parametrizacao_values(df_parametrizacao)
+
+    mapping_preview = construir_mapping_preview_parametrizacao(df_parametrizacao)
+    mapping_criativo = carregar_mapeamento_nome_creativo(df_parametrizacao)
+
+    return mapping_preview, mapping_criativo
+
+
+def buscar_nome_criativo_com_log(utm_content, mapping_criativo):
+    """
+    Busca o nome do criativo com base no utm_content.
+    Se não encontrar, loga uma mensagem de debug.
+    """
+    utm_str = str(utm_content).strip()
+    nome = obter_nome_por_utm_content(utm_str, mapping_criativo)
+    if not nome:
+        logging.debug(f"utm_content '{utm_str}' NÃO encontrado no mapping_criativo.")
+    return nome
+
+
+def preparar_kwargs_linkedin() -> dict:
+    """
+    Prepara os kwargs extras necessários para inicializar ETLs do LinkedIn,
+    carregando os mapeamentos de preview e criativo.
+    """
+    mapping_preview, mapping_criativo = carregar_mapeamentos_linkedin()
+    return {
+        "mapping_preview": mapping_preview,
+        "mapping_criativo": mapping_criativo,
+    }
+
+
+# utils/common_pinterest.py
+
+import logging
+
+def preencher_campos_com_campanha(df):
+    """
+    Para plataformas como Pinterest onde não há Ad Name,
+    replica 'Campaign name' nos campos de destino:
+    - Campanha
+    - Nome_do_Anuncio
+    - Nome_do_Conjunto_de_Anuncio
+    """
+    logging.debug(">>> In preencher_campos_com_campanha (Pinterest)")
+
+    if 'Campaign name' not in df.columns:
+        logging.warning("Coluna 'Campaign name' não encontrada. Não será possível preencher campos derivados.")
+        df['Campanha'] = ""
+        df['Nome_do_Anuncio'] = ""
+        df['Nome_do_Conjunto_de_Anuncio'] = ""
+        return df
+
+    df['Campanha'] = df['Campaign name']
+    df['Nome_do_Anuncio'] = df['Campaign name']
+    df['Nome_do_Conjunto_de_Anuncio'] = df['Campaign name']
+    return df
+
+
+# utils/concatenar_utils_em_txt.py
+
+import os
+
+def concatenar_arquivos_em_txt(diretorio_base, nome_arquivo_saida='concatenado.txt', extensao='.py'):
+    caminho_saida = os.path.join(diretorio_base, nome_arquivo_saida)
+
+    with open(caminho_saida, 'w', encoding='utf-8') as outfile:
+        for nome_arquivo in sorted(os.listdir(diretorio_base)):
+            caminho_completo = os.path.join(diretorio_base, nome_arquivo)
+
+            if os.path.isfile(caminho_completo) and nome_arquivo.endswith(extensao):
+                outfile.write(f'# utils/{nome_arquivo}\n\n')
+                with open(caminho_completo, 'r', encoding='utf-8') as f:
+                    outfile.write(f.read())
+                    outfile.write('\n\n')
+    
+    print(f"Arquivos concatenados com sucesso em: {caminho_saida}")
+
+if __name__ == '__main__':
+    diretorio = '/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils'
+    concatenar_arquivos_em_txt(diretorio)
+
+
+# utils/datas.py
+
+# utils/datas.py
+
+from datetime import datetime, date
+
+def transformar_para_date(valor):
+    """
+    Transforma um valor de data no formato 'YYYY-MM-DD HH:MM:SS' ou
+    um objeto datetime em um objeto date (YYYY-MM-DD).
+
+    Parâmetros:
+        valor (str ou datetime ou date): Data no formato "YYYY-MM-DD HH:MM:SS"
+                                         ou já um objeto datetime ou date.
+
+    Retorna:
+        date: objeto da classe date (ex: 2024-04-15)
+
+    Exceções:
+        ValueError: Se o valor não puder ser interpretado como data.
+    """
+    if not valor:
+        return None
+
+    # Se já for um objeto date, retorna diretamente
+    if isinstance(valor, date) and not isinstance(valor, datetime):
+        return valor
+
+    # Se for um objeto datetime, extrai a parte de data
+    if isinstance(valor, datetime):
+        return valor.date()
+
+    # Se for uma string, tenta converter para datetime com o formato esperado
+    if isinstance(valor, str):
+        try:
+            dt = datetime.strptime(valor, "%Y-%m-%d %H:%M:%S")
+            return dt.date()
+        except ValueError:
+            # Caso a string já esteja no formato "YYYY-MM-DD"
+            try:
+                dt = datetime.strptime(valor, "%Y-%m-%d")
+                return dt.date()
+            except ValueError:
+                raise ValueError(f"Formato de data não reconhecido: {valor}")
+    
+    raise ValueError(f"Tipo de valor não suportado: {type(valor)}")
+
+
+
+def converter_data(df, coluna='Data'):
+    """
+    Converte a coluna de data para datetime, com tratamento de erros.
+    """
+    if coluna in df.columns:
+        df[coluna] = pd.to_datetime(df[coluna], errors='coerce')
+    return df
+
+
+# utils/geo_normalize.py
+
+import json
+import os
+import unicodedata
+
+
+
+def carregar_caches_padrao():
+    path_estados = "/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils/cache_estados.json"
+    path_municipios = "/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils/cache_municipios_estados.json"
+
+    cache_estados = carregar_cache_estados(path_estados)
+    cache_municipios = carregar_cache_municipios(path_municipios)
+    return cache_estados, cache_municipios
+
+
+
+# -----------------------------------------------------------------------------
+# Normalização de strings (remoção de acentos e caracteres especiais)
+def normalize_string(s: str) -> str:
+    if not isinstance(s, str):
+        return ""
+    # Remoção de acentos e caracteres especiais
+    s = unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("ASCII")
+    # Converte para lower e remove espaços extras
+    s = s.lower().strip()
+    return s
+
+# -----------------------------------------------------------------------------
+def carregar_cache_estados(path_cache_estados: str) -> dict:
+    """
+    Lê o JSON com a lista (ou dicionário) de estados do Brasil normalizados.
+    Exemplo de formato (JSON):
+      {
+        "acre": "Acre",
+        "alagoas": "Alagoas",
+        "amapa": "Amapá",
+        ...
+      }
+    """
+    if not os.path.exists(path_cache_estados):
+        return {}
+    with open(path_cache_estados, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data  # {'acre': 'Acre', 'amapa': 'Amapá', ...}
+
+def carregar_cache_municipios(path_cache_municipios: str) -> dict:
+    """
+    Lê o JSON contendo o mapeamento { "municipio_normalizado": "EstadoCorrespondente", ... }.
+    """
+    if not os.path.exists(path_cache_municipios):
+        return {}
+    with open(path_cache_municipios, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data
+
+# -----------------------------------------------------------------------------
+def limpeza_basica(regiao_bruta: str) -> str:
+    """
+    Aplica limpeza e remoção de padrões conhecidos na string.
+    Ex.: "Greater São Paulo Area" -> "São Paulo"
+         "Brazil: Bahia" -> "Bahia"
+         "State of Piaui" -> "Piaui"
+         "Federal District" -> "distrito federal" (a gente trata depois)
+         "Acre (state)" -> "Acre"
+         ...
+    """
+    if not isinstance(regiao_bruta, str):
+        return ""
+
+    texto = regiao_bruta.strip()
+
+    # Se for alguma string especial que indica "Não identificado"
+    if texto in ["-", "unknown", "-1", "br - other", "br-other"]:
+        return ""  # sinalizamos string vazia => “Não identificado” depois
+
+    # Remoção de prefixos e sufixos
+    # "Brazil: " ...
+    texto = texto.replace("Brazil: ", "")
+    # "State of " ...
+    texto = texto.replace("State of ", "")
+    # "(state)" ...
+    texto = texto.replace("(state)", "")
+    # "federal district" => vira "distrito federal" (para bater no cache de estados)
+    texto = texto.replace("Federal District", "Distrito Federal")
+    # "Greater " ...
+    texto = texto.replace("Greater ", "")
+    # " metropolitan area"
+    texto = texto.replace(" metropolitan area", "")
+    # Se terminar com " area", remover
+    if texto.lower().endswith(" area"):
+        texto = texto[: -len(" area")].strip()
+    # Se terminar com " metro", remover
+    if texto.lower().endswith(" metro"):
+        texto = texto[: -len(" metro")].strip()
+
+    return texto.strip()
+
+# -----------------------------------------------------------------------------
+def obter_estado_de_regiao(regiao: str, cache_municipios: dict, cache_estados: dict) -> str:
+    if not isinstance(regiao, str):
+        return "Não identificado"
+
+    regiao = regiao.strip().lower()
+
+    # Regras específicas de limpeza
+    if regiao in ["-", "unknown", "-1", "br - other", "br-other"]:
+        return "Não identificado"
+
+    regiao = (
+        regiao.replace("brazil: ", "")
+        .replace("state of ", "")
+        .replace("(state)", "")
+        .replace("greater ", "")
+        .replace("federal district", "distrito federal")
+        .replace(" metropolitan area", "")
+        .replace(", brazil metropolitan area", "")
+        .replace(" brazil", "")  # <<< IMPORTANTE: remove " brazil" que sobrou
+        .replace(" area", "")
+        .replace(" metro", "")
+        .replace(",", "")   # remove a vírgula
+        .strip()
+    )
+
+    regiao_normalizada = normalize_string(regiao)
+
+    # Primeiro tenta bater com o cache de estados
+    estado_direto = cache_estados.get(regiao_normalizada)
+    if estado_direto:
+        return estado_direto
+
+    # Se não encontrou, tenta bater com os municípios
+    estado_por_municipio = cache_municipios.get(regiao_normalizada)
+    if estado_por_municipio:
+        return estado_por_municipio
+
+    return "Não identificado"
+
+# -----------------------------------------------------------------------------
+# Exemplo de script principal de teste
+if __name__ == "__main__":
+    # Arquivos de cache
+    path_cache_estados = "utils/cache_estados.json"
+    path_cache_municipios = "utils/cache_municipios_estados.json"
+
+    # Carregamos as duas estruturas
+    dict_estados = carregar_cache_estados(path_cache_estados)  # ex.: {"acre": "Acre", ...}
+    dict_municipios = carregar_cache_municipios(path_cache_municipios)  # ex.: {"vitoria": "Espírito Santo", ...}
+
+    # Exemplo de lista de valores para teste
+    valores_para_teste = [
+        "Acre (state)",
+        "Federal District",
+        "Amapa",
+        "-1",
+        "BR-OTHER",
+        "Brazil: Maranhao",
+        "Greater São Paulo Area",
+        "London Area, United Kingdom",
+        "Los Angeles Metropolitan Area",
+        "Charlotte Metro",
+        "Bogotá D.C. Metropolitan Area",
+        "Greater Belem",
+        "Vitoria, Brazil Metropolitan Area",
+        "State of Piaui"
+    ]
+
+    resultados = {}
+    for valor in valores_para_teste:
+        estado = obter_estado_de_regiao(
+            valor,
+            cache_estados=dict_estados,
+            cache_municipios=dict_municipios
+        )
+        resultados[valor] = estado
+
+    import json
+    print(json.dumps(resultados, indent=2, ensure_ascii=False))
+
+
+# utils/get_campaign_parameterization.py
+
+import logging
+import pandas as pd
+from utils.get_google_client import get_google_client
+
+def get_campaign_parameterization(creds_path, spreadsheet_id):
+    """
+    Lê a aba 'BI_PARAMETRIZAÇÃO' e retorna dois dicionários de mapeamento:
+      - mapping_campanha: mapeia o valor da coluna de lookup "NOME CAMPANHA" para o valor desejado para a coluna "Campanha"
+      - mapping_sigla: mapeia o valor da coluna de lookup "NOME CAMPANHA" para o valor desejado para a coluna "ID_Campanha"
+    
+    Considera que:
+      - Os cabeçalhos reais estão na linha 2 e os dados começam na linha 3.
+      - A coluna de lookup é "NOME CAMPANHA".
+      - Para mapeamento, busca-se a coluna que contenha "NOME CAMPANHA" (para Campanha) e a coluna que contenha "SIGLA".
+    
+    Parâmetros:
+        creds_path (str): Caminho para o arquivo de credenciais.
+        spreadsheet_id (str): ID da planilha.
+    
+    Retorna:
+        tuple: (mapping_campanha, mapping_sigla) – dois dicionários com os mapeamentos.
+    """
+    client = get_google_client(creds_path)
+    sh = client.open_by_key(spreadsheet_id)
+    worksheet = sh.worksheet("BI_PARAMETRIZAÇÃO")
+    data = worksheet.get_all_values()
+    
+    if len(data) < 3:
+        raise ValueError("A aba 'BI_PARAMETRIZAÇÃO' não tem dados suficientes (cabeçalho na linha 2 e dados a partir da linha 3).")
+    
+    # Normaliza os cabeçalhos reais (linha 2)
+    raw_headers = data[1]
+    headers = [col.strip().replace('\n', ' ').replace('"', '').upper() for col in raw_headers]
+    logging.info(f"Colunas reais detectadas (linha 2): {headers}")
+    
+    df_param = pd.DataFrame(data[2:], columns=headers)
+    
+    lookup = "NOME CAMPANHA"
+    if lookup not in df_param.columns:
+        raise ValueError(f"A coluna de lookup '{lookup}' não foi encontrada na aba BI_PARAMETRIZAÇÃO.")
+    
+    # Define a coluna para Campanha: busca aquela que contenha "NOME CAMPANHA"
+    col_dest_campanha = next((col for col in df_param.columns if "NOME CAMPANHA" in col), lookup)
+    # Define a coluna para SIGLA: busca aquela que contenha "SIGLA"
+    col_sigla = next((col for col in df_param.columns if "SIGLA" in col), None)
+    
+    if not col_dest_campanha or not col_sigla:
+        raise ValueError("As colunas 'NOME CAMPANHA' e/ou 'SIGLA' não foram encontradas após normalização.")
+    
+    logging.info(f"Coluna de lookup: '{lookup}'")
+    logging.info(f"Coluna usada para Campanha (destino): '{col_dest_campanha}'")
+    logging.info(f"Coluna usada para SIGLA: '{col_sigla}'")
+    
+    mapping_campanha = {
+        str(k).strip().upper(): str(v).strip()
+        for k, v in zip(df_param[lookup], df_param[col_dest_campanha])
+    }
+    mapping_sigla = {
+        str(k).strip().upper(): str(v).strip()
+        for k, v in zip(df_param[lookup], df_param[col_sigla])
+    }
+    
+    logging.info(f"Total de campanhas mapeadas: {len(mapping_campanha)}")
+    logging.info(f"Exemplos de chaves no mapping (Campanha): {list(mapping_campanha.keys())[:10]}")
+    
+    return mapping_campanha, mapping_sigla
+
+
+# utils/get_google_client.py
+
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+def get_google_client(creds_path):
+    """
+    Retorna um cliente autenticado do Google Sheets usando as credenciais fornecidas.
+    
+    Parâmetros:
+        creds_path (str): Caminho para o arquivo JSON de credenciais.
+    
+    Retorna:
+        gspread.Client: Cliente autenticado para acessar o Google Sheets.
+    """
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+    return gspread.authorize(creds)
+
+
+# utils/get_missing_records.py
+
+import pandas as pd
+
+def get_missing_records(df_origin, df_target):
+    """
+    Compara os DataFrames de origem e destino utilizando a coluna 'ID' com contagem cumulativa
+    para tratar duplicatas, e retorna os registros da origem que não estão presentes no destino.
+    
+    Parâmetros:
+        df_origin (pandas.DataFrame): DataFrame de origem.
+        df_target (pandas.DataFrame): DataFrame de destino.
+    
+    Retorna:
+        pandas.DataFrame: Registros faltantes encontrados em df_origin.
+    """
+    origin = df_origin.copy()
+    target = df_target.copy()
+    
+    # Se não houver a coluna "ID" no destino ou o DataFrame estiver vazio, retorna toda a origem
+    if "ID" not in target.columns or target.empty:
+        return origin.copy()
+    
+    # Cria uma coluna de índice para tratar duplicatas
+    origin["ID_index"] = origin.groupby("ID").cumcount() + 1
+    target["ID_index"] = target.groupby("ID").cumcount() + 1
+    
+    merged = pd.merge(origin, target[["ID", "ID_index"]],
+                      on=["ID", "ID_index"], how="left", indicator=True)
+    
+    missing = merged[merged["_merge"] == "left_only"].drop(columns=["_merge", "ID_index"])
+    return missing
+
+
+# utils/get_nome_campanha.py
+
+import logging
+import pandas as pd
+
+def carregar_mapeamento_nome_creativo(df_parametrizacao: pd.DataFrame) -> dict:
+    """
+    Cria e retorna um dicionário {utm_content -> criativo},
+    baseado nas colunas 'utm_content' e 'criativo' na aba BI_PARAMETRIZAÇÃO.
+    """
+    if df_parametrizacao.empty:
+        logging.warning("DataFrame de parametrização vazio. Não foi possível construir o mapeamento.")
+        return {}
+
+    required_cols = {'utm_content', 'criativo'}
+    colunas_atuais = set(df_parametrizacao.columns)
+    if not required_cols.issubset(colunas_atuais):
+        logging.warning("Colunas 'utm_content' e/ou 'criativo' não foram encontradas na parametrização.")
+        return {}
+
+    mapping = {}
+    for _, row in df_parametrizacao.iterrows():
+        utm = str(row.get('utm_content', '')).strip()
+        criativo = str(row.get('criativo', '')).strip()
+        if utm:
+            mapping[utm] = criativo
+
+    return mapping
+
+
+def obter_nome_por_utm_content(utm_content: str, mapping_criativo: dict) -> str:
+    """
+    Dado um valor de utm_content (ex.: 'abc123') e um dicionário {utm_content -> criativo},
+    retorna o 'criativo' correspondente.
+
+    Se não encontrar, retorna string vazia.
+    """
+    if not isinstance(utm_content, str):
+        return ""
+    return mapping_criativo.get(utm_content.strip(), "")
+
+
+# utils/google_sheets.py
+
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
+from gspread_dataframe import get_as_dataframe
+
+def carregar_aba_google_sheets(creds_path, sheet_url, nome_aba):
+    """
+    Autentica com o Google Sheets e retorna um DataFrame da aba especificada.
+    """
+    scope = [
+        'https://spreadsheets.google.com/feeds',
+        'https://www.googleapis.com/auth/drive'
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+    client = gspread.authorize(creds)
+
+    sheet = client.open_by_url(sheet_url)
+    aba = sheet.worksheet(nome_aba)
+
+    df = get_as_dataframe(aba, dtype=str, na_filter=False)
+    return df
+
+# Configuração central do projeto
+CREDS_PATH = "creds.json"
+SPREADSHEET_ID = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
+SPREADSHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit"
+
+
+# utils/limpar_aba_google_sheets.py
+
+# limpar_aba_google_sheets.py
+
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+
+def get_sheet_id(service, spreadsheet_id: str, aba_nome: str) -> int:
+    """
+    Retorna o ID interno da aba a partir do seu nome.
+    """
+    spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    for sheet in spreadsheet['sheets']:
+        if sheet['properties']['title'] == aba_nome:
+            return sheet['properties']['sheetId']
+    raise ValueError(f"Aba '{aba_nome}' não encontrada no documento.")
+
+def limpar_aba_mantendo_cabecalho(creds_path: str, spreadsheet_id: str, aba_nome: str):
+    """
+    Remove todas as linhas da aba, exceto a primeira (cabeçalho).
+    """
+    creds = service_account.Credentials.from_service_account_file(
+        creds_path, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    service = build("sheets", "v4", credentials=creds)
+    
+    sheet_id = get_sheet_id(service, spreadsheet_id, aba_nome)
+
+    request_body = {
+        "requests": [
+            {
+                "deleteDimension": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": 1  # começa na linha 2 (0-indexed)
+                    }
+                }
+            }
+        ]
+    }
+
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body=request_body
+    ).execute()
+
+    print(f"Aba '{aba_nome}' limpa com sucesso (mantido apenas o cabeçalho).")
+
+# =======================
+# APLICAÇÃO DIRETA AQUI:
+# =======================
+
+if __name__ == "__main__":
+    # Caminho do arquivo de credenciais e ID da planilha do projeto atual
+    creds_path = "creds.json"
+    spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
+
+    # Nome da aba que você quer limpar
+    aba_para_limpar = "modeloIdade"
+
+    limpar_aba_mantendo_cabecalho(creds_path, spreadsheet_id, aba_para_limpar)
+
+
+# utils/normalize.py
+
+# utils/normalize.py
+
+import unicodedata
+import pandas as pd
+import logging
+
+def normalize_campaign_name(value):
+    if not isinstance(value, str):
+        return value
+    return value.strip().upper()
+
+def normalize_nome(nome):
+    if not isinstance(nome, str):
+        return ""
+    nome = nome.strip().lower()
+    nome = unicodedata.normalize("NFKD", nome)
+    nome = ''.join([c for c in nome if not unicodedata.combining(c)])
+    return nome
+
+def normalize_columns(columns: pd.Index) -> pd.Index:
+    """
+    Normaliza nomes de colunas:
+    - Converte para string
+    - Remove espaços extras
+    - Substitui quebras de linha
+    - Remove acentos
+    - Converte para lowercase
+    """
+    return (
+        columns.astype(str)
+        .str.strip()
+        .str.replace('\n', ' ', regex=False)
+        .str.lower()
+        .map(lambda x: unicodedata.normalize("NFKD", x))
+        .map(lambda x: ''.join(c for c in x if not unicodedata.combining(c)))
+    )
+
+def normalize_parametrizacao_values(df: pd.DataFrame, cols: list[str] = None) -> pd.DataFrame:
+    """
+    Aplica normalização (lowercase, sem acento, strip) nas colunas indicadas.
+    Se 'cols' for None, aplica em todas as colunas do DataFrame.
+    """
+    df = df.copy()
+
+    def normaliza_valor(val):
+        if not isinstance(val, str):
+            return ""
+        val = val.strip().lower()
+        val = unicodedata.normalize("NFKD", val)
+        return ''.join(c for c in val if not unicodedata.combining(c))
+
+    target_cols = cols if cols else df.columns
+    for col in target_cols:
+        if col in df.columns:
+            df[col] = df[col].apply(normaliza_valor)
+
+    return df
+
+def normalizar_faixa_etaria(valor) -> str:
+    """
+    Normaliza faixas etárias para uso em dashboards e relatórios:
+    - Converte '55-64' e '65+' em '55+'
+    - Converte None, '', 'unknown', 'others', 'none' para 'Não classificado'
+    - Retorna o valor limpo nos demais casos
+    """
+    if not isinstance(valor, str):
+        return "Não classificado"
+
+    valor = valor.strip().lower()
+    if valor in {"", "none", "unknown", "others"}:
+        return "Não classificado"
+    if valor in {"55-64", "65+"}:
+        return "55+"
+    return valor
+
+
+
+def inferir_veiculo_meta_por_placement(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Define a coluna 'Veiculo' com base no conteúdo da coluna 'Placement'.
+    Regras:
+        - Se contiver 'facebook' ou 'audience': 'Facebook'
+        - Se contiver 'instagram': 'Instagram'
+        - Caso contrário: 'Meta'
+    """
+    def extrair_veiculo(placement):
+        if not isinstance(placement, str):
+            return "Meta"
+        placement = placement.lower()
+        if "facebook" in placement or "audience" in placement:
+            return "Facebook"
+        elif "instagram" in placement:
+            return "Instagram"
+        return "Facebook"
+
+    df = df.copy()
+    df['Veiculo'] = df.get('Placement', "").apply(extrair_veiculo)
+    return df
+
+
+def atribuir_veiculo_por_criativo(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Faz lookup do campo 'Ad name' (que representa o CRIATIVO) na aba BI_PARAMETRIZAÇÃO
+    e preenche o campo 'Veiculo' com base na coluna 'VEÍCULOS'.
+    """
+    logging.debug(">>> In atribuir_veiculo_por_criativo (via Ad name → CRIATIVO)")
+
+    from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_URL
+
+    # Carrega a aba BI_PARAMETRIZAÇÃO (começando da linha 2)
+    df_param = carregar_aba_google_sheets(CREDS_PATH, SPREADSHEET_URL, "BI_PARAMETRIZAÇÃO", header_row_index=1)
+
+    # Normaliza as colunas para facilitar acesso
+    df_param.columns = [col.strip().upper() for col in df_param.columns]
+
+    if 'CRIATIVO' not in df_param.columns or 'VEÍCULOS' not in df_param.columns:
+        logging.warning("Colunas 'CRIATIVO' ou 'VEÍCULOS' não encontradas em BI_PARAMETRIZAÇÃO.")
+        df['Veiculo'] = ""
+        return df
+
+    # Cria dicionário de mapeamento: CRIATIVO → VEÍCULO
+    mapping = dict(zip(df_param['CRIATIVO'].astype(str).str.strip(), df_param['VEÍCULOS'].astype(str).str.strip()))
+
+    # Aplica mapeamento ao campo 'Ad name'
+    df['Veiculo'] = df['Ad name'].astype(str).str.strip().map(mapping).fillna("")
+
+    return df
+
+def normalizar_genero(valor) -> str:
+    """
+    Normaliza valores de gênero:
+    - 'female', 'feminino' → 'Mulher'
+    - 'male', 'masculino' → 'Homem'
+    - vazios, 'unknown', 'others', 'none', '-' → 'Não classificado'
+    - outros valores → capitalizados
+    """
+    if not isinstance(valor, str):
+        return "Não classificado"
+
+    valor = valor.strip().lower()
+    if valor in {"female", "feminino"}:
+        return "Mulher"
+    elif valor in {"male", "masculino"}:
+        return "Homem"
+    elif valor in {"", "unknown", "others", "none", "-"}:
+        return "Não classificado"
+    return valor.capitalize()
+
+def converter_data(df, coluna='Data'):
+    """
+    Converte a coluna de data para datetime, com tratamento de erros.
+    """
+    if coluna in df.columns:
+        df[coluna] = pd.to_datetime(df[coluna], errors='coerce')
+    return df
+
+def converter_colunas_numericas(df, colunas):
+    """
+    Converte colunas especificadas para tipo numérico, preenchendo com zero os valores inválidos.
+    """
+    for col in colunas:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    return df
+
+
+# utils/numeracao.py
+
+# utils/numeracao.py
+import pandas as pd
+
+def gerar_numeracao(df, df_destino=None, linha_insercao=2, coluna='Numero'):
+    """
+    Gera uma numeração sequencial para as linhas de um DataFrame de novos dados,
+    levando em conta a numeração já existente na planilha (df_destino).
+
+    Se df_destino for fornecido e contiver a coluna, essa função converte os valores
+    para numérico e utiliza o maior valor + 1 como ponto de partida.
+    Caso contrário, usa o valor padrão (linha_insercao - 1).
+
+    Parâmetros:
+        df (pandas.DataFrame): DataFrame dos novos dados.
+        df_destino (pandas.DataFrame, opcional): DataFrame já existente na planilha, contendo a coluna de numeração.
+        linha_insercao (int, opcional): Valor base caso df_destino esteja vazio (por exemplo, 2 se a linha 1 for cabeçalho).
+        coluna (str, opcional): Nome da coluna onde a numeração será inserida. Padrão é 'Numero'.
+    
+    Retorna:
+        pandas.DataFrame: O DataFrame com a coluna de numeração atualizada.
+    """
+    numero_inicial = linha_insercao - 1  # valor padrão se não houver dados no destino
+    if df_destino is not None and not df_destino.empty:
+        # Tente localizar a coluna; se não achar "Numero", pode haver problemas de capitalização ou espaços.
+        col_dest = None
+        for col in df_destino.columns:
+            if col.strip().lower() == coluna.strip().lower():
+                col_dest = col
+                break
+        if col_dest:
+            # Converte os valores para numérico
+            serie = pd.to_numeric(df_destino[col_dest], errors='coerce')
+            ultimo = serie.max()
+            if pd.notna(ultimo):
+                numero_inicial = int(ultimo) + 1
+    df[coluna] = range(numero_inicial, numero_inicial + len(df))
+    return df
+
+
+# utils/organizar_dataframe.py
+
+import logging
+
+def remover_colunas_indesejadas(df):
+    """
+    Remove colunas que não fazem parte do modelo final.
+    """
+    colunas_para_remover = ['Placement', 'Campaign_ID', 'Campaign_name', 'Content_utm']
+    for col in colunas_para_remover:
+        if col in df.columns:
+            df.drop(columns=col, inplace=True)
+            logging.debug(f"Coluna removida: {col}")
+    return df
+
+def reordenar_colunas_para_modelo(df):
+    """
+    Reordena e garante a presença das colunas do modelo final.
+    """
+    ordem = [
+        'Numero', 'Data', 'Nome_da_Conta', 'Campanha', 'ID_Campanha', 'Veiculo', 'ID_Veiculo',
+        'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio', 'Inicio_da_Campanha', 'Fim_da_Campanha',
+        'Objetivo', 'URL_do_Anuncio', 'ID_Content', 'Investimento', 'Impressoes', 'Cliques_no_Link',
+        'Video_Play', 'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
+        'Reacoes', 'Compartilhamentos', 'Comentarios', 'Engajamento_Total', 'ID'
+    ]
+    for col in ordem:
+        if col not in df.columns:
+            df[col] = ""
+            logging.debug(f"Coluna adicionada (vazia): {col}")
+    df = df[ordem]
+    return df
+
+
+# utils/preview_links.py
+
+# utils/preview_links.py
+
+def ajustar_preview_link(url_anuncio, preview_link_fb):
+    """
+    Se 'url_anuncio' estiver vazio, retorna o valor de 'preview_link_fb'.
+    Caso contrário, retorna o valor original de 'url_anuncio'.
+    """
+    if not url_anuncio or str(url_anuncio).strip() == "":
+        return preview_link_fb if preview_link_fb else ""
+    return url_anuncio
+
+
+def construir_mapping_preview_parametrizacao(df_parametrizacao):
+    """
+    Constrói um dicionário {Content (utm) → PREVIEW}, usando o campo 'ID' da BI_PARAMETRIZAÇÃO
+    como ponto de correspondência com o valor vindo de 'Content (utm)' da aba de origem.
+
+    Exemplo:
+        - 'Content (utm)' na aba linkedinGeral = 'abc123'
+        - Busca linha na BI_PARAMETRIZAÇÃO onde ID == 'abc123'
+        - Pega o valor de PREVIEW nessa linha
+        - Resultado: mapping['abc123'] = preview correspondente
+
+    Args:
+        df_parametrizacao (pd.DataFrame): DataFrame da aba BI_PARAMETRIZAÇÃO.
+
+    Returns:
+        dict: dicionário {Content (utm) → PREVIEW}
+    """
+    mapping = {}
+    required_cols = {'ID', 'PREVIEW'}
+
+    colunas_atuais = set(df_parametrizacao.columns)
+    if not required_cols.issubset(colunas_atuais):
+        import logging
+        logging.warning("Colunas 'ID' e/ou 'PREVIEW' não encontradas na aba BI_PARAMETRIZAÇÃO.")
+        return mapping
+
+    for _, row in df_parametrizacao.iterrows():
+        id_val = str(row.get("ID", "")).strip()
+        preview = str(row.get("PREVIEW", "")).strip()
+        if id_val:
+            mapping[id_val] = preview
+    return mapping
+
+
+def construir_preview_link_pinterest(id_pin):
+    """
+    Constrói a URL de preview pública de um Pin do Pinterest a partir do seu ID.
+
+    Args:
+        id_pin (str or int): ID do Pin (ex: "1234567890")
+
+    Returns:
+        str: URL completa (ex: "https://www.pinterest.com/pin/1234567890")
+    """
+    if not id_pin or str(id_pin).strip() == "":
+        return ""
+    return f"https://www.pinterest.com/pin/{str(id_pin).strip()}"
+
+
+# utils/read_sheet_as_dataframe.py
+
+def read_sheet_as_dataframe_range(
+    client,
+    spreadsheet_id: str,
+    sheet_name: str,
+    range_str: str = "A1:ZZ",
+    header_row_index: int = 0
+):
+    """
+    Lê um intervalo específico (ex.: 'A1:AM') e converte em DataFrame,
+    garantindo que todas as linhas tenham o mesmo tamanho, preenchendo com ''
+    ou cortando ao máximo.
+    """
+    from googleapiclient.errors import HttpError
+    import pandas as pd
+
+    try:
+        sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
+        data = sheet.get(range_str)  # matriz de strings
+    except HttpError as e:
+        print(f"Erro ao ler '{sheet_name}': {e}")
+        return pd.DataFrame()
+
+    if not data or len(data) <= header_row_index:
+        return pd.DataFrame()
+
+    # 1) Determina o número máximo de colunas
+    max_cols = max(len(row) for row in data)
+
+    # 2) Ajusta cada linha para ter exat. 'max_cols'
+    for i, row in enumerate(data):
+        if len(row) < max_cols:
+            # preenche com strings vazias
+            data[i] = row + [""] * (max_cols - len(row))
+        elif len(row) > max_cols:
+            # corta o excedente
+            data[i] = row[:max_cols]
+
+    # 3) Extrai a linha de cabeçalho
+    headers = data[header_row_index]
+    body = data[header_row_index + 1 :]
+
+    # 4) Constrói o DataFrame
+    df = pd.DataFrame(body, columns=headers)
+
+    return df
+
+
+# utils/renomeacoes.py
+
+import logging
+
+# Mapeamento de objetivos de campanha para nomes padronizados
+SUBSTITUICOES_OBJETIVO = {
+    'AWARENESS': 'Alcance',
+    'COMMUNITY_INTERACTION': 'Engajamento',
+    'APP_PROMOTION': 'Promoção do app',
+    'REACH': 'Alcance',
+    'VIDEO_VIEWS': 'Visualização',
+    'TRAFFIC': 'Tráfego',
+    'CONVERSIONS': 'Conversões',
+    'LEAD_GENERATION': 'Geração de Leads',
+    'OUTCOME_AWARENESS': 'Alcance',
+    'OUTCOME_TRAFFIC': 'Tráfego',
+    'OUTCOME_ENGAGEMENT': 'Engajamento',
+    'OUTCOME_SALES': 'Vendas',
+    'OUTCOME_APP+PROMOTION': 'Promoção do app',
+    'BRAND_AWARENESS': 'Alcance',
+    'WEBSITE_VISITS': 'Tráfego',
+    'ENGAGEMENT': 'Engajamento',
+    'WEBSITE_CONVERSIONS': 'Conversões',
+    'CONSIDERATION': 'Tráfego',
+    'CATALOG_SALES': 'Vendas',
+    'WEBSITE_VISIT': 'Tráfego'
+}
+
+def aplicar_substituicoes_objetivo(df):
+    """
+    Substitui valores da coluna 'Objetivo' com base no dicionário SUBSTITUICOES_OBJETIVO.
+    """
+    if 'Objetivo' in df.columns:
+        for old, new in SUBSTITUICOES_OBJETIVO.items():
+            df.loc[df['Objetivo'] == old, 'Objetivo'] = new
+        logging.debug("[aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'")
+    else:
+        logging.warning("[aplicar_substituicoes_objetivo] Coluna 'Objetivo' não encontrada no DataFrame.")
+    return df
+
+
+def renomear_colunas_origem_para_modelo(df):
+    """
+    Renomeia colunas de plataformas para os nomes padronizados do modelo geral.
+    Ignora colunas ausentes sem erro.
+    """
+    renomear = {
+        'Date': 'Data', 'Account name': 'Nome_da_Conta', 'Advertiser name': 'Nome_da_Conta',
+        'Campaign name': 'Campaign_name', 'Ad group name': 'Nome_do_Conjunto_de_Anuncio',
+        'Ad set name': 'Nome_do_Conjunto_de_Anuncio', 'Ad name': 'Nome_do_Anuncio',
+        'Campaign ID': 'Campaign_ID', 'Start': 'Inicio_da_Campanha', 'End': 'Fim_da_Campanha',
+        'Campaign objective type': 'Objetivo', 'Campaign objective': 'Objetivo',
+        'Placement': 'Placement', 'Preview Link': 'URL_do_Anuncio',
+        'Content (utm)': 'ID_Content', 'Impressions': 'Impressoes', 'Cost': 'Investimento',
+        'Link clicks': 'Cliques_no_Link', 'Clicks': 'Cliques_no_Link',
+        'Video play actions': 'Video_Play', 'Video views': 'Video_Play',
+        'Video watches at 25%': 'Visualizacoes_ate_25', 'Video watches at 50%': 'Visualizacoes_ate_50',
+        'Video watches at 75%': 'Visualizacoes_ate_75', 'Video watches at 100%': 'Visualizacoes_ate_100',
+        'Post reactions': 'Reacoes', 'Paid likes': 'Reacoes', 'Post shares': 'Compartilhamentos',
+        'Paid shares': 'Compartilhamentos', 'Post comments': 'Comentarios', 'Paid comments': 'Comentarios'
+    }
+    df.rename(columns=renomear, inplace=True)
+    logging.debug("[renomear_colunas_origem_para_modelo] Colunas após renomear: %s", list(df.columns))
+    return df
+
+
+# utils/setup_logging.py
+
+import logging
+
+def setup_logging(level=logging.DEBUG):
+    """
+    Configura o log do projeto com o nível especificado e um formato padrão.
+    
+    Parâmetros:
+        level (int, opcional): Nível de log (ex: logging.INFO, logging.DEBUG). Padrão: logging.INFO.
+    """
+    logging.basicConfig(level=level, format='%(levelname)s: %(message)s')
+
+
+# utils/testgeolocalizacao.py
+
+import json
+from geolocalizacao import (
+    carregar_cache_estados,
+    carregar_cache_municipios,
+    obter_estado_de_regiao
+)
+
+# Caminhos para os arquivos de cache
+path_cache_estados = "utils/cache_estados.json"
+path_cache_municipios = "utils/cache_municipios_estados.json"
+
+# Carrega os dicionários
+cache_estados = carregar_cache_estados(path_cache_estados)
+cache_municipios = carregar_cache_municipios(path_cache_municipios)
+
+# Lista de regiões para testar
+valores_para_teste = [
+    "Acre (state)",
+    "Rio de Janeiro (state)",
+    "Unknown",
+    "São Paulo (state)",
+    "Federal District",
+    "Sao Paulo",
+    "Amapa",
+    "Para",
+    "-1",
+    "BR-OTHER",
+    "Greater Cuiaba",
+    "Brazil: Maranhao",
+    "Greater São Paulo Area",
+    "Brazil: Sao Paulo",
+    "Greater Richmond Region",
+    "London Area, United Kingdom",
+    "Los Angeles Metropolitan Area",
+    "Greater Ribeirão Preto",
+    "Greater São Luís Area",
+    "Charlotte Metro",
+    "Bogotá D.C. Metropolitan Area",
+    "Greater Belem",
+    "Vitoria, Brazil Metropolitan Area",
+    "State of Piaui"
+]
+
+# Dicionário para guardar os resultados
+resultados = {}
+
+# Executa o teste
+for valor in valores_para_teste:
+    estado = obter_estado_de_regiao(valor, cache_estados, cache_municipios)
+    resultados[valor] = estado
+
+# Exibe o resultado como JSON formatado
+print(json.dumps(resultados, indent=2, ensure_ascii=False))
+
+

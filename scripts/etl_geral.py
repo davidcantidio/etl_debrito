@@ -3,18 +3,15 @@ import numpy as np
 import logging
 
 from utils.campanha_mapper import buscar_mapping
-from utils.objetivos import SUBSTITUICOES_OBJETIVO
+from utils.renomeacoes import aplicar_substituicoes_objetivo, renomear_colunas_origem_para_modelo
 from utils.numeracao import gerar_numeracao
-from utils.datas import transformar_para_date
+from utils.datas import transformar_para_date, converter_data
 from utils.preview_links import construir_preview_link_pinterest, ajustar_preview_link
-from utils.get_nome_campanha import obter_nome_por_utm_content
-from utils.normalize import inferir_veiculo_meta_por_placement
-from utils.google_sheets import carregar_aba_google_sheets
-from utils.common_linkedin import carregar_mapeamentos_linkedin, buscar_nome_criativo_com_log
-from utils.atribuicao_veiculo_nome_e_id import (
-    atribuir_veiculo_e_id_meta,
-    atribuir_id_veiculo_generico,
-)
+from utils.common_linkedin import buscar_nome_criativo_com_log
+from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico, aplicar_parametrizacao_campanha
+from utils.campos_calculados import calcular_engajamento_total, inicializar_colunas_auxiliares
+from utils.normalize import converter_colunas_numericas
+from utils.organizar_dataframe import remover_colunas_indesejadas, reordenar_colunas_para_modelo
 
 
 class BaseGeralETL:
@@ -25,59 +22,27 @@ class BaseGeralETL:
         self.veiculo = veiculo
         self.mapping_campanha = mapping_campanha or {}
         self.mapping_sigla = mapping_sigla or {}
-        self.substituicoes = {'Objetivo': SUBSTITUICOES_OBJETIVO}
 
     def renomear_colunas_origem_para_modelo(self):
-        renomear = {
-            'Date': 'Data', 'Account name': 'Nome_da_Conta', 'Advertiser name': 'Nome_da_Conta',
-            'Campaign name': 'Campaign_name', 'Ad group name': 'Nome_do_Conjunto_de_Anuncio',
-            'Ad set name': 'Nome_do_Conjunto_de_Anuncio', 'Ad name': 'Nome_do_Anuncio',
-            'Campaign ID': 'Campaign_ID', 'Start': 'Inicio_da_Campanha', 'End': 'Fim_da_Campanha',
-            'Campaign objective type': 'Objetivo', 'Campaign objective': 'Objetivo',
-            'Placement': 'Placement', 'Preview Link': 'URL_do_Anuncio',
-            'Content (utm)': 'ID_Content', 'Impressions': 'Impressoes', 'Cost': 'Investimento',
-            'Link clicks': 'Cliques_no_Link', 'Clicks': 'Cliques_no_Link',
-            'Video play actions': 'Video_Play', 'Video views': 'Video_Play',
-            'Video watches at 25%': 'Visualizacoes_ate_25', 'Video watches at 50%': 'Visualizacoes_ate_50',
-            'Video watches at 75%': 'Visualizacoes_ate_75', 'Video watches at 100%': 'Visualizacoes_ate_100',
-            'Post reactions': 'Reacoes', 'Paid likes': 'Reacoes', 'Post shares': 'Compartilhamentos',
-            'Paid shares': 'Compartilhamentos', 'Post comments': 'Comentarios', 'Paid comments': 'Comentarios'
-        }
-        self.df.rename(columns=renomear, inplace=True)
-        logging.debug(f"Colunas após renomear: {list(self.df.columns)}")
+        self.df = renomear_colunas_origem_para_modelo(self.df)
 
     def ajustar_tipos_e_calculos(self):
-        if 'Data' in self.df.columns:
-            self.df['Data'] = pd.to_datetime(self.df['Data'], errors='coerce')
-
-        numericas = ['Impressoes', 'Investimento', 'Cliques_no_Link', 'Video_Play',
-                     'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
-                     'Reacoes', 'Compartilhamentos', 'Comentarios']
-        for col in numericas:
-            if col in self.df.columns:
-                self.df[col] = pd.to_numeric(self.df[col], errors='coerce').fillna(0)
-
-        if all(x in self.df.columns for x in ['Reacoes', 'Compartilhamentos', 'Comentarios']):
-            self.df['Engajamento_Total'] = self.df['Reacoes'] + self.df['Compartilhamentos'] + self.df['Comentarios']
-        else:
-            self.df['Engajamento_Total'] = 0
-
-        self.df['Numero'] = self.df.get('Numero', np.nan)
-        self.df['ID'] = self.df.get('ID', np.nan)
+        self.df = converter_data(self.df, 'Data')
+        colunas_numericas = [
+            'Impressoes', 'Investimento', 'Cliques_no_Link', 'Video_Play',
+            'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
+            'Reacoes', 'Compartilhamentos', 'Comentarios'
+        ]
+        self.df = converter_colunas_numericas(self.df, colunas_numericas)
+        self.df = calcular_engajamento_total(self.df)
+        self.df = inicializar_colunas_auxiliares(self.df)
 
     def aplicar_substituicoes_objetivo(self):
-        if 'Objetivo' in self.df.columns:
-            for old, new in self.substituicoes['Objetivo'].items():
-                self.df.loc[self.df['Objetivo'] == old, 'Objetivo'] = new
+        self.df = aplicar_substituicoes_objetivo(self.df)
 
     def aplicar_parametrizacao_campanha_externa(self):
-        if 'Campaign_name' not in self.df.columns:
-            self.df['Campanha'] = ""
-            self.df['ID_Campanha'] = ""
-            return
-
-        self.df['Campanha'] = self.df['Campaign_name'].apply(lambda x: buscar_mapping(self.mapping_campanha, x) or x)
-        self.df['ID_Campanha'] = self.df['Campaign_name'].apply(lambda x: buscar_mapping(self.mapping_sigla, x))
+        logging.debug(">>> In aplicar_parametrizacao_campanha_externa")
+        self.df = aplicar_parametrizacao_campanha(self.df, self.mapping_campanha, self.mapping_sigla)
 
     def criar_veiculo(self):
         logging.debug(">>> In criar_veiculo (default) com atribuição genérica")
@@ -85,22 +50,10 @@ class BaseGeralETL:
         self.df = atribuir_id_veiculo_generico(self.df)
 
     def remover_colunas_indesejadas(self):
-        for col in ['Placement', 'Campaign_ID', 'Campaign_name', 'Content_utm']:
-            if col in self.df.columns:
-                self.df.drop(columns=col, inplace=True)
+        self.df = remover_colunas_indesejadas(self.df)
 
     def reordenar_colunas_para_modelo(self):
-        ordem = [
-            'Numero', 'Data', 'Nome_da_Conta', 'Campanha', 'ID_Campanha', 'Veiculo', 'ID_Veiculo',
-            'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio', 'Inicio_da_Campanha', 'Fim_da_Campanha',
-            'Objetivo', 'URL_do_Anuncio', 'ID_Content', 'Investimento', 'Impressoes', 'Cliques_no_Link',
-            'Video_Play', 'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
-            'Reacoes', 'Compartilhamentos', 'Comentarios', 'Engajamento_Total', 'ID'
-        ]
-        for col in ordem:
-            if col not in self.df.columns:
-                self.df[col] = ""
-        self.df = self.df[ordem]
+        self.df = reordenar_colunas_para_modelo(self.df)
 
     def gerar_id(self):
         self.df['ID'] = self.df.apply(

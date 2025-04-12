@@ -5,8 +5,8 @@ import numpy as np
 import logging
 from utils.normalize import inferir_veiculo_meta_por_placement
 from utils.campanha_mapper import buscar_mapping
-from utils.geolocalizacao import obter_estado_de_regiao
-from utils.objetivos import SUBSTITUICOES_OBJETIVO
+from utils.geo_normalize import obter_estado_de_regiao
+from utils.renomeacoes import SUBSTITUICOES_OBJETIVO
 from utils.numeracao import gerar_numeracao
 
 class BaseRegiaoETL:

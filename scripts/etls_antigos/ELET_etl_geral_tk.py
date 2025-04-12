@@ -3,7 +3,7 @@ import numpy as np
 import logging
 
 from utils.campanha_mapper import buscar_mapping
-from utils.geolocalizacao import obter_estado_de_regiao
+from utils.geo_normalize import obter_estado_de_regiao
 from utils.objetivos import SUBSTITUICOES_OBJETIVO
 
 class BaseETL:

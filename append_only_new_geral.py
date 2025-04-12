@@ -19,51 +19,48 @@ from scripts.etl_geral import (
     PinterestGeralETL,
 )
 
-# IMPORT FEITO AQUI, APÓS A IMPORTAÇÃO DOS ETLs, PARA EVITAR LOOP CIRCULAR
-from utils.common_linkedin import preparar_kwargs_linkedin
+from utils.common_linkedin import preparar_kwargs_linkedin  # evita loop circular
 
 
 def main():
     setup_logging(level=logging.DEBUG)
 
-    source_sheet = "pinterestGeral"
+    source_sheet = "linkedinGeral"
     target_sheet = "modeloGeral"
     plataforma = source_sheet.lower().replace("geral", "").strip()
 
-    if plataforma == "meta":
-        etl_class = MetaGeralETL
-        veiculo_nome = None  # Inferido dinamicamente
-    elif plataforma == "tiktok":
-        etl_class = TiktokGeralETL
-        veiculo_nome = "Tiktok"
-    elif plataforma == "linkedin":
-        etl_class = LinkedinGeralETL
-        veiculo_nome = "Linkedin"
-    elif plataforma == "pinterest":
-        etl_class = PinterestGeralETL
-        veiculo_nome = "Pinterest"
-    else:
-        raise ValueError(f"Não há subclasse de ETL definida para a plataforma '{plataforma}'")
+    # Mapeamento da subclasse ETL com base na plataforma
+    etl_class_map = {
+        "meta": (MetaGeralETL, None),
+        "tiktok": (TiktokGeralETL, "Tiktok"),
+        "linkedin": (LinkedinGeralETL, "Linkedin"),
+        "pinterest": (PinterestGeralETL, "Pinterest"),
+    }
+
+    if plataforma not in etl_class_map:
+        raise ValueError(f"Plataforma '{plataforma}' não suportada.")
+
+    etl_class, veiculo_nome = etl_class_map[plataforma]
 
     logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
     df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
 
     if "Date" in df_origin.columns:
         df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
-    logging.debug(f"df_origin shape após remoção de linhas com Date vazio: {df_origin.shape}")
+    logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
 
     logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
     mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
 
+    # Mapeamentos adicionais para LinkedIn
     extra_kwargs = {}
     if plataforma == "linkedin":
         extra_kwargs.update(preparar_kwargs_linkedin())
 
-    id_veiculo = None  # Sempre atribuído dinamicamente pelos ETLs
-
+    # Cria instância do ETL
     etl_instance = etl_class(
         df=df_origin,
-        id_veiculo=id_veiculo,
+        id_veiculo=None,  # sempre atribuído dentro do ETL
         veiculo=veiculo_nome,
         mapping_campanha=mapping_campanha,
         mapping_sigla=mapping_sigla,
@@ -73,11 +70,7 @@ def main():
     logging.info(f"Lendo dados da aba de destino '{target_sheet}'...")
     client = get_google_client(creds_path)
     df_target = read_sheet_as_dataframe_range(
-        client,
-        spreadsheet_id,
-        sheet_name=target_sheet,
-        range_str="A1:AM",
-        header_row_index=0
+        client, spreadsheet_id, sheet_name=target_sheet, range_str="A1:AM", header_row_index=0
     )
 
     logging.info(f"Executando ETL Geral para '{plataforma}'...")
@@ -85,13 +78,14 @@ def main():
 
     logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
     missing_records = get_missing_records(df_processed, df_target)
+
     if missing_records.empty:
         logging.info("Não há registros faltantes para inserir.")
     else:
         append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, missing_records)
         logging.info(f"Inseridos {missing_records.shape[0]} novos registros na aba '{target_sheet}'.")
 
-    logging.info(f"Processo de atualização para '{target_sheet}' concluído com sucesso.")
+    logging.info(f"Atualização da aba '{target_sheet}' concluída com sucesso.")
 
 
 if __name__ == "__main__":

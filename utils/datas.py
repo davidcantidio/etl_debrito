@@ -1,6 +1,8 @@
 # utils/datas.py
 
 from datetime import datetime, date
+import pandas as pd
+
 
 def transformar_para_date(valor):
     """
@@ -13,32 +15,38 @@ def transformar_para_date(valor):
 
     Retorna:
         date: objeto da classe date (ex: 2024-04-15)
-
-    Exceções:
-        ValueError: Se o valor não puder ser interpretado como data.
     """
     if not valor:
         return None
 
-    # Se já for um objeto date, retorna diretamente
     if isinstance(valor, date) and not isinstance(valor, datetime):
         return valor
 
-    # Se for um objeto datetime, extrai a parte de data
     if isinstance(valor, datetime):
         return valor.date()
 
-    # Se for uma string, tenta converter para datetime com o formato esperado
     if isinstance(valor, str):
-        try:
-            dt = datetime.strptime(valor, "%Y-%m-%d %H:%M:%S")
-            return dt.date()
-        except ValueError:
-            # Caso a string já esteja no formato "YYYY-MM-DD"
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
             try:
-                dt = datetime.strptime(valor, "%Y-%m-%d")
-                return dt.date()
+                return datetime.strptime(valor.strip(), fmt).date()
             except ValueError:
-                raise ValueError(f"Formato de data não reconhecido: {valor}")
+                continue
+        raise ValueError(f"Formato de data não reconhecido: {valor}")
     
     raise ValueError(f"Tipo de valor não suportado: {type(valor)}")
+
+
+def converter_data(df: pd.DataFrame, coluna: str = 'Data') -> pd.DataFrame:
+    """
+    Converte a coluna especificada do DataFrame para o tipo `date` (sem hora).
+
+    Parâmetros:
+        df (pd.DataFrame): DataFrame contendo a coluna de data.
+        coluna (str): Nome da coluna a ser convertida.
+
+    Retorna:
+        pd.DataFrame: DataFrame com a coluna convertida para `date`.
+    """
+    if coluna in df.columns:
+        df[coluna] = pd.to_datetime(df[coluna], errors='coerce').dt.date
+    return df

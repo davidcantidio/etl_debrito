@@ -2,8 +2,12 @@ import pandas as pd
 import logging
 from utils.normalize import normalizar_faixa_etaria
 from utils.campanha_mapper import buscar_mapping
-from utils.objetivos import SUBSTITUICOES_OBJETIVO
-from utils.atribuicao_veiculo_nome_e_id import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico
+from utils.renomeacoes import SUBSTITUICOES_OBJETIVO
+from utils.atribuicoes_via_lookup import (
+    atribuir_veiculo_e_id_meta,
+    atribuir_id_veiculo_generico,
+    preencher_campos_com_campanha,
+)
 from utils.numeracao import gerar_numeracao
 
 
