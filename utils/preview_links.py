@@ -44,7 +44,7 @@ def construir_mapping_preview_parametrizacao(df_parametrizacao):
     return mapping
 
 
-def construir_preview_link_pinterest(id_pin):
+def build_pinterest_preview_link(id_pin):
     """
     Constrói a URL de preview pública de um Pin do Pinterest a partir do seu ID.
 
