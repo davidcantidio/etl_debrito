@@ -1,6 +1,6 @@
 # utils/preview_links.py
 
-def ajustar_preview_link(url_anuncio, preview_link_fb):
+def select_meta_preview_link(url_anuncio, preview_link_fb):
     """
     Se 'url_anuncio' estiver vazio, retorna o valor de 'preview_link_fb'.
     Caso contrário, retorna o valor original de 'url_anuncio'.

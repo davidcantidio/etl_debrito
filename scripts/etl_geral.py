@@ -6,7 +6,7 @@ from utils.campanha_mapper import buscar_mapping
 from utils.renomeacoes import aplicar_substituicoes_objetivo, renomear_colunas_origem_para_modelo
 from utils.numeracao import gerar_numeracao
 from utils.datas import transformar_para_date, converter_data
-from utils.preview_links import construir_preview_link_pinterest, ajustar_preview_link
+from utils.preview_links import construir_preview_link_pinterest, select_meta_preview_link
 from utils.common_linkedin import buscar_nome_criativo_com_log
 from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico, aplicar_parametrizacao_campanha
 from utils.campos_calculados import calcular_engajamento_total, inicializar_colunas_auxiliares
@@ -85,7 +85,7 @@ class MetaGeralETL(BaseGeralETL):
             self.df.rename(columns={'Preview Link FB': 'Preview_Link_FB'}, inplace=True)
         if 'URL_do_Anuncio' in self.df.columns and 'Preview_Link_FB' in self.df.columns:
             self.df['URL_do_Anuncio'] = self.df.apply(
-                lambda row: ajustar_preview_link(row['URL_do_Anuncio'], row['Preview_Link_FB']), axis=1
+                lambda row: select_meta_preview_link(row['URL_do_Anuncio'], row['Preview_Link_FB']), axis=1
             )
 
     def criar_veiculo(self):
