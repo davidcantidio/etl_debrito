@@ -2,7 +2,7 @@ import logging
 from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.normalize import normalize_columns, normalize_parametrizacao_values
-from utils.preview_links import construir_mapping_preview_parametrizacao
+from utils.preview_links import generate_preview_link_from_lookup
 from utils.get_nome_campanha import carregar_mapeamento_nome_creativo, obter_nome_por_utm_content
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 
@@ -26,7 +26,7 @@ def carregar_mapeamentos_linkedin():
     df_parametrizacao.columns = normalize_columns(df_parametrizacao.columns)
     df_parametrizacao = normalize_parametrizacao_values(df_parametrizacao)
 
-    mapping_preview = construir_mapping_preview_parametrizacao(df_parametrizacao)
+    mapping_preview = generate_preview_link_from_lookup(df_parametrizacao)
     mapping_criativo = carregar_mapeamento_nome_creativo(df_parametrizacao)
 
     return mapping_preview, mapping_criativo

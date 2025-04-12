@@ -10,7 +10,7 @@ def select_meta_preview_link(url_anuncio, preview_link_fb):
     return url_anuncio
 
 
-def construir_mapping_preview_parametrizacao(df_parametrizacao):
+def generate_preview_link_from_lookup(df_parametrizacao):
     """
     Constrói um dicionário {Content (utm) → PREVIEW}, usando o campo 'ID' da BI_PARAMETRIZAÇÃO
     como ponto de correspondência com o valor vindo de 'Content (utm)' da aba de origem.
