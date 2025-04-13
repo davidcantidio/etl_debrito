@@ -3,7 +3,7 @@ from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.normalize import normalize_columns, normalize_parametrizacao_values
 from utils.preview_links import generate_linkedin_ad_preview_link_from_lookup
-from utils.get_nome_campanha import carregar_mapeamento_nome_creativo, obter_nome_por_utm_content
+from utils.creative_mapping import carregar_mapeamento_nome_creativo, obter_nome_por_utm_content
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 
 def carregar_mapeamentos_linkedin():
