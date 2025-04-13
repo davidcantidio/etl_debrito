@@ -1,6 +1,8 @@
-# utils/preview_links.py
+import logging
+import pandas as pd
 
-def determine_meta_ad_preview_link(df):
+
+def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     """
     Determina o link de visualização do anúncio para Meta Ads,
     usando 'Preview Link FB' como fallback para 'URL_do_Anuncio'.
@@ -8,49 +10,46 @@ def determine_meta_ad_preview_link(df):
     """
     if 'Preview Link FB' in df.columns:
         df = df.rename(columns={'Preview Link FB': 'Preview_Link_FB'})
+
     if 'URL_do_Anuncio' in df.columns and 'Preview_Link_FB' in df.columns:
         df['URL_do_Anuncio'] = df.apply(
-            lambda row: row['Preview_Link_FB'] if not row['URL_do_Anuncio'] or str(row['URL_do_Anuncio']).strip() == "" else row['URL_do_Anuncio'],
+            lambda row: row['Preview_Link_FB']
+            if not row['URL_do_Anuncio'] or str(row['URL_do_Anuncio']).strip() == ""
+            else row['URL_do_Anuncio'],
             axis=1
         )
+
     return df
 
 
-def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao):
+def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao: pd.DataFrame) -> dict:
     """
-    Constrói um dicionário {Content (utm) → PREVIEW}, usando o campo 'ID' da BI_PARAMETRIZAÇÃO
-    como ponto de correspondência com o valor vindo de 'Content (utm)' da aba de origem.
-
-    Exemplo:
-        - 'Content (utm)' na aba linkedinGeral = 'abc123'
-        - Busca linha na BI_PARAMETRIZAÇÃO onde ID == 'abc123'
-        - Pega o valor de PREVIEW nessa linha
-        - Resultado: mapping['abc123'] = preview correspondente
-
-    Args:
-        df_parametrizacao (pd.DataFrame): DataFrame da aba BI_PARAMETRIZAÇÃO.
-
-    Returns:
-        dict: dicionário {Content (utm) → PREVIEW}
+    Gera um dicionário {ID_Content: Preview_Link} a partir da aba BI_PARAMETRIZAÇÃO.
+    - ID_Content vem da coluna 'ID'
+    - Preview vem da coluna 'PREVIEW'
     """
-    mapping = {}
-    required_cols = {'ID', 'PREVIEW'}
+    logging.debug("Iniciando geração de mapping_preview para LinkedIn...")
 
-    colunas_atuais = set(df_parametrizacao.columns)
-    if not required_cols.issubset(colunas_atuais):
-        import logging
+    # Identifica as colunas certas sem alterar o df original
+    colunas_normalizadas = [col.strip().upper() for col in df_parametrizacao.columns]
+    coluna_id = next((col for col in df_parametrizacao.columns if col.strip().upper() == 'ID'), None)
+    coluna_preview = next((col for col in df_parametrizacao.columns if col.strip().upper() == 'PREVIEW'), None)
+
+    if not coluna_id or not coluna_preview:
         logging.warning("Colunas 'ID' e/ou 'PREVIEW' não encontradas na aba BI_PARAMETRIZAÇÃO.")
-        return mapping
+        return {}
 
-    for _, row in df_parametrizacao.iterrows():
-        id_val = str(row.get("ID", "")).strip()
-        preview = str(row.get("PREVIEW", "")).strip()
-        if id_val:
-            mapping[id_val] = preview
+    df = df_parametrizacao[[coluna_id, coluna_preview]].dropna()
+    df[coluna_id] = df[coluna_id].astype(str).str.strip()
+    df[coluna_preview] = df[coluna_preview].astype(str).str.strip()
+
+    mapping = dict(zip(df[coluna_id], df[coluna_preview]))
+
+    logging.debug(f"Exemplos de mapping_preview gerados: {list(mapping.items())[:5]}")
     return mapping
 
 
-def build_pinterest_preview_link(id_pin):
+def build_pinterest_preview_link(id_pin: str) -> str:
     """
     Constrói a URL de preview pública de um Pin do Pinterest a partir do seu ID.
 
