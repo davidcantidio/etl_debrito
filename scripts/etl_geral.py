@@ -104,23 +104,14 @@ class LinkedinGeralETL(BaseGeralETL):
             self.df['URL_do_Anuncio'] = self.df['ID_Content'].map(self.mapping_preview).fillna("")
 
 
+from utils.datas import generate_pinterest_dates
+from utils.preview_links import generate_pinterest_ad_preview_link
+
 class PinterestGeralETL(BaseGeralETL):
-    def ajustes_preview(self):
-        if 'start' in self.df.columns:
-            self.df['Inicio_da_Campanha'] = self.df['start'].apply(transformar_para_date)
-        else:
-            self.df['Inicio_da_Campanha'] = ""
-
-        if 'end' in self.df.columns:
-            self.df['Fim_da_Campanha'] = self.df['end'].apply(transformar_para_date)
-        else:
-            self.df['Fim_da_Campanha'] = ""
-
-        match_col = [col for col in self.df.columns if col.strip().lower() == 'preview link']
-        if match_col:
-            self.df['URL_do_Anuncio'] = self.df[match_col[0]].apply(build_pinterest_preview_link)
-        else:
-            self.df['URL_do_Anuncio'] = ""
+    def ajustar_tipos_e_calculos(self):
+        super().ajustar_tipos_e_calculos()
+        self.df = generate_pinterest_dates(self.df)
+        self.df = generate_pinterest_ad_preview_link(self.df)
 
 
 class TiktokGeralETL(BaseGeralETL):

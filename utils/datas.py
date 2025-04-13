@@ -50,3 +50,21 @@ def converter_data(df: pd.DataFrame, coluna: str = 'Data') -> pd.DataFrame:
     if coluna in df.columns:
         df[coluna] = pd.to_datetime(df[coluna], errors='coerce').dt.date
     return df
+
+
+def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preenche as colunas 'Inicio_da_Campanha' e 'Fim_da_Campanha' convertendo
+    as colunas 'start' e 'end' (datetime) para datas (YYYY-MM-DD) no Pinterest.
+    """
+    if 'start' in df.columns:
+        df['Inicio_da_Campanha'] = df['start'].apply(transformar_para_date)
+    else:
+        df['Inicio_da_Campanha'] = ""
+
+    if 'end' in df.columns:
+        df['Fim_da_Campanha'] = df['end'].apply(transformar_para_date)
+    else:
+        df['Fim_da_Campanha'] = ""
+
+    return df

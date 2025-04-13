@@ -3,14 +3,31 @@ import logging
 
 def calcular_engajamento_total(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calcula o campo 'Engajamento_Total' como a soma de Reacoes, Compartilhamentos e Comentarios.
+    Calcula a coluna 'Engajamento_Total' como a soma de:
+    - Reacoes
+    - Compartilhamentos
+    - Comentarios
+
+    Caso os campos 'Compartilhamentos' ou 'Comentarios' estejam ausentes ou vazios,
+    assume valor 0.
     """
-    logging.debug(">>> In calcular_engajamento_total")
-    if all(col in df.columns for col in ['Reacoes', 'Compartilhamentos', 'Comentarios']):
-        df['Engajamento_Total'] = df['Reacoes'] + df['Compartilhamentos'] + df['Comentarios']
+    for col in ['Compartilhamentos', 'Comentarios']:
+        if col not in df.columns:
+            df[col] = 0
+        else:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+    if 'Reacoes' not in df.columns:
+        df['Reacoes'] = 0
     else:
-        df['Engajamento_Total'] = 0
+        df['Reacoes'] = pd.to_numeric(df['Reacoes'], errors='coerce').fillna(0)
+
+    df['Engajamento_Total'] = (
+        df['Reacoes'] + df['Compartilhamentos'] + df['Comentarios']
+    )
+
     return df
+
 
 def inicializar_colunas_auxiliares(df: pd.DataFrame) -> pd.DataFrame:
     """

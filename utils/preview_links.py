@@ -62,3 +62,17 @@ def build_pinterest_preview_link(id_pin: str) -> str:
     if not id_pin or str(id_pin).strip() == "":
         return ""
     return f"https://www.pinterest.com/pin/{str(id_pin).strip()}"
+
+
+def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preenche a coluna 'URL_do_Anuncio' com base na coluna 'Preview Link'
+    aplicando a função build_pinterest_preview_link().
+    """
+    match_col = [col for col in df.columns if col.strip().lower() == 'preview link']
+    if match_col:
+        df['URL_do_Anuncio'] = df[match_col[0]].apply(build_pinterest_preview_link)
+    else:
+        df['URL_do_Anuncio'] = ""
+    return df
+
