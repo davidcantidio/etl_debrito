@@ -1,16 +1,22 @@
 # utils/preview_links.py
 
-def select_meta_preview_link(url_anuncio, preview_link_fb):
+def determine_meta_ad_preview_link(df):
     """
-    Se 'url_anuncio' estiver vazio, retorna o valor de 'preview_link_fb'.
-    Caso contrário, retorna o valor original de 'url_anuncio'.
+    Determina o link de visualização do anúncio para Meta Ads,
+    usando 'Preview Link FB' como fallback para 'URL_do_Anuncio'.
+    Renomeia a coluna se necessário e aplica a lógica de substituição.
     """
-    if not url_anuncio or str(url_anuncio).strip() == "":
-        return preview_link_fb if preview_link_fb else ""
-    return url_anuncio
+    if 'Preview Link FB' in df.columns:
+        df = df.rename(columns={'Preview Link FB': 'Preview_Link_FB'})
+    if 'URL_do_Anuncio' in df.columns and 'Preview_Link_FB' in df.columns:
+        df['URL_do_Anuncio'] = df.apply(
+            lambda row: row['Preview_Link_FB'] if not row['URL_do_Anuncio'] or str(row['URL_do_Anuncio']).strip() == "" else row['URL_do_Anuncio'],
+            axis=1
+        )
+    return df
 
 
-def generate_preview_link_from_lookup(df_parametrizacao):
+def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao):
     """
     Constrói um dicionário {Content (utm) → PREVIEW}, usando o campo 'ID' da BI_PARAMETRIZAÇÃO
     como ponto de correspondência com o valor vindo de 'Content (utm)' da aba de origem.

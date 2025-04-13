@@ -1,4 +1,5 @@
 import logging
+from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER
 
 def remover_colunas_indesejadas(df):
     """
@@ -11,20 +12,12 @@ def remover_colunas_indesejadas(df):
             logging.debug(f"Coluna removida: {col}")
     return df
 
-def reordenar_colunas_para_modelo(df):
-    """
-    Reordena e garante a presença das colunas do modelo final.
-    """
-    ordem = [
-        'Numero', 'Data', 'Nome_da_Conta', 'Campanha', 'ID_Campanha', 'Veiculo', 'ID_Veiculo',
-        'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio', 'Inicio_da_Campanha', 'Fim_da_Campanha',
-        'Objetivo', 'URL_do_Anuncio', 'ID_Content', 'Investimento', 'Impressoes', 'Cliques_no_Link',
-        'Video_Play', 'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
-        'Reacoes', 'Compartilhamentos', 'Comentarios', 'Engajamento_Total', 'ID'
-    ]
-    for col in ordem:
+
+def reordenar_colunas_para_modelo(df, column_order_list):
+    for col in column_order_list:
         if col not in df.columns:
             df[col] = ""
             logging.debug(f"Coluna adicionada (vazia): {col}")
-    df = df[ordem]
+    df = df[column_order_list]
     return df
+

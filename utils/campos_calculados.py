@@ -26,3 +26,14 @@ def remover_colunas_indesejadas(self):
     for col in ['Placement', 'Campaign_ID', 'Campaign_name', 'Content_utm']:
         if col in self.df.columns:
             self.df.drop(columns=col, inplace=True)
+
+def gerar_id(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Gera a coluna 'ID' a partir da concatenação de campos-chave.
+    """
+    df = df.copy()
+    df['ID'] = df.apply(
+        lambda row: f"{row['Data']}-{row['Campanha']}-{row['Impressoes']}-{row['Investimento']}-{row['Cliques_no_Link']}",
+        axis=1
+    )
+    return df

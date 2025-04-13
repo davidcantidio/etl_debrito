@@ -18,18 +18,16 @@ from scripts.etl_geral import (
     LinkedinGeralETL,
     PinterestGeralETL,
 )
-
-from utils.common_linkedin import preparar_kwargs_linkedin  # evita loop circular
+from utils.common_linkedin import preparar_kwargs_linkedin
 
 
 def main():
     setup_logging(level=logging.DEBUG)
 
-    source_sheet = "linkedinGeral"
+    source_sheet = "linkedinGeral"  # ← Troque aqui se quiser rodar outras plataformas
     target_sheet = "modeloGeral"
     plataforma = source_sheet.lower().replace("geral", "").strip()
 
-    # Mapeamento da subclasse ETL com base na plataforma
     etl_class_map = {
         "meta": (MetaGeralETL, None),
         "tiktok": (TiktokGeralETL, "Tiktok"),
@@ -45,22 +43,24 @@ def main():
     logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
     df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
 
+    # Limpa linhas vazias com base na coluna Date
     if "Date" in df_origin.columns:
         df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
+
     logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
+    logging.debug(f"Colunas da origem: {df_origin.columns.tolist()}")
+    logging.debug(df_origin.head(3).to_string())
 
     logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
     mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
 
-    # Mapeamentos adicionais para LinkedIn
     extra_kwargs = {}
     if plataforma == "linkedin":
         extra_kwargs.update(preparar_kwargs_linkedin())
 
-    # Cria instância do ETL
     etl_instance = etl_class(
         df=df_origin,
-        id_veiculo=None,  # sempre atribuído dentro do ETL
+        id_veiculo=None,
         veiculo=veiculo_nome,
         mapping_campanha=mapping_campanha,
         mapping_sigla=mapping_sigla,
@@ -75,6 +75,9 @@ def main():
 
     logging.info(f"Executando ETL Geral para '{plataforma}'...")
     df_processed = etl_instance.processar(df_destino=df_target)
+
+    logging.debug("Prévia dos dados processados:")
+    logging.debug(df_processed.head(3).to_string())
 
     logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
     missing_records = get_missing_records(df_processed, df_target)

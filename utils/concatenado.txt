@@ -54,6 +54,8 @@ def append_records_to_sheet(creds_path, spreadsheet_id, sheet_name, df):
 import logging
 from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_ID, SPREADSHEET_URL
 from utils.normalize import inferir_veiculo_meta_por_placement
+from utils.campanha_mapper import buscar_mapping
+
 import pandas as pd
 
 def atribuir_id_veiculo_generico(df: pd.DataFrame) -> pd.DataFrame:
@@ -199,13 +201,24 @@ def remover_colunas_indesejadas(self):
         if col in self.df.columns:
             self.df.drop(columns=col, inplace=True)
 
+def gerar_id(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Gera a coluna 'ID' a partir da concatenação de campos-chave.
+    """
+    df = df.copy()
+    df['ID'] = df.apply(
+        lambda row: f"{row['Data']}-{row['Campanha']}-{row['Impressoes']}-{row['Investimento']}-{row['Cliques_no_Link']}",
+        axis=1
+    )
+    return df
+
 # utils/common_linkedin.py
 
 import logging
 from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.normalize import normalize_columns, normalize_parametrizacao_values
-from utils.preview_links import construir_mapping_preview_parametrizacao
+from utils.preview_links import generate_linkedin_ad_preview_link_from_lookup
 from utils.get_nome_campanha import carregar_mapeamento_nome_creativo, obter_nome_por_utm_content
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 
@@ -229,11 +242,10 @@ def carregar_mapeamentos_linkedin():
     df_parametrizacao.columns = normalize_columns(df_parametrizacao.columns)
     df_parametrizacao = normalize_parametrizacao_values(df_parametrizacao)
 
-    mapping_preview = construir_mapping_preview_parametrizacao(df_parametrizacao)
+    mapping_preview = generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao)
     mapping_criativo = carregar_mapeamento_nome_creativo(df_parametrizacao)
 
     return mapping_preview, mapping_criativo
-
 
 def buscar_nome_criativo_com_log(utm_content, mapping_criativo):
     """
@@ -246,7 +258,6 @@ def buscar_nome_criativo_com_log(utm_content, mapping_criativo):
         logging.debug(f"utm_content '{utm_str}' NÃO encontrado no mapping_criativo.")
     return nome
 
-
 def preparar_kwargs_linkedin() -> dict:
     """
     Prepara os kwargs extras necessários para inicializar ETLs do LinkedIn,
@@ -258,6 +269,21 @@ def preparar_kwargs_linkedin() -> dict:
         "mapping_criativo": mapping_criativo,
     }
 
+def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
+    """
+    Preenche as colunas 'Nome_do_Anuncio' e 'Nome_do_Conjunto_de_Anuncio' com base no ID_Content
+    e mapeamento de criativo (utm_content → nome).
+    """
+    if 'ID_Content' not in df.columns:
+        df['Nome_do_Anuncio'] = ""
+        df['Nome_do_Conjunto_de_Anuncio'] = ""
+        return df
+
+    df['Nome_do_Anuncio'] = df['ID_Content'].apply(
+        lambda utm: buscar_nome_criativo_com_log(utm, mapping_criativo)
+    )
+    df['Nome_do_Conjunto_de_Anuncio'] = df['Nome_do_Anuncio']
+    return df
 
 # utils/common_pinterest.py
 
@@ -315,6 +341,8 @@ if __name__ == '__main__':
 # utils/datas.py
 
 from datetime import datetime, date
+import pandas as pd
+
 
 def transformar_para_date(valor):
     """
@@ -327,45 +355,71 @@ def transformar_para_date(valor):
 
     Retorna:
         date: objeto da classe date (ex: 2024-04-15)
-
-    Exceções:
-        ValueError: Se o valor não puder ser interpretado como data.
     """
     if not valor:
         return None
 
-    # Se já for um objeto date, retorna diretamente
     if isinstance(valor, date) and not isinstance(valor, datetime):
         return valor
 
-    # Se for um objeto datetime, extrai a parte de data
     if isinstance(valor, datetime):
         return valor.date()
 
-    # Se for uma string, tenta converter para datetime com o formato esperado
     if isinstance(valor, str):
-        try:
-            dt = datetime.strptime(valor, "%Y-%m-%d %H:%M:%S")
-            return dt.date()
-        except ValueError:
-            # Caso a string já esteja no formato "YYYY-MM-DD"
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
             try:
-                dt = datetime.strptime(valor, "%Y-%m-%d")
-                return dt.date()
+                return datetime.strptime(valor.strip(), fmt).date()
             except ValueError:
-                raise ValueError(f"Formato de data não reconhecido: {valor}")
+                continue
+        raise ValueError(f"Formato de data não reconhecido: {valor}")
     
     raise ValueError(f"Tipo de valor não suportado: {type(valor)}")
 
 
-
-def converter_data(df, coluna='Data'):
+def converter_data(df: pd.DataFrame, coluna: str = 'Data') -> pd.DataFrame:
     """
-    Converte a coluna de data para datetime, com tratamento de erros.
+    Converte a coluna especificada do DataFrame para o tipo `date` (sem hora).
+
+    Parâmetros:
+        df (pd.DataFrame): DataFrame contendo a coluna de data.
+        coluna (str): Nome da coluna a ser convertida.
+
+    Retorna:
+        pd.DataFrame: DataFrame com a coluna convertida para `date`.
     """
     if coluna in df.columns:
-        df[coluna] = pd.to_datetime(df[coluna], errors='coerce')
+        df[coluna] = pd.to_datetime(df[coluna], errors='coerce').dt.date
     return df
+
+
+# utils/fields_lists.py
+
+# utils/fields_lists.py
+
+# Componentes base reutilizáveis
+DIMENSIONS_BASE_COLUMNS_ORDER = [
+    'Numero', 'Data', 'Nome_da_Conta', 'Campanha', 'ID_Campanha'
+]
+
+METRICS_BASE_COLUMNS_ORDER = [
+    'Impressoes', 'Investimento', 'Cliques_no_Link', 'ID'
+]
+
+# Modelo geral (completo)
+GENERAL_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + [
+    'Veiculo', 'ID_Veiculo', 'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio',
+    'Inicio_da_Campanha', 'Fim_da_Campanha', 'Objetivo', 'URL_do_Anuncio', 'ID_Content',
+    'Video_Play', 'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
+    'Reacoes', 'Compartilhamentos', 'Comentarios', 'Engajamento_Total'
+] + METRICS_BASE_COLUMNS_ORDER
+
+# Modelos específicos por dimensão
+AGE_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Faixa_Etaria'] + METRICS_BASE_COLUMNS_ORDER
+GENDER_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Genero'] + METRICS_BASE_COLUMNS_ORDER
+REGION_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Regiao', 'Estado'] + METRICS_BASE_COLUMNS_ORDER
+REACH_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + [
+    'Veiculo', 'Posicionamento', 'Alcance'
+] + ['Impressoes', 'ID']
 
 
 # utils/geo_normalize.py
@@ -807,7 +861,7 @@ if __name__ == "__main__":
     spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
 
     # Nome da aba que você quer limpar
-    aba_para_limpar = "modeloIdade"
+    aba_para_limpar = "modeloGeral"
 
     limpar_aba_mantendo_cabecalho(creds_path, spreadsheet_id, aba_para_limpar)
 
@@ -962,13 +1016,7 @@ def normalizar_genero(valor) -> str:
         return "Não classificado"
     return valor.capitalize()
 
-def converter_data(df, coluna='Data'):
-    """
-    Converte a coluna de data para datetime, com tratamento de erros.
-    """
-    if coluna in df.columns:
-        df[coluna] = pd.to_datetime(df[coluna], errors='coerce')
-    return df
+
 
 def converter_colunas_numericas(df, colunas):
     """
@@ -1024,6 +1072,7 @@ def gerar_numeracao(df, df_destino=None, linha_insercao=2, coluna='Numero'):
 # utils/organizar_dataframe.py
 
 import logging
+from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER
 
 def remover_colunas_indesejadas(df):
     """
@@ -1036,40 +1085,38 @@ def remover_colunas_indesejadas(df):
             logging.debug(f"Coluna removida: {col}")
     return df
 
-def reordenar_colunas_para_modelo(df):
-    """
-    Reordena e garante a presença das colunas do modelo final.
-    """
-    ordem = [
-        'Numero', 'Data', 'Nome_da_Conta', 'Campanha', 'ID_Campanha', 'Veiculo', 'ID_Veiculo',
-        'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio', 'Inicio_da_Campanha', 'Fim_da_Campanha',
-        'Objetivo', 'URL_do_Anuncio', 'ID_Content', 'Investimento', 'Impressoes', 'Cliques_no_Link',
-        'Video_Play', 'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
-        'Reacoes', 'Compartilhamentos', 'Comentarios', 'Engajamento_Total', 'ID'
-    ]
-    for col in ordem:
+
+def reordenar_colunas_para_modelo(df, column_order_list):
+    for col in column_order_list:
         if col not in df.columns:
             df[col] = ""
             logging.debug(f"Coluna adicionada (vazia): {col}")
-    df = df[ordem]
+    df = df[column_order_list]
     return df
 
 
-# utils/preview_links.py
 
 # utils/preview_links.py
 
-def ajustar_preview_link(url_anuncio, preview_link_fb):
+# utils/preview_links.py
+
+def determine_meta_ad_preview_link(df):
     """
-    Se 'url_anuncio' estiver vazio, retorna o valor de 'preview_link_fb'.
-    Caso contrário, retorna o valor original de 'url_anuncio'.
+    Determina o link de visualização do anúncio para Meta Ads,
+    usando 'Preview Link FB' como fallback para 'URL_do_Anuncio'.
+    Renomeia a coluna se necessário e aplica a lógica de substituição.
     """
-    if not url_anuncio or str(url_anuncio).strip() == "":
-        return preview_link_fb if preview_link_fb else ""
-    return url_anuncio
+    if 'Preview Link FB' in df.columns:
+        df = df.rename(columns={'Preview Link FB': 'Preview_Link_FB'})
+    if 'URL_do_Anuncio' in df.columns and 'Preview_Link_FB' in df.columns:
+        df['URL_do_Anuncio'] = df.apply(
+            lambda row: row['Preview_Link_FB'] if not row['URL_do_Anuncio'] or str(row['URL_do_Anuncio']).strip() == "" else row['URL_do_Anuncio'],
+            axis=1
+        )
+    return df
 
 
-def construir_mapping_preview_parametrizacao(df_parametrizacao):
+def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao):
     """
     Constrói um dicionário {Content (utm) → PREVIEW}, usando o campo 'ID' da BI_PARAMETRIZAÇÃO
     como ponto de correspondência com o valor vindo de 'Content (utm)' da aba de origem.
@@ -1103,7 +1150,7 @@ def construir_mapping_preview_parametrizacao(df_parametrizacao):
     return mapping
 
 
-def construir_preview_link_pinterest(id_pin):
+def build_pinterest_preview_link(id_pin):
     """
     Constrói a URL de preview pública de um Pin do Pinterest a partir do seu ID.
 
