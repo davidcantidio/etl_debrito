@@ -9,9 +9,9 @@ def main():
     setup_logging(level=logging.DEBUG)
     logging.info("Iniciando execução centralizada de ETLs.")
 
-    # # Executa o ETL Geral
-    # logging.info("Executando ETL Geral...")
-    # run_etl_geral()
+    # Executa o ETL Geral
+    logging.info("Executando ETL Geral...")
+    run_etl_geral()
 
     # Executa o ETL de Idade
     logging.info("Executando ETL Idade...")

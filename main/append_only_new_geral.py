@@ -32,7 +32,7 @@ def run_etl_geral():
       - Insere os registros faltantes
     """
     logging.info("Iniciando ETL Geral...")
-    source_sheet = "pinterestGeral"  # Defina a aba de origem desejada
+    source_sheet = "linkedinGeral"  # Defina a aba de origem desejada
     target_sheet = "modeloGeral"
     plataforma = source_sheet.lower().replace("geral", "").strip()
 

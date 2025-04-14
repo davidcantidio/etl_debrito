@@ -329,24 +329,32 @@ import logging
 
 def preencher_campos_com_campanha(df):
     """
-    Para plataformas como Pinterest onde não há Ad Name,
-    replica 'Campaign name' nos campos de destino:
-    - Campanha
-    - Nome_do_Anuncio
-    - Nome_do_Conjunto_de_Anuncio
+    Para plataformas como Pinterest, Age, Gender e Region, mantém os valores de:
+      - 'Campanha'
+      - 'ID_Campanha'
+    que já foram preenchidos via lookup (de BI_PARAMETRIZAÇÃO).
+
+    Em paralelo, aproveita a coluna "Campaign name" do dataset de origem
+    (já renomeada manualmente no CSV/planilha) para escrever:
+      - Nome_do_Conjunto_de_Anuncio
+      - Nome_do_Anuncio
+
+    Se a coluna 'Campaign name' não existir, essas colunas são preenchidas com strings vazias.
     """
     logging.debug(">>> In preencher_campos_com_campanha (Pinterest)")
 
+    # Se a coluna 'Campaign name' não estiver no df, apenas zera os campos de anúncio/conjunto
     if 'Campaign name' not in df.columns:
-        logging.warning("Coluna 'Campaign name' não encontrada. Não será possível preencher campos derivados.")
-        df['Campanha'] = ""
-        df['Nome_do_Anuncio'] = ""
+        logging.warning("Coluna 'Campaign name' não encontrada. Não será possível preencher os campos de anúncio.")
         df['Nome_do_Conjunto_de_Anuncio'] = ""
+        df['Nome_do_Anuncio'] = ""
         return df
 
-    df['Campanha'] = df['Campaign name']
-    df['Nome_do_Anuncio'] = df['Campaign name']
+    # Caso exista, atribui 'Campaign name' → Nome_do_Anuncio / Nome_do_Conjunto_de_Anuncio
     df['Nome_do_Conjunto_de_Anuncio'] = df['Campaign name']
+    df['Nome_do_Anuncio'] = df['Campaign name']
+
+    # Não sobrescreve 'Campanha' e 'ID_Campanha', pois eles já vieram do lookup.
     return df
 
 
@@ -496,29 +504,138 @@ def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
 
 # Componentes base reutilizáveis
 DIMENSIONS_BASE_COLUMNS_ORDER = [
-    'Numero', 'Data', 'Nome_da_Conta', 'Campanha', 'ID_Campanha'
+    'Numero',
+    'Data',
+    'Nome_da_Conta',
+    'Campanha',
+    'ID_Campanha'
 ]
 
 NUMERIC_COLUMNS = [
-    'Impressoes', 'Investimento', 'Cliques_no_Link',
-    'Video_Play', 'Visualizacoes_ate_25', 'Visualizacoes_ate_50',
-    'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
-    'Reacoes', 'Compartilhamentos', 'Comentarios'
+    'Impressoes',
+    'Investimento',
+    'Cliques_no_Link',
+    'Video_Play',
+    'Visualizacoes_ate_25',
+    'Visualizacoes_ate_50',
+    'Visualizacoes_ate_75',
+    'Visualizacoes_ate_100',
+    'Reacoes',
+    'Compartilhamentos',
+    'Comentarios'
 ]
 
-METRICS_BASE_COLUMNS_ORDER = NUMERIC_COLUMNS + ['ID']
-
 # Modelo geral (completo)
-GENERAL_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + [
-    'Veiculo', 'ID_Veiculo', 'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio',
-    'Inicio_da_Campanha', 'Fim_da_Campanha', 'Objetivo', 'URL_do_Anuncio', 'ID_Content'
-] + NUMERIC_COLUMNS + ['Engajamento_Total'] + ['ID']
+GENERAL_MODEL_COLUMN_ORDER = [
+    'Numero',
+    'Data',
+    'Nome_da_Conta',
+    'Veiculo',
+    'ID_Veiculo',
+    'ID_Campanha',
+    'Campanha',
+    'Nome_do_Conjunto_de_Anuncio',
+    'Nome_do_Anuncio',
+    'Objetivo',
+    'Inicio_da_Campanha',
+    'Fim_da_Campanha',
+    'URL_do_Anuncio',
+    'ID_Content',
+    'Impressoes',
+    'Investimento',
+    'Cliques_no_Link',
+    'Video_Play',
+    'Visualizacoes_ate_25',
+    'Visualizacoes_ate_50',
+    'Visualizacoes_ate_75',
+    'Visualizacoes_ate_100',
+    'Reacoes',
+    'Compartilhamentos',
+    'Comentarios',
+    'Engajamento_Total',
+    'ID'
+]
 
-# Modelos específicos por dimensão
-AGE_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Faixa_Etaria'] + METRICS_BASE_COLUMNS_ORDER
-GENDER_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Genero'] + METRICS_BASE_COLUMNS_ORDER
-REGION_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Regiao', 'Estado'] + METRICS_BASE_COLUMNS_ORDER
-REACH_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Veiculo', 'Posicionamento', 'Alcance'] + ['Impressoes', 'ID']
+# Modelo específico para ETL de Idade
+AGE_MODEL_COLUMN_ORDER = [
+    'Numero',
+    'Data',
+    'Nome_da_Conta',
+    'ID_Veiculo',
+    'Veiculo',
+    'ID_Campanha',
+    'Campanha',
+    'Nome_do_Conjunto_de_Anuncio',
+    'Nome_do_Anuncio',
+    'Objetivo',
+    'Idade',
+    'Impressoes',
+    'Investimento',
+    'Cliques_no_Link',
+    'Visualizacoes_ate_100',
+    'ID'
+]
+
+# Modelo específico para ETL de Gender
+GENDER_MODEL_COLUMN_ORDER = [
+    'Numero',
+    'Data',
+    'Nome_da_Conta',
+    'Campanha',
+    'ID_Campanha',
+    'Genero',
+    'Impressoes',
+    'Investimento',
+    'Cliques_no_Link',
+    'Video_Play',
+    'Visualizacoes_ate_25',
+    'Visualizacoes_ate_50',
+    'Visualizacoes_ate_75',
+    'Visualizacoes_ate_100',
+    'Reacoes',
+    'Compartilhamentos',
+    'Comentarios',
+    'ID'
+]
+
+# Modelo específico para ETL de Região
+REGION_MODEL_COLUMN_ORDER = [
+    'Numero',
+    'Data',
+    'Nome_da_Conta',
+    'Campanha',
+    'ID_Campanha',
+    'Regiao',
+    'Estado',
+    'Impressoes',
+    'Investimento',
+    'Cliques_no_Link',
+    'Video_Play',
+    'Visualizacoes_ate_25',
+    'Visualizacoes_ate_50',
+    'Visualizacoes_ate_75',
+    'Visualizacoes_ate_100',
+    'Reacoes',
+    'Compartilhamentos',
+    'Comentarios',
+    'ID'
+]
+
+# Modelo específico para ETL de Reach
+REACH_MODEL_COLUMN_ORDER = [
+    'Numero',
+    'Data',
+    'Nome_da_Conta',
+    'Veiculo',
+    'ID_Veiculo',
+    'ID_Campanha',
+    'Campanha',
+    'Nome_do_Conjunto_de_Anuncio',
+    'Nome_do_Anuncio',
+    'Objetivo',
+    'Impressoes',
+    'ID'
+]
 
 
 # utils/geo_normalize.py
@@ -918,7 +1035,7 @@ if __name__ == "__main__":
     spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
 
     # Nome da aba que você quer limpar
-    aba_para_limpar = "modeloGeral"
+    aba_para_limpar = "modeloIdade"
 
     limpar_aba_mantendo_cabecalho(creds_path, spreadsheet_id, aba_para_limpar)
 
@@ -1343,7 +1460,7 @@ def renomear_colunas_origem_para_modelo(df):
         'Video watches at 25%': 'Visualizacoes_ate_25', 'Video watches at 50%': 'Visualizacoes_ate_50',
         'Video watches at 75%': 'Visualizacoes_ate_75', 'Video watches at 100%': 'Visualizacoes_ate_100',
         'Post reactions': 'Reacoes', 'Paid likes': 'Reacoes', 'Post shares': 'Compartilhamentos',
-        'Paid shares': 'Compartilhamentos', 'Post comments': 'Comentarios', 'Paid comments': 'Comentarios'
+        'Paid shares': 'Compartilhamentos', 'Post comments': 'Comentarios', 'Paid comments': 'Comentarios','Age': 'Faixa_Etaria'
     }
     df.rename(columns=renomear, inplace=True)
     logging.debug("[renomear_colunas_origem_para_modelo] Colunas após renomear: %s", list(df.columns))
