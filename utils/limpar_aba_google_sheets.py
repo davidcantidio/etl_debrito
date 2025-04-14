@@ -55,6 +55,6 @@ if __name__ == "__main__":
     spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
 
     # Nome da aba que você quer limpar
-    aba_para_limpar = "modeloIdade"
+    aba_para_limpar = "modeloGenero"
 
     limpar_aba_mantendo_cabecalho(creds_path, spreadsheet_id, aba_para_limpar)
