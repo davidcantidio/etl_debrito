@@ -2,6 +2,8 @@ from scripts.etl_geral import BaseGeralETL
 from utils.fields_lists import AGE_MODEL_COLUMN_ORDER
 from utils.organizar_dataframe import reordenar_colunas_para_modelo
 from utils.normalize import normalizar_faixa_etaria
+from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta
+import logging
 
 class BaseIdadeETL(BaseGeralETL):
     def ajustar_tipos_e_calculos(self):
@@ -26,7 +28,10 @@ class BaseIdadeETL(BaseGeralETL):
 # Classes específicas para cada plataforma no contexto do ETL de Idade
 class MetaIdadeETL(BaseIdadeETL):
     # Se necessário, sobrescreva métodos para tratar peculiaridades da Meta para Idade
-    pass
+    def criar_veiculo(self):
+        logging.debug(">>> In MetaGeralETL.criar_veiculo")
+        self.df = atribuir_veiculo_e_id_meta(self.df)
+
 
 class TikTokIdadeETL(BaseIdadeETL):
     # Se necessário, sobrescreva métodos para o TikTok

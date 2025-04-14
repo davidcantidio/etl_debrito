@@ -24,7 +24,7 @@ from scripts.etl_idade import (
 def run_etl_idade():
     setup_logging(level=logging.DEBUG)
 
-    source_sheet = "tiktokIdade"
+    source_sheet = "metaIdade"
     target_sheet = "modeloIdade"
 
     plataforma = source_sheet.lower().replace("idade", "").strip()
