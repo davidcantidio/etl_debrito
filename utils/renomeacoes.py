@@ -55,7 +55,7 @@ def renomear_colunas_origem_para_modelo(df):
         'Video watches at 25%': 'Visualizacoes_ate_25', 'Video watches at 50%': 'Visualizacoes_ate_50',
         'Video watches at 75%': 'Visualizacoes_ate_75', 'Video watches at 100%': 'Visualizacoes_ate_100',
         'Post reactions': 'Reacoes', 'Paid likes': 'Reacoes', 'Post shares': 'Compartilhamentos',
-        'Paid shares': 'Compartilhamentos', 'Post comments': 'Comentarios', 'Paid comments': 'Comentarios'
+        'Paid shares': 'Compartilhamentos', 'Post comments': 'Comentarios', 'Paid comments': 'Comentarios','Age': 'Faixa_Etaria'
     }
     df.rename(columns=renomear, inplace=True)
     logging.debug("[renomear_colunas_origem_para_modelo] Colunas após renomear: %s", list(df.columns))

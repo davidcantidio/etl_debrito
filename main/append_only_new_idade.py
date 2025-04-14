@@ -21,7 +21,7 @@ from scripts.etl_idade import (
 )
 
 
-def main():
+def run_etl_idade():
     setup_logging(level=logging.DEBUG)
 
     source_sheet = "tiktokIdade"
@@ -31,7 +31,7 @@ def main():
 
     if plataforma == "meta":
         etl_class = MetaIdadeETL
-        veiculo_nome = None  # Inferido dinamicamente por Placement
+        veiculo_nome = None  # Inferido dinamicamente por Placement, se aplicável
     elif plataforma == "tiktok":
         etl_class = TikTokIdadeETL
         veiculo_nome = "Tiktok"
@@ -54,8 +54,11 @@ def main():
     logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
     mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
 
+    # Aqui adicionamos os parâmetros 'id_veiculo' (None) e 'veiculo' (veiculo_nome)
     etl_instance = etl_class(
         df=df_origin,
+        id_veiculo=None,
+        veiculo=veiculo_nome,
         mapping_campanha=mapping_campanha,
         mapping_sigla=mapping_sigla
     )
@@ -69,15 +72,17 @@ def main():
     logging.info(f"Executando ETL de Idade para '{plataforma}'...")
     df_processed = etl_instance.processar(df_destino=df_target)
 
-
     logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
     missing_records = get_missing_records(df_processed, df_target)
     if missing_records.empty:
         logging.info("Não há registros faltantes para inserir.")
     else:
         append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, missing_records)
+        logging.info(f"Inseridos {missing_records.shape[0]} novos registros na aba '{target_sheet}'.")
 
     logging.info(f"Atualização da aba '{target_sheet}' concluída com sucesso.")
+    return df_processed
+
 
 if __name__ == "__main__":
-    main()
+    run_etl_idade()

@@ -1,163 +1,44 @@
-import pandas as pd
-import logging
+from scripts.etl_geral import BaseGeralETL
+from utils.fields_lists import AGE_MODEL_COLUMN_ORDER
+from utils.organizar_dataframe import reordenar_colunas_para_modelo
 from utils.normalize import normalizar_faixa_etaria
-from utils.campanha_mapper import buscar_mapping
-from utils.renomeacoes import SUBSTITUICOES_OBJETIVO
-from utils.atribuicoes_via_lookup import (
-    atribuir_veiculo_e_id_meta,
-    atribuir_id_veiculo_generico,
-    preencher_campos_com_campanha,
-)
-from utils.numeracao import gerar_numeracao
 
-
-class BaseIdadeETL:
-    def __init__(self, df, mapping_campanha=None, mapping_sigla=None, veiculo=""):
-        logging.debug(">>> In BaseIdadeETL.__init__")
-        self.df = df.copy()
-        self.df.columns = [col.strip() for col in self.df.columns]
-        self.mapping_campanha = mapping_campanha or {}
-        self.mapping_sigla = mapping_sigla or {}
-        self.veiculo = veiculo
-
-    def ajustar_tipos(self):
-        logging.debug(">>> In ajustar_tipos")
-        self.df['Date'] = pd.to_datetime(self.df['Date'], errors='coerce')
-        for col in ['Cost', 'Impressions', 'Link clicks', 'Video watches at 100%']:
-            if col in self.df.columns:
-                self.df[col] = pd.to_numeric(self.df[col], errors='coerce').fillna(0)
-        if 'Cost' in self.df.columns:
-            self.df['Cost'] = self.df['Cost'].round(2)
-        self.df['Numero'] = 0
-        self.df['Veiculo'] = self.veiculo
-        self.df['ID'] = pd.Series(dtype='str')
-
-    def renomear_colunas(self):
-        logging.debug(">>> In renomear_colunas")
-        rename_map = {
-            'Date': 'Data',
-            'Account name': 'Nome_da_Conta',
-            'Ad set name': 'Nome_do_Conjunto_de_Anuncio',
-            'Ad name': 'Nome_do_Anuncio',
-            'Age': 'Idade',
-            'Impressions': 'Impressoes',
-            'Campaign objective type': 'Objetivo',
-            'Cost': 'Investimento',
-            'Link clicks': 'Cliques_no_Link',
-            'Video watches at 100%': 'Visualizacoes_ate_100'
-        }
-        self.df.rename(columns=rename_map, inplace=True)
-
-    def aplicar_normalizacoes(self):
-        logging.debug(">>> In aplicar_normalizacoes")
+class BaseIdadeETL(BaseGeralETL):
+    def ajustar_tipos_e_calculos(self):
+        # Aplica as transformações gerais da classe base
+        super().ajustar_tipos_e_calculos()
+        # Renomeia a coluna que veio como 'Faixa_Etaria' para 'Idade'
+        if 'Faixa_Etaria' in self.df.columns:
+            self.df.rename(columns={'Faixa_Etaria': 'Idade'}, inplace=True)
+        # Aplica a normalização no campo 'Idade'
         if 'Idade' in self.df.columns:
             self.df['Idade'] = self.df['Idade'].apply(normalizar_faixa_etaria)
-        if 'Objetivo' in self.df.columns:
-            self.df['Objetivo'] = self.df['Objetivo'].apply(
-                lambda x: SUBSTITUICOES_OBJETIVO.get(str(x).upper().strip(), x))
-
-    def aplicar_parametrizacao_campanha_externa(self):
-        logging.debug(">>> In aplicar_parametrizacao_campanha_externa")
-        if 'Campaign name' in self.df.columns:
-            self.df['Campanha'] = self.df['Campaign name'].apply(
-                lambda x: buscar_mapping(self.mapping_campanha, x) or x
-            )
-            self.df['ID_Campanha'] = self.df['Campaign name'].apply(
-                lambda x: buscar_mapping(self.mapping_sigla, x)
-            )
-        else:
-            self.df['Campanha'] = ""
-            self.df['ID_Campanha'] = ""
-
-    def atribuir_id_veiculo(self, id_veiculo):
-        logging.debug(">>> In atribuir_id_veiculo")
-        self.df['ID_Veiculo'] = id_veiculo
-
-    def remover_colunas(self):
-        logging.debug(">>> In remover_colunas")
-        for col in ['Campaign ID', 'Campaign name']:
-            if col in self.df.columns:
-                self.df.drop(columns=col, inplace=True)
-
-    def reordenar_colunas(self):
-        logging.debug(">>> In reordenar_colunas")
-        ordem = [
-            'Numero', 'Data', 'Nome_da_Conta', 'ID_Veiculo', 'Veiculo', 'ID_Campanha', 'Campanha',
-            'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio', 'Objetivo', 'Idade',
-            'Impressoes', 'Investimento', 'Cliques_no_Link', 'Visualizacoes_ate_100', 'ID'
-        ]
-        for col in ordem:
-            if col not in self.df.columns:
-                self.df[col] = ""
-        self.df = self.df[ordem]
-
+    
     def criar_veiculo(self):
-        logging.debug(">>> In criar_veiculo (default genérico)")
-        self.df = atribuir_id_veiculo_generico(self.df)
+        # Utiliza a implementação padrão para preencher 'Veiculo' e 'ID_Veiculo'
+        super().criar_veiculo()
+    
+    def reordenar_colunas_para_modelo(self):
+        # Reordena as colunas conforme o modelo específico para Idade
+        self.df = reordenar_colunas_para_modelo(self.df, AGE_MODEL_COLUMN_ORDER)
 
 
-    def gerar_id(self):
-        logging.debug(">>> In gerar_id")
-        self.df['ID'] = self.df.apply(
-            lambda row: f"{row['Data']}-{row['Campanha']}-{row['Impressoes']}-{row['Investimento']}-{row['Cliques_no_Link']}-{row['Idade']}",
-            axis=1
-        )
-
-    def processar(self, df_destino=None):
-        logging.debug(">>> In processar (BaseIdadeETL)")
-        self.ajustar_tipos()
-        self.renomear_colunas()
-        self.aplicar_normalizacoes()
-        self.aplicar_parametrizacao_campanha_externa()
-
-        if hasattr(self, "criar_veiculo"):
-            self.criar_veiculo()
-
-        self.remover_colunas()
-        self.reordenar_colunas()
-        self.gerar_id()
-
-        if df_destino is not None:
-            logging.debug(f">>> Chamando gerar_numeracao com {df_destino.shape[0]} linhas no destino")
-            self.df = gerar_numeracao(
-                self.df,
-                df_destino=df_destino,
-                linha_insercao=2,
-                coluna='Numero'
-            )
-            logging.debug(f">>> DataFrame após gerar_numeracao:\n{self.df[['ID', 'Numero']].head(5)}")
-        else:
-            logging.warning(">>> df_destino não fornecido para gerar_numeracao")
-
-        return self.df
-
-
+# Classes específicas para cada plataforma no contexto do ETL de Idade
 class MetaIdadeETL(BaseIdadeETL):
-    def criar_veiculo(self):
-        logging.debug(">>> In MetaIdadeETL.criar_veiculo")
-        self.df = atribuir_veiculo_e_id_meta(self.df)
-
+    # Se necessário, sobrescreva métodos para tratar peculiaridades da Meta para Idade
+    pass
 
 class TikTokIdadeETL(BaseIdadeETL):
-    def __init__(self, df, mapping_campanha=None, mapping_sigla=None):
-        super().__init__(df, mapping_campanha, mapping_sigla, veiculo='TikTok')
-
+    # Se necessário, sobrescreva métodos para o TikTok
+    pass
 
 class LinkedinIdadeETL(BaseIdadeETL):
-    def __init__(self, df, mapping_campanha=None, mapping_sigla=None):
-        super().__init__(df, mapping_campanha, mapping_sigla, veiculo='LinkedIn')
-
-
-from utils.common_pinterest import preencher_campos_com_campanha
+    # Se necessário, sobrescreva métodos para o Linkedin
+    pass
 
 class PinterestIdadeETL(BaseIdadeETL):
-    def __init__(self, df, mapping_campanha=None, mapping_sigla=None):
-        super().__init__(df, mapping_campanha, mapping_sigla, veiculo='Pinterest')
-
-    def aplicar_parametrizacao_campanha_externa(self):
-        logging.debug(">>> In PinterestIdadeETL.aplicar_parametrizacao_campanha_externa")
-        # Primeiro preenche os campos a partir de 'Campaign name'
-        self.df = preencher_campos_com_campanha(self.df)
-
-        # Depois aplica os mapeamentos externos normalmente
-        super().aplicar_parametrizacao_campanha_externa()
+    # Para Pinterest, pode ser necessário tratamentos adicionais – por exemplo, para ajustar datas
+    def ajustar_tipos_e_calculos(self):
+        super().ajustar_tipos_e_calculos()
+        from utils.datas import generate_pinterest_dates
+        self.df = generate_pinterest_dates(self.df)

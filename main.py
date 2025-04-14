@@ -1,7 +1,7 @@
 import logging
 from utils.setup_logging import setup_logging
 from main.append_only_new_geral import run_etl_geral
-# from main.append_only_new_idade import run_etl_idade
+from main.append_only_new_idade import run_etl_idade
 # from main.append_only_new_regiao import run_etl_regiao
 
 def main():
@@ -9,13 +9,13 @@ def main():
     setup_logging(level=logging.DEBUG)
     logging.info("Iniciando execução centralizada de ETLs.")
 
-    # Executa o ETL Geral
-    logging.info("Executando ETL Geral...")
-    run_etl_geral()
+    # # Executa o ETL Geral
+    # logging.info("Executando ETL Geral...")
+    # run_etl_geral()
 
-    # # Executa o ETL de Idade
-    # logging.info("Executando ETL Idade...")
-    # run_etl_idade()
+    # Executa o ETL de Idade
+    logging.info("Executando ETL Idade...")
+    run_etl_idade()
 
     # # Executa o ETL de Região
     # logging.info("Executando ETL Região...")
