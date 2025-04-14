@@ -1,5 +1,26 @@
 # utils/__init__.py
 
+# utils/__init__.py
+
+# Importa funcionalidades de normalização e transformação
+from .normalize import (
+    normalize_campaign_name,
+    normalizar_genero,
+    normalizar_faixa_etaria,
+    normalize_columns,
+    normalize_parametrizacao_values,
+    inferir_veiculo_meta_por_placement,
+    atribuir_veiculo_por_criativo,
+)
+from .datas import transformar_para_date, converter_data, generate_pinterest_dates
+from .renomeacoes import renomear_colunas_origem_para_modelo, aplicar_substituicoes_objetivo
+from .preview_links import (
+    determine_meta_ad_preview_link,
+    generate_linkedin_ad_preview_link_from_lookup,
+    build_pinterest_preview_link,
+    generate_pinterest_ad_preview_link
+)
+# Você pode incluir outras funções utilitárias conforme necessário
 
 
 # utils/append_records_to_sheet.py
@@ -177,14 +198,31 @@ import logging
 
 def calcular_engajamento_total(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calcula o campo 'Engajamento_Total' como a soma de Reacoes, Compartilhamentos e Comentarios.
+    Calcula a coluna 'Engajamento_Total' como a soma de:
+    - Reacoes
+    - Compartilhamentos
+    - Comentarios
+
+    Caso os campos 'Compartilhamentos' ou 'Comentarios' estejam ausentes ou vazios,
+    assume valor 0.
     """
-    logging.debug(">>> In calcular_engajamento_total")
-    if all(col in df.columns for col in ['Reacoes', 'Compartilhamentos', 'Comentarios']):
-        df['Engajamento_Total'] = df['Reacoes'] + df['Compartilhamentos'] + df['Comentarios']
+    for col in ['Compartilhamentos', 'Comentarios']:
+        if col not in df.columns:
+            df[col] = 0
+        else:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+    if 'Reacoes' not in df.columns:
+        df['Reacoes'] = 0
     else:
-        df['Engajamento_Total'] = 0
+        df['Reacoes'] = pd.to_numeric(df['Reacoes'], errors='coerce').fillna(0)
+
+    df['Engajamento_Total'] = (
+        df['Reacoes'] + df['Compartilhamentos'] + df['Comentarios']
+    )
+
     return df
+
 
 def inicializar_colunas_auxiliares(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -219,7 +257,7 @@ from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.normalize import normalize_columns, normalize_parametrizacao_values
 from utils.preview_links import generate_linkedin_ad_preview_link_from_lookup
-from utils.get_nome_campanha import carregar_mapeamento_nome_creativo, obter_nome_por_utm_content
+from utils.creative_mapping import carregar_mapeamento_nome_creativo, obter_nome_por_utm_content
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 
 def carregar_mapeamentos_linkedin():
@@ -336,6 +374,48 @@ if __name__ == '__main__':
     concatenar_arquivos_em_txt(diretorio)
 
 
+# utils/creative_mapping.py
+
+import logging
+import pandas as pd
+
+def carregar_mapeamento_nome_creativo(df_parametrizacao: pd.DataFrame) -> dict:
+    """
+    Cria e retorna um dicionário {utm_content -> criativo},
+    baseado nas colunas 'utm_content' e 'criativo' na aba BI_PARAMETRIZAÇÃO.
+    """
+    if df_parametrizacao.empty:
+        logging.warning("DataFrame de parametrização vazio. Não foi possível construir o mapeamento.")
+        return {}
+
+    required_cols = {'utm_content', 'criativo'}
+    colunas_atuais = set(df_parametrizacao.columns)
+    if not required_cols.issubset(colunas_atuais):
+        logging.warning("Colunas 'utm_content' e/ou 'criativo' não foram encontradas na parametrização.")
+        return {}
+
+    mapping = {}
+    for _, row in df_parametrizacao.iterrows():
+        utm = str(row.get('utm_content', '')).strip()
+        criativo = str(row.get('criativo', '')).strip()
+        if utm:
+            mapping[utm] = criativo
+
+    return mapping
+
+
+def obter_nome_por_utm_content(utm_content: str, mapping_criativo: dict) -> str:
+    """
+    Dado um valor de utm_content (ex.: 'abc123') e um dicionário {utm_content -> criativo},
+    retorna o 'criativo' correspondente.
+
+    Se não encontrar, retorna string vazia.
+    """
+    if not isinstance(utm_content, str):
+        return ""
+    return mapping_criativo.get(utm_content.strip(), "")
+
+
 # utils/datas.py
 
 # utils/datas.py
@@ -392,6 +472,24 @@ def converter_data(df: pd.DataFrame, coluna: str = 'Data') -> pd.DataFrame:
     return df
 
 
+def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preenche as colunas 'Inicio_da_Campanha' e 'Fim_da_Campanha' convertendo
+    as colunas 'start' e 'end' (datetime) para datas (YYYY-MM-DD) no Pinterest.
+    """
+    if 'start' in df.columns:
+        df['Inicio_da_Campanha'] = df['start'].apply(transformar_para_date)
+    else:
+        df['Inicio_da_Campanha'] = ""
+
+    if 'end' in df.columns:
+        df['Fim_da_Campanha'] = df['end'].apply(transformar_para_date)
+    else:
+        df['Fim_da_Campanha'] = ""
+
+    return df
+
+
 # utils/fields_lists.py
 
 # utils/fields_lists.py
@@ -401,25 +499,26 @@ DIMENSIONS_BASE_COLUMNS_ORDER = [
     'Numero', 'Data', 'Nome_da_Conta', 'Campanha', 'ID_Campanha'
 ]
 
-METRICS_BASE_COLUMNS_ORDER = [
-    'Impressoes', 'Investimento', 'Cliques_no_Link', 'ID'
+NUMERIC_COLUMNS = [
+    'Impressoes', 'Investimento', 'Cliques_no_Link',
+    'Video_Play', 'Visualizacoes_ate_25', 'Visualizacoes_ate_50',
+    'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
+    'Reacoes', 'Compartilhamentos', 'Comentarios'
 ]
+
+METRICS_BASE_COLUMNS_ORDER = NUMERIC_COLUMNS + ['ID']
 
 # Modelo geral (completo)
 GENERAL_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + [
     'Veiculo', 'ID_Veiculo', 'Nome_do_Conjunto_de_Anuncio', 'Nome_do_Anuncio',
-    'Inicio_da_Campanha', 'Fim_da_Campanha', 'Objetivo', 'URL_do_Anuncio', 'ID_Content',
-    'Video_Play', 'Visualizacoes_ate_25', 'Visualizacoes_ate_50', 'Visualizacoes_ate_75', 'Visualizacoes_ate_100',
-    'Reacoes', 'Compartilhamentos', 'Comentarios', 'Engajamento_Total'
-] + METRICS_BASE_COLUMNS_ORDER
+    'Inicio_da_Campanha', 'Fim_da_Campanha', 'Objetivo', 'URL_do_Anuncio', 'ID_Content'
+] + NUMERIC_COLUMNS + ['Engajamento_Total'] + ['ID']
 
 # Modelos específicos por dimensão
 AGE_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Faixa_Etaria'] + METRICS_BASE_COLUMNS_ORDER
 GENDER_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Genero'] + METRICS_BASE_COLUMNS_ORDER
 REGION_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Regiao', 'Estado'] + METRICS_BASE_COLUMNS_ORDER
-REACH_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + [
-    'Veiculo', 'Posicionamento', 'Alcance'
-] + ['Impressoes', 'ID']
+REACH_MODEL_COLUMN_ORDER = DIMENSIONS_BASE_COLUMNS_ORDER + ['Veiculo', 'Posicionamento', 'Alcance'] + ['Impressoes', 'ID']
 
 
 # utils/geo_normalize.py
@@ -728,48 +827,6 @@ def get_missing_records(df_origin, df_target):
     
     missing = merged[merged["_merge"] == "left_only"].drop(columns=["_merge", "ID_index"])
     return missing
-
-
-# utils/get_nome_campanha.py
-
-import logging
-import pandas as pd
-
-def carregar_mapeamento_nome_creativo(df_parametrizacao: pd.DataFrame) -> dict:
-    """
-    Cria e retorna um dicionário {utm_content -> criativo},
-    baseado nas colunas 'utm_content' e 'criativo' na aba BI_PARAMETRIZAÇÃO.
-    """
-    if df_parametrizacao.empty:
-        logging.warning("DataFrame de parametrização vazio. Não foi possível construir o mapeamento.")
-        return {}
-
-    required_cols = {'utm_content', 'criativo'}
-    colunas_atuais = set(df_parametrizacao.columns)
-    if not required_cols.issubset(colunas_atuais):
-        logging.warning("Colunas 'utm_content' e/ou 'criativo' não foram encontradas na parametrização.")
-        return {}
-
-    mapping = {}
-    for _, row in df_parametrizacao.iterrows():
-        utm = str(row.get('utm_content', '')).strip()
-        criativo = str(row.get('criativo', '')).strip()
-        if utm:
-            mapping[utm] = criativo
-
-    return mapping
-
-
-def obter_nome_por_utm_content(utm_content: str, mapping_criativo: dict) -> str:
-    """
-    Dado um valor de utm_content (ex.: 'abc123') e um dicionário {utm_content -> criativo},
-    retorna o 'criativo' correspondente.
-
-    Se não encontrar, retorna string vazia.
-    """
-    if not isinstance(utm_content, str):
-        return ""
-    return mapping_criativo.get(utm_content.strip(), "")
 
 
 # utils/google_sheets.py
@@ -1098,9 +1155,11 @@ def reordenar_colunas_para_modelo(df, column_order_list):
 
 # utils/preview_links.py
 
-# utils/preview_links.py
+import logging
+import pandas as pd
 
-def determine_meta_ad_preview_link(df):
+
+def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     """
     Determina o link de visualização do anúncio para Meta Ads,
     usando 'Preview Link FB' como fallback para 'URL_do_Anuncio'.
@@ -1108,49 +1167,46 @@ def determine_meta_ad_preview_link(df):
     """
     if 'Preview Link FB' in df.columns:
         df = df.rename(columns={'Preview Link FB': 'Preview_Link_FB'})
+
     if 'URL_do_Anuncio' in df.columns and 'Preview_Link_FB' in df.columns:
         df['URL_do_Anuncio'] = df.apply(
-            lambda row: row['Preview_Link_FB'] if not row['URL_do_Anuncio'] or str(row['URL_do_Anuncio']).strip() == "" else row['URL_do_Anuncio'],
+            lambda row: row['Preview_Link_FB']
+            if not row['URL_do_Anuncio'] or str(row['URL_do_Anuncio']).strip() == ""
+            else row['URL_do_Anuncio'],
             axis=1
         )
+
     return df
 
 
-def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao):
+def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao: pd.DataFrame) -> dict:
     """
-    Constrói um dicionário {Content (utm) → PREVIEW}, usando o campo 'ID' da BI_PARAMETRIZAÇÃO
-    como ponto de correspondência com o valor vindo de 'Content (utm)' da aba de origem.
-
-    Exemplo:
-        - 'Content (utm)' na aba linkedinGeral = 'abc123'
-        - Busca linha na BI_PARAMETRIZAÇÃO onde ID == 'abc123'
-        - Pega o valor de PREVIEW nessa linha
-        - Resultado: mapping['abc123'] = preview correspondente
-
-    Args:
-        df_parametrizacao (pd.DataFrame): DataFrame da aba BI_PARAMETRIZAÇÃO.
-
-    Returns:
-        dict: dicionário {Content (utm) → PREVIEW}
+    Gera um dicionário {ID_Content: Preview_Link} a partir da aba BI_PARAMETRIZAÇÃO.
+    - ID_Content vem da coluna 'ID'
+    - Preview vem da coluna 'PREVIEW'
     """
-    mapping = {}
-    required_cols = {'ID', 'PREVIEW'}
+    logging.debug("Iniciando geração de mapping_preview para LinkedIn...")
 
-    colunas_atuais = set(df_parametrizacao.columns)
-    if not required_cols.issubset(colunas_atuais):
-        import logging
+    # Identifica as colunas certas sem alterar o df original
+    colunas_normalizadas = [col.strip().upper() for col in df_parametrizacao.columns]
+    coluna_id = next((col for col in df_parametrizacao.columns if col.strip().upper() == 'ID'), None)
+    coluna_preview = next((col for col in df_parametrizacao.columns if col.strip().upper() == 'PREVIEW'), None)
+
+    if not coluna_id or not coluna_preview:
         logging.warning("Colunas 'ID' e/ou 'PREVIEW' não encontradas na aba BI_PARAMETRIZAÇÃO.")
-        return mapping
+        return {}
 
-    for _, row in df_parametrizacao.iterrows():
-        id_val = str(row.get("ID", "")).strip()
-        preview = str(row.get("PREVIEW", "")).strip()
-        if id_val:
-            mapping[id_val] = preview
+    df = df_parametrizacao[[coluna_id, coluna_preview]].dropna()
+    df[coluna_id] = df[coluna_id].astype(str).str.strip()
+    df[coluna_preview] = df[coluna_preview].astype(str).str.strip()
+
+    mapping = dict(zip(df[coluna_id], df[coluna_preview]))
+
+    logging.debug(f"Exemplos de mapping_preview gerados: {list(mapping.items())[:5]}")
     return mapping
 
 
-def build_pinterest_preview_link(id_pin):
+def build_pinterest_preview_link(id_pin: str) -> str:
     """
     Constrói a URL de preview pública de um Pin do Pinterest a partir do seu ID.
 
@@ -1163,6 +1219,20 @@ def build_pinterest_preview_link(id_pin):
     if not id_pin or str(id_pin).strip() == "":
         return ""
     return f"https://www.pinterest.com/pin/{str(id_pin).strip()}"
+
+
+def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preenche a coluna 'URL_do_Anuncio' com base na coluna 'Preview Link'
+    aplicando a função build_pinterest_preview_link().
+    """
+    match_col = [col for col in df.columns if col.strip().lower() == 'preview link']
+    if match_col:
+        df['URL_do_Anuncio'] = df[match_col[0]].apply(build_pinterest_preview_link)
+    else:
+        df['URL_do_Anuncio'] = ""
+    return df
+
 
 
 # utils/read_sheet_as_dataframe.py

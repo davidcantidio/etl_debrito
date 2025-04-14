@@ -1,3 +1,4 @@
+# append_only_new_geral.py
 import logging
 from utils.google_sheets import (
     carregar_aba_google_sheets,
@@ -21,10 +22,17 @@ from scripts.etl_geral import (
 from utils.common_linkedin import preparar_kwargs_linkedin
 
 
-def main():
-    setup_logging(level=logging.DEBUG)
-
-    source_sheet = "pinterestGeral"  # ← Troque aqui se quiser rodar outras plataformas
+def run_etl_geral():
+    """
+    Executa o fluxo completo do ETL Geral:
+      - Lê os dados da aba de origem (por exemplo, 'pinterestGeral')
+      - Carrega os mapeamentos de campanha
+      - Instancia a classe ETL correspondente
+      - Lê os dados da aba de destino e processa o DataFrame
+      - Insere os registros faltantes
+    """
+    logging.info("Iniciando ETL Geral...")
+    source_sheet = "pinterestGeral"  # Defina a aba de origem desejada
     target_sheet = "modeloGeral"
     plataforma = source_sheet.lower().replace("geral", "").strip()
 
@@ -43,13 +51,11 @@ def main():
     logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
     df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
 
-    # Limpa linhas vazias com base na coluna Date
+    # Remove linhas vazias na coluna "Date", se existir
     if "Date" in df_origin.columns:
         df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
 
     logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
-    logging.debug(f"Colunas da origem: {df_origin.columns.tolist()}")
-    logging.debug(df_origin.head(3).to_string())
 
     logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
     mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
@@ -89,7 +95,9 @@ def main():
         logging.info(f"Inseridos {missing_records.shape[0]} novos registros na aba '{target_sheet}'.")
 
     logging.info(f"Atualização da aba '{target_sheet}' concluída com sucesso.")
+    return df_processed
 
 
 if __name__ == "__main__":
-    main()
+    setup_logging(level=logging.DEBUG)
+    run_etl_geral()

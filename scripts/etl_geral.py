@@ -1,24 +1,18 @@
 import pandas as pd
 import logging
 
+from utils import aplicar_substituicoes_objetivo, renomear_colunas_origem_para_modelo
 from utils.campanha_mapper import buscar_mapping
-from utils.renomeacoes import aplicar_substituicoes_objetivo, renomear_colunas_origem_para_modelo
 from utils.numeracao import gerar_numeracao
-from utils.datas import transformar_para_date, converter_data
-from utils.preview_links import build_pinterest_preview_link
+from utils import transformar_para_date, converter_data
+from utils import build_pinterest_preview_link, determine_meta_ad_preview_link, generate_linkedin_ad_preview_link_from_lookup
 from utils.common_linkedin import preencher_nomes_anuncio_linkedin
-from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico
-from utils.campos_calculados import calcular_engajamento_total, inicializar_colunas_auxiliares
-from utils.normalize import  converter_colunas_numericas
-from utils.atribuicoes_via_lookup import aplicar_parametrizacao_campanha
-from utils.organizar_dataframe import remover_colunas_indesejadas
-from utils.campos_calculados import gerar_id
-from utils.preview_links import determine_meta_ad_preview_link, generate_linkedin_ad_preview_link_from_lookup
-
+from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico, aplicar_parametrizacao_campanha
+from utils.campos_calculados import calcular_engajamento_total, inicializar_colunas_auxiliares, gerar_id
+from utils.normalize import converter_colunas_numericas
+from utils.organizar_dataframe import remover_colunas_indesejadas, reordenar_colunas_para_modelo
 from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER, NUMERIC_COLUMNS
 
-
-from utils.organizar_dataframe import reordenar_colunas_para_modelo
 
 
 class BaseGeralETL:
