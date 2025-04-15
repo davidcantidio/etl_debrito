@@ -6,9 +6,11 @@ from scripts.etl_geral import BaseGeralETL
 from utils.fields_lists import REACH_MODEL_COLUMN_ORDER
 from utils.organizar_dataframe import reordenar_colunas_para_modelo
 from utils.numeracao import gerar_numeracao
-from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta
+from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico
 from utils.common_pinterest import preencher_campos_com_campanha
 from utils.datas import generate_pinterest_dates
+from utils.common_linkedin import preencher_nomes_anuncio_linkedin
+
 
 def gerar_id(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -25,22 +27,19 @@ def gerar_id(df: pd.DataFrame) -> pd.DataFrame:
 class BaseAlcanceETL(BaseGeralETL):
     """
     Classe base para ETLs de Alcance.
-    Aplica apenas transformações genéricas, sem normalizações específicas.
+    Aplica transformações genéricas sem normalizações específicas.
     """
 
     def ajustar_tipos_e_calculos(self):
         logging.debug(">>> In BaseAlcanceETL.ajustar_tipos_e_calculos (Antes do super)")
         super().ajustar_tipos_e_calculos()
-        # Não há transformações específicas para Alcance além das gerais.
+        # Para Alcance não há transformações específicas além das gerais.
         return self.df
 
     def criar_veiculo(self):
-        logging.debug(">>> In BaseAlcanceETL.criar_veiculo (Chamando atribuir_veiculo_e_id_meta)")
-        self.df = atribuir_veiculo_e_id_meta(self.df)
-        # Após atribuir o veículo, renomeia 'Placement' para 'Posicionamento'
-        if "Placement" in self.df.columns:
-            logging.debug("Renomeando 'Placement' para 'Posicionamento'")
-            self.df.rename(columns={"Placement": "Posicionamento"}, inplace=True)
+        # Para plataformas genéricas, usamos o mecanismo genérico definido na BaseGeralETL.
+        logging.debug(">>> In BaseAlcanceETL.criar_veiculo (Chamando super para atribuir Veiculo e ID)")
+        super().criar_veiculo()
         return self.df
 
     def reordenar_colunas_para_modelo(self):
@@ -50,7 +49,6 @@ class BaseAlcanceETL(BaseGeralETL):
 
     def processar(self, df_destino=None):
         logging.debug(">>> In processar (BaseAlcanceETL)")
-
         self.renomear_colunas_origem_para_modelo()
         self.ajustar_tipos_e_calculos()
         self.aplicar_substituicoes_objetivo()
@@ -58,7 +56,7 @@ class BaseAlcanceETL(BaseGeralETL):
         self.determine_ad_preview_link()
         self.criar_veiculo()
         
-        # Copiar o dado de "Reach" para "Alcance" antes de remover colunas indesejadas
+        # Copiar os dados do campo "Reach" para a coluna "Alcance"
         if "Reach" in self.df.columns:
             logging.debug("Copiando dados da coluna 'Reach' para 'Alcance'")
             self.df["Alcance"] = self.df["Reach"]
@@ -68,24 +66,47 @@ class BaseAlcanceETL(BaseGeralETL):
         self.df = gerar_id(self.df)
         self.df = gerar_numeracao(self.df, df_destino, linha_insercao=2, coluna="Numero")
         
-        # Filtra para manter somente as colunas definidas no modelo de alcance, além da coluna 'ID'
+        # Filtra para manter somente as colunas definidas no modelo de Alcance, além da coluna "ID"
         valid_cols = set(REACH_MODEL_COLUMN_ORDER).union({"ID"})
         self.df = self.df[[col for col in self.df.columns if col in valid_cols]]
         
         logging.debug(">>> Final do processar (BaseAlcanceETL)")
         return self.df
 
-
 # ---------- SUBCLASSES POR PLATAFORMA ----------
 
 class MetaAlcanceETL(BaseAlcanceETL):
-    pass
+    def criar_veiculo(self):
+        logging.debug(">>> In MetaAlcanceETL.criar_veiculo (Usando atribuir_veiculo_e_id_meta)")
+        # Para Meta, utiliza a função específica que infere veículo a partir de Placement
+        self.df = atribuir_veiculo_e_id_meta(self.df)
+        return self.df
 
 class TikTokAlcanceETL(BaseAlcanceETL):
     pass
 
+
+
+
 class LinkedinAlcanceETL(BaseAlcanceETL):
-    pass
+    def __init__(self, *args, mapping_preview=None, mapping_criativo=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mapping_preview = mapping_preview or {}
+        self.mapping_criativo = mapping_criativo or {}
+
+    def ajustar_tipos_e_calculos(self):
+        logging.debug(">>> In LinkedinAlcanceETL.ajustar_tipos_e_calculos")
+        super().ajustar_tipos_e_calculos()
+
+        # ✅ Aplica preenchimento com o mapeamento de criativo
+        if 'utm_content' in self.df.columns:
+            self.df = preencher_nomes_anuncio_linkedin(self.df, self.mapping_criativo)
+        else:
+            logging.warning("utm_content ausente, não será possível preencher nomes de anúncio.")
+
+        return self.df
+
+
 
 class PinterestAlcanceETL(BaseAlcanceETL):
     def ajustar_tipos_e_calculos(self):

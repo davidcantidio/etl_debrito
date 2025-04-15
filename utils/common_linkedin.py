@@ -1,3 +1,5 @@
+# common_linkedin.py
+
 import logging
 from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
@@ -5,6 +7,7 @@ from utils.normalize import normalize_columns, normalize_parametrizacao_values
 from utils.preview_links import generate_linkedin_ad_preview_link_from_lookup
 from utils.creative_mapping import carregar_mapeamento_nome_creativo, obter_nome_por_utm_content
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+
 
 def carregar_mapeamentos_linkedin():
     """
@@ -31,6 +34,7 @@ def carregar_mapeamentos_linkedin():
 
     return mapping_preview, mapping_criativo
 
+
 def buscar_nome_criativo_com_log(utm_content, mapping_criativo):
     """
     Busca o nome do criativo com base no utm_content.
@@ -39,8 +43,9 @@ def buscar_nome_criativo_com_log(utm_content, mapping_criativo):
     utm_str = str(utm_content).strip()
     nome = obter_nome_por_utm_content(utm_str, mapping_criativo)
     if not nome:
-        logging.debug(f"utm_content '{utm_str}' NÃO encontrado no mapping_criativo.")
+        logging.debug(f"[LinkedIn] utm_content '{utm_str}' NÃO encontrado no mapping_criativo.")
     return nome
+
 
 def preparar_kwargs_linkedin() -> dict:
     """
@@ -53,18 +58,22 @@ def preparar_kwargs_linkedin() -> dict:
         "mapping_criativo": mapping_criativo,
     }
 
-def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
-    """
-    Preenche as colunas 'Nome_do_Anuncio' e 'Nome_do_Conjunto_de_Anuncio' com base no ID_Content
-    e mapeamento de criativo (utm_content → nome).
-    """
-    if 'ID_Content' not in df.columns:
-        df['Nome_do_Anuncio'] = ""
-        df['Nome_do_Conjunto_de_Anuncio'] = ""
-        return df
 
-    df['Nome_do_Anuncio'] = df['ID_Content'].apply(
-        lambda utm: buscar_nome_criativo_com_log(utm, mapping_criativo)
-    )
-    df['Nome_do_Conjunto_de_Anuncio'] = df['Nome_do_Anuncio']
+def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
+    df = df.copy()
+
+    # Correção: Nome_do_Anuncio = utm_content
+    # Nome_do_Conjunto_de_Anuncio = mapeamento via utm_content
+    df["Nome_do_Anuncio"] = df["utm_content"]
+    df["Nome_do_Conjunto_de_Anuncio"] = df["utm_content"].map(mapping_criativo)
+
+    # Log de utm_content não encontrados no mapping
+    utms_nao_mapeados = df[df["Nome_do_Conjunto_de_Anuncio"].isna()]["utm_content"].dropna().unique()
+    if len(utms_nao_mapeados) > 0:
+        logging.warning("utm_content sem correspondência em BI_PARAMETRIZAÇÃO (LinkedIn):")
+        for utm in utms_nao_mapeados[:10]:
+            logging.warning(f"- {utm}")
+
     return df
+
+
