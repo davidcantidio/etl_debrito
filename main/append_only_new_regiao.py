@@ -26,7 +26,7 @@ def run_etl_regiao():
     setup_logging(level=logging.DEBUG)
 
     # Aba de origem com os dados regionais. Ajuste conforme a plataforma (ex.: "tiktokRegiao")
-    source_sheet = "metaRegiao"  
+    source_sheet = "tiktokRegiao"  
     # Aba de destino para o modelo de região
     target_sheet = "modeloRegiao"    
 
