@@ -141,11 +141,12 @@ def pivot_meta_placement_data(df_placement):
 
     logging.debug("Starting pivot_meta_placement_data()")
 
-    # Definir as colunas numéricas que serão pivotadas
+    # Definir apenas as colunas numéricas que serão pivotadas.
     numeric_columns = ["Impressions", "Link clicks", "Cost", "Video watches at 100%"]
     logging.debug(f"Using numeric columns for pivot: {numeric_columns}")
 
-    # Cria a tabela pivô: agrupa por 'Ad ID' e 'Date', pivotando pela coluna 'Placement'
+    # Cria a tabela pivô: agrupa estritamente por 'Ad ID' e 'Date'
+    # Assim, não utiliza ou modifica colunas de dimensão como 'Account name', 'Ad name', etc.
     pivot_df = pd.pivot_table(
         df_placement,
         index=["Ad ID", "Date"],
@@ -156,19 +157,20 @@ def pivot_meta_placement_data(df_placement):
     )
     logging.debug("Pivot table created with MultiIndex columns.")
 
-    # O pivot table tem MultiIndex nas colunas no formato (metric, placement).
-    # Para montar colunas no formato "<Placement>_<Metric>", invertemos os níveis.
+    # Manipula os níveis para que as colunas resultantes fiquem no formato "<Placement>_<Metric>".
     pivot_df = pivot_df.swaplevel(axis=1)
     pivot_df.sort_index(axis=1, level=0, inplace=True)
     logging.debug("Swapped MultiIndex levels on columns.")
 
-    # Achata (flatten) o MultiIndex em um único nível, concatenando os níveis com um underscore.
+    # Achata (flatten) o MultiIndex concatenando os níveis com um underscore.
     pivot_df.columns = [f"{col[0]}_{col[1]}" for col in pivot_df.columns]
     logging.debug("Flattened pivot table columns.")
     
     logging.debug(f"Finished pivot_meta_placement_data(), result shape: {pivot_df.shape}")
+    
+    # Retorna somente as chaves 'Ad ID' e 'Date' juntamente com as métricas pivotadas;
+    # as colunas de dimensão originais serão adicionadas posteriormente, se necessário.
     return pivot_df.reset_index()
-
 
 
 def pivot_meta_gender_data(df_gender):
