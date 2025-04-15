@@ -33,7 +33,7 @@ def run_etl_alcance():
       - Insere os registros faltantes
     """
     logging.info("Iniciando ETL de Alcance...")
-    source_sheet = "linkedinAlcance"  # Modifique conforme a aba de origem
+    source_sheet = "pinterestAlcance"  # Modifique conforme a aba de origem
     target_sheet = "modeloAlcance"
     plataforma = source_sheet.lower().replace("alcance", "").strip()
 
