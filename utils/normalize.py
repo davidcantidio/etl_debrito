@@ -156,3 +156,24 @@ def converter_colunas_numericas(df, colunas):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     return df
+
+
+# Dentro de utils/normalize.py
+
+def extrair_veiculo(placement: str) -> str:
+    """
+    Extrai o nome do veículo com base no campo Placement.
+    Exemplo: "facebook|feed|mobile_app" → "Facebook"
+    """
+    if not isinstance(placement, str) or placement.strip() == "":
+        return "Não identificado"
+
+    plataforma = placement.split("|")[0].strip().lower()
+    mapping = {
+        "facebook": "Facebook",
+        "instagram": "Instagram",
+        "messenger": "Messenger",
+        "audience_network": "Audience Network",
+        "unknown": "Não identificado"
+    }
+    return mapping.get(plataforma, "Não identificado")
