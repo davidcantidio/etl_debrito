@@ -24,7 +24,7 @@ from scripts.etl_genero import (
 def run_etl_genero():
     setup_logging(level=logging.DEBUG)
 
-    source_sheet = "pinterestGenero"  # Nome da aba de origem contendo os dados de gênero
+    source_sheet = "metaGenero"  # Nome da aba de origem contendo os dados de gênero
     target_sheet = "modeloGenero"       # Nome da aba de destino para o modelo Gênero
 
     # Define a plataforma removendo a palavra "genero" do nome da aba de origem
