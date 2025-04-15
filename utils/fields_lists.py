@@ -28,19 +28,19 @@ GENERAL_MODEL_COLUMN_ORDER = [
     'Numero',
     'Data',
     'Nome_da_Conta',
+    'Campanha',
+    'ID_Campanha',
     'Veiculo',
     'ID_Veiculo',
-    'ID_Campanha',
-    'Campanha',
     'Nome_do_Conjunto_de_Anuncio',
     'Nome_do_Anuncio',
-    'Objetivo',
     'Inicio_da_Campanha',
     'Fim_da_Campanha',
+    'Objetivo',
     'URL_do_Anuncio',
     'ID_Content',
-    'Impressoes',
     'Investimento',
+    'Impressoes',
     'Cliques_no_Link',
     'Video_Play',
     'Visualizacoes_ate_25',
@@ -53,6 +53,7 @@ GENERAL_MODEL_COLUMN_ORDER = [
     'Engajamento_Total',
     'ID'
 ]
+
 
 # Modelo específico para ETL de Idade
 AGE_MODEL_COLUMN_ORDER = [
@@ -116,7 +117,7 @@ REGION_MODEL_COLUMN_ORDER = [
 
 
 # Modelo específico para ETL de Reach
-REACH_MODEL_COLUMN_ORDER = [
+REACH_MODEL_COLUMN_ORDER =  [
     'Numero',
     'Data',
     'Nome_da_Conta',
@@ -127,6 +128,7 @@ REACH_MODEL_COLUMN_ORDER = [
     'Nome_do_Conjunto_de_Anuncio',
     'Nome_do_Anuncio',
     'Objetivo',
+    'Alcance',
     'Impressoes',
     'ID'
 ]
