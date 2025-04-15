@@ -161,19 +161,14 @@ def converter_colunas_numericas(df, colunas):
 # Dentro de utils/normalize.py
 
 def extrair_veiculo(placement: str) -> str:
-    """
-    Extrai o nome do veículo com base no campo Placement.
-    Exemplo: "facebook|feed|mobile_app" → "Facebook"
-    """
-    if not isinstance(placement, str) or placement.strip() == "":
-        return "Não identificado"
+    if not isinstance(placement, str):
+        return "Facebook"  # fallback padrão
 
-    plataforma = placement.split("|")[0].strip().lower()
-    mapping = {
-        "facebook": "Facebook",
-        "instagram": "Instagram",
-        "messenger": "Messenger",
-        "audience_network": "Audience Network",
-        "unknown": "Não identificado"
-    }
-    return mapping.get(plataforma, "Não identificado")
+    placement = placement.lower()
+    if "facebook" in placement:
+        return "Facebook"
+    elif "instagram" in placement:
+        return "Instagram"
+    # fallback: só Facebook ou Instagram são possíveis neste contexto
+    return "Facebook"
+
