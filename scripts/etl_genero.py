@@ -15,7 +15,9 @@ from utils.common_meta import (
     merge_placement_and_gender_data,
     preserve_placement_column,
 )
-from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta
+from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico
+from utils.common_pinterest import preencher_campos_com_campanha
+from utils.datas import generate_pinterest_dates
 
 
 # ---------- BASE GENERO ----------
@@ -32,6 +34,20 @@ class BaseGeneroETL(BaseGeralETL):
         if 'Genero' in self.df.columns:
             logging.debug("Normalizando valores da coluna 'Genero'")
             self.df['Genero'] = self.df['Genero'].apply(normalizar_genero)
+
+        if "Veiculo" not in self.df.columns or self.df["Veiculo"].isnull().all():
+            if self.veiculo:
+                logging.debug(f"Veiculo não atribuído, usando self.veiculo: {self.veiculo}")
+                self.df["Veiculo"] = self.veiculo
+            else:
+                logging.debug("Veiculo não atribuído e self.veiculo ausente, aplicando fallback padrão: Facebook")
+                self.df["Veiculo"] = "Facebook"
+
+            self.df = atribuir_id_veiculo_generico(self.df)
+
+
+
+
 
         return self.df
 
