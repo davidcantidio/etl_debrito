@@ -151,6 +151,8 @@ class MetaGeneroETL(BaseGeneroETL):
         self.df["Impressoes"] = self.df["Impressoes_y"]
         self.df["Investimento"] = self.df["Investimento_y"]
         self.df["Cliques_no_Link"] = self.df["Cliques_no_Link_y"]
+        self.df["Visualizacoes_ate_100"] = self.df["Visualizacoes_ate_100_y"]
+
 
 
         # 7. Gera ID único
