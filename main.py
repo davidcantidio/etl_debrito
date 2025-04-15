@@ -3,7 +3,7 @@ from utils.setup_logging import setup_logging
 from main.append_only_new_geral import run_etl_geral
 from main.append_only_new_idade import run_etl_idade
 from main.append_only_new_genero import run_etl_genero
-# from main.append_only_new_regiao import run_etl_regiao
+from main.append_only_new_regiao import run_etl_regiao
 
 def main():
     # Configura o logging para DEBUG (ou outro nível desejado)
@@ -18,13 +18,13 @@ def main():
     # logging.info("Executando ETL Idade...")
     # run_etl_idade()
 
-    # # Executa o ETL de Região
-    # logging.info("Executando ETL Região...")
-    # run_etl_regiao()
-
     # Executa o ETL de Região
     logging.info("Executando ETL Região...")
-    run_etl_genero()
+    run_etl_regiao()
+
+    # Executa o ETL de Região
+    # logging.info("Executando ETL Região...")
+    # run_etl_genero()
 
     logging.info("Todos os ETLs foram executados com sucesso.")
 

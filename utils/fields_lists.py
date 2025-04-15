@@ -99,23 +99,21 @@ REGION_MODEL_COLUMN_ORDER = [
     'Numero',
     'Data',
     'Nome_da_Conta',
-    'Campanha',
+    'ID_Veiculo',
+    'Veiculo',
     'ID_Campanha',
-    'Regiao',
+    'Campanha',
+    'Nome_do_Conjunto_de_Anuncio',
+    'Nome_do_Anuncio',
+    'Objetivo',
     'Estado',
     'Impressoes',
     'Investimento',
     'Cliques_no_Link',
-    'Video_Play',
-    'Visualizacoes_ate_25',
-    'Visualizacoes_ate_50',
-    'Visualizacoes_ate_75',
     'Visualizacoes_ate_100',
-    'Reacoes',
-    'Compartilhamentos',
-    'Comentarios',
     'ID'
 ]
+
 
 # Modelo específico para ETL de Reach
 REACH_MODEL_COLUMN_ORDER = [
