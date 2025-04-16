@@ -21,22 +21,22 @@ def main():
 
 
     # # Executa o ETL de Idade
-    logging.info("Executando ETL Idade...")
-    run_etl_idade()
-    time.sleep(60)
+    # logging.info("Executando ETL Idade...")
+    # run_etl_idade()
+    # time.sleep(60)
+
+    # # # Executa o ETL de Região
+    # logging.info("Executando ETL Região...")
+    # run_etl_regiao()
+    # time.sleep(60)
 
     # # Executa o ETL de Região
-    logging.info("Executando ETL Região...")
-    run_etl_regiao()
-    time.sleep(60)
+    # logging.info("Executando ETL Região...")
+    # run_etl_alcance()
 
-    # Executa o ETL de Região
-    logging.info("Executando ETL Região...")
-    run_etl_alcance()
-
-    # Executa o ETL de Região
-    logging.info("Executando ETL Região...")
-    run_etl_genero()
+    # # Executa o ETL de Região
+    # logging.info("Executando ETL Região...")
+    # run_etl_genero()
 
     logging.info("Todos os ETLs foram executados com sucesso.")
 

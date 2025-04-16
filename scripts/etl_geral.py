@@ -29,6 +29,8 @@ class BaseGeralETL:
 
     def ajustar_tipos_e_calculos(self):
         self.df = converter_data(self.df, 'Data')
+        self.df = converter_data(self.df, 'Inicio_da_Campanha')
+        self.df = converter_data(self.df, 'Fim_da_Campanha')
         self.df = converter_colunas_numericas(self.df, NUMERIC_COLUMNS)
         self.df = calcular_engajamento_total(self.df)
         self.df = inicializar_colunas_auxiliares(self.df)

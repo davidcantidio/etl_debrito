@@ -31,7 +31,7 @@ def run_etl_geral():
     """
     setup_logging(level=logging.DEBUG)
 
-    plataformas = ["meta", "tiktok", "linkedin", "pinterest"]
+    plataformas = ["tiktok"]
     target_sheet = "modeloGeral"
 
     for plataforma in plataformas:
