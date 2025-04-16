@@ -1,6 +1,7 @@
 # append_only_new_alcance.py
 
 import logging
+import time
 from utils.google_sheets import (
     carregar_aba_google_sheets,
     CREDS_PATH as creds_path,
@@ -25,17 +26,12 @@ from scripts.etl_alcance import (
 
 def run_etl_alcance():
     """
-    Executa o fluxo completo do ETL de Alcance:
-      - Lê os dados da aba de origem (por exemplo, 'linkedinAlcance')
-      - Carrega os mapeamentos de campanha
-      - Instancia a classe ETL correspondente
-      - Lê os dados da aba de destino e processa o DataFrame
-      - Insere os registros faltantes
+    Executa o ETL de Alcance para todas as plataformas com delay de 60 segundos entre cada uma.
     """
-    logging.info("Iniciando ETL de Alcance...")
-    source_sheet = "pinterestAlcance"  # Modifique conforme a aba de origem
+    setup_logging(level=logging.DEBUG)
+
+    plataformas = ["meta", "tiktok", "linkedin", "pinterest"]
     target_sheet = "modeloAlcance"
-    plataforma = source_sheet.lower().replace("alcance", "").strip()
 
     etl_class_map = {
         "meta": (MetaAlcanceETL, None),
@@ -44,63 +40,68 @@ def run_etl_alcance():
         "pinterest": (PinterestAlcanceETL, "Pinterest"),
     }
 
-    if plataforma not in etl_class_map:
-        raise ValueError(f"Plataforma '{plataforma}' não suportada.")
+    for plataforma in plataformas:
+        source_sheet = f"{plataforma}Alcance"
+        logging.info(f"==== Iniciando ETL de Alcance para plataforma: {plataforma} ====")
 
-    etl_class, veiculo_nome = etl_class_map[plataforma]
+        if plataforma not in etl_class_map:
+            logging.warning(f"Plataforma '{plataforma}' não suportada. Pulando...")
+            continue
 
-    logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
-    df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
+        etl_class, veiculo_nome = etl_class_map[plataforma]
 
-    # Remove linhas com "Date" vazia
-    if "Date" in df_origin.columns:
-        df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
-    logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
+        logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
+        df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
 
-    # Mapeamentos de campanha
-    logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
-    mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
+        # Remove linhas com "Date" vazia
+        if "Date" in df_origin.columns:
+            df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
+        logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
 
-    # Parâmetros adicionais específicos por plataforma
-    extra_kwargs = {}
-    if plataforma == "linkedin":
-        extra_kwargs.update(preparar_kwargs_linkedin())
+        logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
+        mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
 
-    # Instancia a classe ETL
-    etl_instance = etl_class(
-        df=df_origin,
-        id_veiculo=None,
-        veiculo=veiculo_nome,
-        mapping_campanha=mapping_campanha,
-        mapping_sigla=mapping_sigla,
-        **extra_kwargs
-    )
+        extra_kwargs = {}
+        if plataforma == "linkedin":
+            extra_kwargs.update(preparar_kwargs_linkedin())
 
-    logging.info(f"Lendo dados da aba de destino '{target_sheet}'...")
-    client = get_google_client(creds_path)
-    df_target = read_sheet_as_dataframe_range(
-        client, spreadsheet_id, sheet_name=target_sheet, range_str="A1:AM", header_row_index=0
-    )
+        # Instancia a classe ETL
+        etl_instance = etl_class(
+            df=df_origin,
+            id_veiculo=None,
+            veiculo=veiculo_nome,
+            mapping_campanha=mapping_campanha,
+            mapping_sigla=mapping_sigla,
+            **extra_kwargs
+        )
 
-    logging.info(f"Executando ETL de Alcance para '{plataforma}'...")
-    df_processed = etl_instance.processar(df_destino=df_target)
+        logging.info(f"Lendo dados da aba de destino '{target_sheet}'...")
+        client = get_google_client(creds_path)
+        df_target = read_sheet_as_dataframe_range(
+            client, spreadsheet_id, sheet_name=target_sheet, range_str="A1:AM", header_row_index=0
+        )
 
-    logging.debug("Prévia dos dados processados:")
-    logging.debug(df_processed.head(3).to_string())
+        logging.info(f"Executando ETL de Alcance para '{plataforma}'...")
+        df_processed = etl_instance.processar(df_destino=df_target)
 
-    logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
-    missing_records = get_missing_records(df_processed, df_target)
+        logging.debug("Prévia dos dados processados:")
+        logging.debug(df_processed.head(3).to_string())
 
-    if missing_records.empty:
-        logging.info("Não há registros faltantes para inserir.")
-    else:
-        append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, missing_records)
-        logging.info(f"Inseridos {missing_records.shape[0]} novos registros na aba '{target_sheet}'.")
+        logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
+        missing_records = get_missing_records(df_processed, df_target)
 
-    logging.info(f"Atualização da aba '{target_sheet}' concluída com sucesso.")
-    return df_processed
+        if missing_records.empty:
+            logging.info("Não há registros faltantes para inserir.")
+        else:
+            append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, missing_records)
+            logging.info(f"Inseridos {missing_records.shape[0]} novos registros na aba '{target_sheet}'.")
+
+        logging.info(f"Atualização da aba '{target_sheet}' concluída com sucesso.")
+        logging.info("Aguardando 60 segundos antes de processar próxima plataforma...\n")
+        time.sleep(60)
+
+    logging.info("Todos os ETLs de Alcance foram executados com sucesso.")
 
 
 if __name__ == "__main__":
-    setup_logging(level=logging.DEBUG)
     run_etl_alcance()

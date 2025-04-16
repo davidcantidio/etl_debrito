@@ -89,13 +89,34 @@ class LinkedinGeralETL(BaseGeralETL):
 
     def ajustar_tipos_e_calculos(self):
         super().ajustar_tipos_e_calculos()
+
+        # Duplicar Content (utm) como ID_Content e utm_content
+        if "Content (utm)" in self.df.columns:
+            self.df["ID_Content"] = self.df["Content (utm)"]
+            self.df["utm_content"] = self.df["Content (utm)"]
+            logging.debug("[LinkedIn] Campo 'Content (utm)' duplicado em 'ID_Content' e 'utm_content'.")
+        else:
+            logging.warning("[LinkedIn] Coluna 'Content (utm)' ausente. Não será possível gerar 'ID_Content' nem 'utm_content'.")
+
+        # Preenche Nome_do_Anuncio e Nome_do_Conjunto_de_Anuncio com base no mapping_criativo
         self.df = preencher_nomes_anuncio_linkedin(self.df, self.mapping_criativo)
 
+        return self.df
+    
     def determine_ad_preview_link(self):
-        if 'ID_Content' not in self.df.columns:
-            self.df['URL_do_Anuncio'] = ""
-        else:
-            self.df['URL_do_Anuncio'] = self.df['ID_Content'].map(self.mapping_preview).fillna("")
+        logging.debug(">>> In LinkedinGeralETL.determine_ad_preview_link (via ID_Content)")
+
+        if "ID_Content" not in self.df.columns:
+            logging.warning("[LinkedIn] Coluna 'ID_Content' ausente. Não será possível gerar 'URL_do_Anuncio'.")
+            return
+
+        self.df["URL_do_Anuncio"] = self.df["ID_Content"].map(self.mapping_preview)
+
+        nao_mapeados = self.df[self.df["URL_do_Anuncio"].isna()]["ID_Content"].dropna().unique()
+        if len(nao_mapeados) > 0:
+            logging.warning(f"[LinkedIn] ID_Content sem preview link (até 10): {nao_mapeados[:10]}")
+
+
 
 
 from utils.datas import generate_pinterest_dates

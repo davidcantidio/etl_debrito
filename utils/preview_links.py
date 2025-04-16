@@ -24,30 +24,24 @@ def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
 
 def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao: pd.DataFrame) -> dict:
     """
-    Gera um dicionário {ID_Content: Preview_Link} a partir da aba BI_PARAMETRIZAÇÃO.
-    - ID_Content vem da coluna 'ID'
-    - Preview vem da coluna 'PREVIEW'
+    Gera um dicionário {utm_content: preview} para ser usado no preenchimento de preview do LinkedIn.
     """
-    logging.debug("Iniciando geração de mapping_preview para LinkedIn...")
+    COL_UTM = "utm_content"
+    COL_PREVIEW = "preview"
 
-    # Identifica as colunas certas sem alterar o df original
-    colunas_normalizadas = [col.strip().upper() for col in df_parametrizacao.columns]
-    coluna_id = next((col for col in df_parametrizacao.columns if col.strip().upper() == 'ID'), None)
-    coluna_preview = next((col for col in df_parametrizacao.columns if col.strip().upper() == 'PREVIEW'), None)
-
-    if not coluna_id or not coluna_preview:
-        logging.warning("Colunas 'ID' e/ou 'PREVIEW' não encontradas na aba BI_PARAMETRIZAÇÃO.")
+    if COL_UTM not in df_parametrizacao.columns or COL_PREVIEW not in df_parametrizacao.columns:
+        logging.warning("Colunas 'utm_content' ou 'preview' não encontradas em BI_PARAMETRIZAÇÃO.")
         return {}
 
-    df = df_parametrizacao[[coluna_id, coluna_preview]].dropna()
-    df[coluna_id] = df[coluna_id].astype(str).str.strip()
-    df[coluna_preview] = df[coluna_preview].astype(str).str.strip()
+    mapping = df_parametrizacao[[COL_UTM, COL_PREVIEW]].dropna()
+    mapping = mapping.astype(str).drop_duplicates(subset=[COL_UTM])
+    preview_dict = dict(zip(mapping[COL_UTM], mapping[COL_PREVIEW]))
 
-    mapping = dict(zip(df[coluna_id], df[coluna_preview]))
+    logging.debug("Exemplo de mapeamentos de preview gerados para LinkedIn:")
+    for k, v in list(preview_dict.items())[:5]:
+        logging.debug(f"{k} -> {v}")
 
-    logging.debug(f"Exemplos de mapping_preview gerados: {list(mapping.items())[:5]}")
-    return mapping
-
+    return preview_dict
 
 def build_pinterest_preview_link(id_pin: str) -> str:
     """
