@@ -2,6 +2,9 @@
 
 import logging
 import time
+from gspread.utils import rowcol_to_a1
+from utils.fields_lists import AGE_MODEL_COLUMN_ORDER
+from utils.get_google_client import get_google_client
 from utils.google_sheets import (
     carregar_aba_google_sheets,
     CREDS_PATH as creds_path,
@@ -13,7 +16,6 @@ from utils.get_campaign_parameterization import get_campaign_parameterization
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.get_missing_records import get_missing_records
 from utils.append_records_to_sheet import append_records_to_sheet
-from utils.get_google_client import get_google_client
 
 # Importação dos ETLs de idade
 from scripts.etl_idade import (
@@ -24,15 +26,33 @@ from scripts.etl_idade import (
 )
 
 
+def garantir_cabecalho_idade():
+    """
+    Garante que a linha 1 da aba 'modeloIdade' contenha todas as colunas de AGE_MODEL_COLUMN_ORDER.
+    Se alguma estiver faltando, sobrescreve apenas A1 até a última coluna do modelo.
+    """
+    client = get_google_client(creds_path)
+    ws = client.open_by_key(spreadsheet_id).worksheet("modeloIdade")
+
+    header_atual = ws.row_values(1)  # sem valores vazios à direita
+    faltam = set(AGE_MODEL_COLUMN_ORDER) - set(header_atual)
+    if faltam:
+        ultima = rowcol_to_a1(1, len(AGE_MODEL_COLUMN_ORDER))  # ex: 'P1'
+        ws.update(f"A1:{ultima}", [AGE_MODEL_COLUMN_ORDER])
+        logging.info("Cabeçalho de modeloIdade atualizado para as 16 colunas do modelo.")
+    else:
+        logging.debug("Cabeçalho de modeloIdade já está completo.")
+
+
 def run_etl_idade():
     setup_logging(level=logging.DEBUG)
+    garantir_cabecalho_idade()
 
     plataformas = ["meta", "tiktok", "pinterest"]
     target_sheet = "modeloIdade"
 
     for plataforma in plataformas:
         logging.info(f"=== Iniciando ETL Idade para plataforma: {plataforma} ===")
-
         source_sheet = f"{plataforma}Idade"
 
         if plataforma == "meta":
@@ -72,7 +92,11 @@ def run_etl_idade():
         logging.info(f"Lendo dados da aba de destino '{target_sheet}'...")
         client = get_google_client(creds_path)
         df_target = read_sheet_as_dataframe_range(
-            client, spreadsheet_id, sheet_name=target_sheet, range_str="A1:AN", header_row_index=0
+            client,
+            spreadsheet_id,
+            sheet_name=target_sheet,
+            range_str="A1:AN",
+            header_row_index=0
         )
 
         logging.info(f"Executando ETL de Idade para '{plataforma}'...")
@@ -84,11 +108,9 @@ def run_etl_idade():
             logging.info("Não há registros faltantes para inserir.")
         else:
             append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, missing_records)
-            logging.info(f"Inseridos {missing_records.shape[0]} novos registros na aba '{target_sheet}'.")
+            logging.info(f"Inseridos {missing_records.shape[0]} registros na aba '{target_sheet}'.")
 
         logging.info(f"Atualização da aba '{target_sheet}' concluída com sucesso.")
-
-        # Delay entre execuções para evitar bloqueios na API
         logging.info("Aguardando 60 segundos antes do próximo ETL...")
         time.sleep(60)
 

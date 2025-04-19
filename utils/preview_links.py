@@ -5,19 +5,31 @@ import pandas as pd
 def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     """
     Determina o link de visualização do anúncio para Meta Ads,
-    usando 'Preview Link FB' como fallback para 'URL_do_Anuncio'.
-    Renomeia a coluna se necessário e aplica a lógica de substituição.
+    usando na ordem:
+      1) qualquer valor já existente em 'URL_do_Anuncio'
+      2) o campo 'Preview_Link_FB'
+      3) o campo 'Preview_Link_IG'
+    e renomeia as colunas brutas 'Preview Link FB' e 'Preview Link IG'.
     """
+    # 1) Renomeia colunas brutas vinda do Google‑Sheets
     if 'Preview Link FB' in df.columns:
         df = df.rename(columns={'Preview Link FB': 'Preview_Link_FB'})
+    if 'Preview Link IG' in df.columns:
+        df = df.rename(columns={'Preview Link IG': 'Preview_Link_IG'})
 
-    if 'URL_do_Anuncio' in df.columns and 'Preview_Link_FB' in df.columns:
-        df['URL_do_Anuncio'] = df.apply(
-            lambda row: row['Preview_Link_FB']
-            if not row['URL_do_Anuncio'] or str(row['URL_do_Anuncio']).strip() == ""
-            else row['URL_do_Anuncio'],
-            axis=1
-        )
+    # 2) Preenche URL_do_Anuncio pela ordem de preferência
+    if 'URL_do_Anuncio' in df.columns:
+        def _pref_preview(row):
+            # já veio preenchido?
+            if row.get('URL_do_Anuncio') and str(row['URL_do_Anuncio']).strip():
+                return row['URL_do_Anuncio']
+            # senão tenta FB
+            if row.get('Preview_Link_FB'):
+                return row['Preview_Link_FB']
+            # senão IG (ou vazio se nem existir)
+            return row.get('Preview_Link_IG', '')
+
+        df['URL_do_Anuncio'] = df.apply(_pref_preview, axis=1)
 
     return df
 

@@ -492,312 +492,263 @@ def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
 
 # utils/common_meta.py
 
+"""
+Funções utilitárias comuns aos ETLs do **Meta Ads** (Idade, Gênero, Região …).
+
+•  carrega as abas *metaIdade* e *metaGeral* do Google‑Sheets  
+•  faz pivôs por placement / age  
+•  contém o algoritmo `distribute_age_metrics` – totalmente testado em
+   `tests/test_meta_idade_algoritmo_extra.py`
+"""
+
+from __future__ import annotations
+
 import logging
+from collections import Counter
+from decimal import Decimal, ROUND_DOWN
+from math      import floor
+from typing    import Dict, List, Tuple, Union
+
 import pandas as pd
-from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_URL
-from utils.datas import converter_data
-from utils.normalize import converter_colunas_numericas
 
-# ====================================================
-#                   GÊNERO FUNCTIONS
-# ====================================================
-
-def merge_placement_and_gender_data(df_placement_pivot, df_gender_pivot):
-    """
-    Realiza o merge dos DataFrames pivotados dos dados de metaGeral (com Placement)
-    e metaGenero (com Gender) utilizando as chaves 'Ad ID' e 'Date'.
-    Apenas os registros com correspondência em ambos os conjuntos serão mantidos.
-    """
-    logging.debug("Starting merge_placement_and_gender_data()")
-    merged_df = pd.merge(df_gender_pivot, df_placement_pivot, on=["Ad ID", "Date"], how="inner")
-    if merged_df.empty:
-        logging.warning("No matching records found during merge of placement and gender data.")
-    logging.debug(f"Finished merge_placement_and_gender_data(), result shape: {merged_df.shape}")
-    return merged_df
+# -------------------------------------------------------------------- #
+# Dependências auxiliares de Sheets
+# -------------------------------------------------------------------- #
+from utils.google_sheets          import CREDS_PATH, SPREADSHEET_ID
+from utils.get_google_client      import get_google_client
+from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 
 
-def load_and_prepare_meta_placement_data():
-    logging.debug("Starting load_and_prepare_meta_placement_data()")
-    sheet_name = "metaGeral"
-    logging.debug(f"Loading metaGeral data from sheet: {sheet_name}")
-    try:
-        df = carregar_aba_google_sheets(CREDS_PATH, SPREADSHEET_URL, sheet_name)
-        logging.debug(f"Loaded metaGeral data with shape: {df.shape}")
-    except Exception as e:
-        logging.error(f"Error loading metaGeral data: {e}")
-        raise
+# -------------------------------------------------------------------- #
+# 0) Conjunto ÚNICO de métricas usadas em Meta‑Idade
+# -------------------------------------------------------------------- #
+METRICAS: List[str] = [
+    "Impressions",
+    "Link clicks",
+    "Cost",
+    "Video watches at 100%",
+]
 
-    if 'Ad ID' not in df.columns:
-        logging.debug("Column 'Ad ID' not found. Generating 'Ad ID' using 'Campaign name' and 'Ad name'.")
-        if 'Campaign name' in df.columns and 'Ad name' in df.columns:
-            df['Ad ID'] = df['Campaign name'].str.strip() + "_" + df['Ad name'].str.strip()
-            logging.debug("Generated 'Ad ID' from 'Campaign name' and 'Ad name'.")
-        else:
-            df['Ad ID'] = df.index.astype(str)
-            logging.debug("Generated 'Ad ID' from DataFrame index due to missing 'Campaign name' or 'Ad name'.")
-    else:
-        logging.debug("Column 'Ad ID' already exists.")
+# -------------------------------------------------------------------- #
+# 1) Carregamento e preparação das abas de origem
+# -------------------------------------------------------------------- #
+_CLIENT = get_google_client(CREDS_PATH)   #  re‑usa a sessão
 
-    if 'Placement' not in df.columns:
-        logging.error("Missing required column 'Placement'.")
-        raise KeyError("The dataset does not contain the 'Placement' column.")
-    else:
-        sample_placement = df['Placement'].dropna().unique()[:5]
-        logging.debug(f"Sample unique placements: {sample_placement}")
 
-    numeric_columns = ['Impressions', 'Link clicks', 'Cost', 'Video watches at 100%']
-    logging.debug(f"Converting columns to numeric: {numeric_columns}")
-    df = converter_colunas_numericas(df, numeric_columns)
-    logging.debug("Converted numeric columns.")
+def _read_sheet(sheet_name: str) -> pd.DataFrame:
+    """Wrapper minimamente tipado para ler qualquer aba."""
+    return read_sheet_as_dataframe_range(
+        _CLIENT,
+        SPREADSHEET_ID,
+        sheet_name=sheet_name,
+        range_str="A1:ZZ",
+        header_row_index=0,
+    )
 
-    if 'Date' in df.columns:
-        df = converter_data(df, 'Date')
-        logging.debug("Converted 'Date' column to date format.")
-    else:
-        logging.warning("Column 'Date' not found in metaGeral.")
 
-    logging.debug(f"Finished load_and_prepare_meta_placement_data(), final DataFrame shape: {df.shape}")
+def load_and_prepare_meta_age_data() -> pd.DataFrame:
+    """Lê a aba **metaIdade** e garante colunas numéricas."""
+    df = _read_sheet("metaIdade").dropna(subset=["Ad ID", "Date", "Age"])
+    for col in METRICAS:
+        if col not in df.columns:
+            df[col] = 0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
     return df
 
 
-def load_and_prepare_meta_gender_data():
-    logging.debug("Starting load_and_prepare_meta_gender_data()")
-    sheet_name = "metaGenero"
-    logging.debug(f"Loading metaGenero data from sheet: {sheet_name}")
-    try:
-        df = carregar_aba_google_sheets(CREDS_PATH, SPREADSHEET_URL, sheet_name)
-        logging.debug(f"Loaded metaGenero data with shape: {df.shape}")
-    except Exception as e:
-        logging.error(f"Error loading metaGenero data: {e}")
-        raise
-
-    if 'Ad ID' not in df.columns:
-        logging.debug("Column 'Ad ID' not found in metaGenero. Generating 'Ad ID' using 'Campaign name' and 'Ad name'.")
-        if 'Campaign name' in df.columns and 'Ad name' in df.columns:
-            df['Ad ID'] = df['Campaign name'].str.strip() + "_" + df['Ad name'].str.strip()
-            logging.debug("Generated 'Ad ID' from 'Campaign name' and 'Ad name'.")
-        else:
-            df['Ad ID'] = df.index.astype(str)
-            logging.debug("Generated 'Ad ID' from DataFrame index due to missing 'Campaign name' or 'Ad name'.")
-    else:
-        logging.debug("Column 'Ad ID' already exists in metaGenero.")
-
-    if 'Gender' not in df.columns:
-        logging.error("Missing required column 'Gender' in metaGenero.")
-        raise KeyError("The dataset does not contain the 'Gender' column.")
-    else:
-        sample_gender = df['Gender'].dropna().unique()[:5]
-        logging.debug(f"Sample unique genders: {sample_gender}")
-
-    numeric_columns = ['Impressions', 'Link clicks', 'Cost', 'Video watches at 100%']
-    logging.debug(f"Converting numeric columns in metaGenero: {numeric_columns}")
-    df = converter_colunas_numericas(df, numeric_columns)
-    logging.debug("Converted numeric columns for metaGenero.")
-
-    if 'Date' in df.columns:
-        df = converter_data(df, 'Date')
-        logging.debug("Converted 'Date' column to date format in metaGenero.")
-    else:
-        logging.warning("Column 'Date' not found in metaGenero.")
-
-    logging.debug(f"Finished load_and_prepare_meta_gender_data(), final DataFrame shape: {df.shape}")
+def load_and_prepare_meta_placement_data() -> pd.DataFrame:
+    """Lê a aba **metaGeral** já com dados por placement."""
+    df = _read_sheet("metaGeral").dropna(subset=["Ad ID", "Date"])
     return df
 
 
-def pivot_meta_placement_data(df_placement):
-    logging.debug("Starting pivot_meta_placement_data()")
-    numeric_columns = ["Impressions", "Link clicks", "Cost", "Video watches at 100%"]
-    logging.debug(f"Using numeric columns for pivot: {numeric_columns}")
-    pivot_df = pd.pivot_table(df_placement, index=["Ad ID", "Date"], columns="Placement",
-                              values=numeric_columns, aggfunc="sum", fill_value=0)
-    pivot_df = pivot_df.swaplevel(axis=1)
-    pivot_df.sort_index(axis=1, level=0, inplace=True)
-    pivot_df.columns = [f"{col[0]}_{col[1]}" for col in pivot_df.columns]
-    logging.debug(f"Finished pivot_meta_placement_data(), result shape: {pivot_df.shape}")
-    return pivot_df.reset_index()
+# -------------------------------------------------------------------- #
+# 2) Pivot / merge helpers
+# -------------------------------------------------------------------- #
+def pivot_meta_age_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Agrupa ['Ad ID', 'Date', 'Age'] somando métricas."""
+    return df.groupby(["Ad ID", "Date", "Age"], as_index=False)[METRICAS].sum()
 
 
-def pivot_meta_gender_data(df_gender):
-    """
-    Processa os dados de metaGenero agrupando-os por 'Ad ID', 'Date' e 'Gender' e
-    somando as métricas numéricas.
-    """
-    logging.debug("Starting pivot_meta_gender_data()")
-    numeric_columns = ["Impressions", "Link clicks", "Cost", "Video watches at 100%"]
-    group_columns = ["Ad ID", "Date", "Gender"]
-    logging.debug(f"Grouping by {group_columns} and summing numeric columns: {numeric_columns}")
-    df_grouped = df_gender.groupby(group_columns, as_index=False).agg({col: "sum" for col in numeric_columns})
-    logging.debug(f"Finished pivot_meta_gender_data(), result shape: {df_grouped.shape}")
-    return df_grouped
+def pivot_meta_placement_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Coloca métricas por placement no formato `<placement>_<metric>`."""
+    id_vars   = ["Ad ID", "Date"]
+    value_vars = [c for c in df.columns if c not in id_vars + ["Placement"]]
+
+    df_piv = df.pivot_table(
+        index=id_vars,
+        columns="Placement",
+        values=value_vars,
+        aggfunc="sum",
+        fill_value=0,
+    )
+    df_piv.columns = [f"{pl}_{m}" for m, pl in df_piv.columns]
+    df_piv.reset_index(inplace=True)
+    return df_piv
 
 
-def distribute_gender_metrics(df_merged):
-    """
-    Distribui as métricas agregadas de gênero para cada plataforma (definida pelo pivot de Placement).
-    
-    Cria uma nova linha para cada (Ad ID, Date, Gender, _Plataforma) com métricas redistribuídas.
-    """
-    logging.debug("Starting distribute_gender_metrics()")
-    metrics = ["Impressions", "Link clicks", "Cost", "Video watches at 100%"]
-    placement_cols = [col for col in df_merged.columns if col.endswith("_Impressions")]
-    placements = list({col.rsplit("_", 1)[0] for col in placement_cols})
-    logging.debug(f"Identified platforms: {placements}")
-    output_rows = []
-    for idx, row in df_merged.iterrows():
-        total_by_metric = {metric: sum(row.get(f"{pl}_{metric}", 0) for pl in placements) for metric in metrics}
-        for platform in placements:
-            distributed_metrics = {}
-            for metric in metrics:
-                col_name = f"{platform}_{metric}"
-                total = total_by_metric[metric]
-                distributed_metrics[metric] = round(row[metric] * (row.get(col_name, 0) / total)) if total > 0 else 0
-            new_row = row[["Ad ID", "Date", "Gender"]].to_dict()
-            new_row["_Plataforma"] = platform
-            new_row.update(distributed_metrics)
-            output_rows.append(new_row)
-    output_df = pd.DataFrame(output_rows)
-    logging.debug(f"Finished distribute_gender_metrics(), result shape: {output_df.shape}")
-    return output_df
+def merge_placement_and_age_data(
+    df_age: pd.DataFrame,
+    df_placement: pd.DataFrame,
+) -> pd.DataFrame:
+    """Merge final por ['Ad ID', 'Date']."""
+    return pd.merge(df_age, df_placement, on=["Ad ID", "Date"], how="inner")
 
 
-def preserve_placement_column(df):
-    """
-    Garante que o DataFrame possua a coluna 'Placement'. Caso contrário,
-    se existir '_Plataforma', copia seus valores para 'Placement'.
-    """
-    df = df.copy()
-    if "Placement" not in df.columns:
-        if "_Plataforma" in df.columns:
-            df["Placement"] = df["_Plataforma"]
-            logging.debug("Column 'Placement' was missing; '_Plataforma' values copied into 'Placement'.")
-        else:
-            raise KeyError("Neither 'Placement' nor '_Plataforma' exists in the DataFrame.")
+# -------------------------------------------------------------------- #
+# 3) Algoritmo de redistribuição por Age
+# -------------------------------------------------------------------- #
+def get_placements(df: pd.DataFrame) -> List[str]:
+    """Extrai e devolve *placements* ordenados alfabeticamente."""
+    cols = [c for c in df.columns if c.endswith("_Impressions")]
+    return sorted({c.rsplit("_", 1)[0] for c in cols})
+
+
+def compute_pesos_impressao(
+    row: pd.Series, placements: List[str]
+) -> Tuple[Dict[str, int], int]:
+    log = logging.getLogger("common_meta.compute_pesos_impressao")
+    pesos = {pl: max(int(row.get(f"{pl}_Impressions", 0)), 0) for pl in placements}
+    if all(v == 0 for v in pesos.values()):
+        top_pl, _ = max(
+            ((pl, abs(float(row.get(f"{pl}_{m}", 0))))
+             for pl in placements for m in METRICAS),
+            key=lambda t: t[1],
+            default=(placements[0], 0),
+        )
+        pesos[top_pl] = 1
+    return pesos, sum(pesos.values())
+
+
+DISTRIBUICAO_LOGS: Counter[str] = Counter()
+
+
+def _sanitize_metric_value(metric: str, raw):
+    v = 0 if raw is None or pd.isna(raw) else raw
+    v = max(v, 0)
+    return float(v) if metric == "Cost" else int(round(v))
+
+
+def _floor_cents(v: float) -> float:
+    return float(Decimal(str(v)).quantize(Decimal("0.01"), rounding=ROUND_DOWN))
+
+
+def _special_distribution(
+    metric: str,
+    valor_int: int,
+    placements: List[str],
+    peso_imp: Dict[str, int],
+):
+    if metric == "Cost" or valor_int > len(placements):
+        return None, False
+
+    dist = {pl: 0 for pl in placements}
+    if valor_int < len(placements):
+        top_pl = max(placements, key=lambda pl: peso_imp.get(pl, 0))
+        dist[top_pl] = valor_int
+    else:  # valor == len(placements)
+        for pl in placements[:valor_int]:
+            dist[pl] = 1
+    DISTRIBUICAO_LOGS[f"{metric}_especial"] += 1
+    return dist, True
+
+
+def _distribute_proportional(
+    metric: str, valor, placements, peso_imp
+) -> Dict[str, Union[int, float]]:
+    total_peso = sum(peso_imp.values())
+    if valor == 0 or total_peso == 0:
+        return {pl: 0 for pl in placements}
+
+    quots = {pl: (peso_imp[pl] / total_peso) * valor for pl in placements}
+    if metric == "Cost":
+        base = {pl: _floor_cents(quots[pl]) for pl in placements}
+        resto = round(valor - sum(base.values()), 2)
+        inc   = 0.01
     else:
-        logging.debug("Column 'Placement' is present; no need to preserve it.")
-    return df
+        base = {pl: int(floor(quots[pl])) for pl in placements}
+        resto = int(round(valor - sum(base.values())))
+        inc   = 1
+
+    if resto > 0:
+        frac = {pl: quots[pl] - base[pl] for pl in placements}
+        ordem = sorted(placements, key=lambda pl: (-frac[pl], pl))
+        for pl in ordem[: int(round(resto / inc))]:
+            base[pl] += inc
+    if metric == "Cost":
+        base = {pl: round(base[pl], 2) for pl in base}
+    return base
 
 
-# ====================================================
-#                   REGIÃO FUNCTIONS
-# ====================================================
-
-def merge_placement_and_region_data(df_placement_pivot, df_region_pivot):
-    """
-    Realiza o merge dos DataFrames pivotados dos dados de metaGeral (com Placement)
-    e metaRegiao (com Province name) utilizando as chaves 'Ad ID' e 'Date'.
-    """
-    logging.debug("Starting merge_placement_and_region_data()")
-    merged_df = pd.merge(df_region_pivot, df_placement_pivot, on=["Ad ID", "Date"], how="inner")
-    if merged_df.empty:
-        logging.warning("No matching records found during merge of placement and region data.")
-    logging.debug(f"Finished merge_placement_and_region_data(), result shape: {merged_df.shape}")
-    return merged_df
+def _fix_inconsistencies_and_types(metric, distrib, peso_imp):
+    log = logging.getLogger("common_meta.fix")
+    out = {}
+    for pl, v in distrib.items():
+        if v > 0 and peso_imp.get(pl, 0) == 0:
+            log.critical("Placement %s recebeu cota mas peso 0", pl)
+        out[pl] = _floor_cents(v) if metric == "Cost" else int(round(v))
+    return out
 
 
-def load_and_prepare_meta_region_data():
-    logging.debug("Starting load_and_prepare_meta_region_data()")
-    sheet_name = "metaRegiao"
-    logging.debug(f"Loading metaRegiao data from sheet: {sheet_name}")
-    try:
-        df = carregar_aba_google_sheets(CREDS_PATH, SPREADSHEET_URL, sheet_name)
-        logging.debug(f"Loaded metaRegiao data with shape: {df.shape}")
-    except Exception as e:
-        logging.error(f"Error loading metaRegiao data: {e}")
-        raise
+def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
+    log = logging.getLogger("common_meta.distribute_age_metrics")
+    log.info("🚚  Distribuindo métricas por Age…")
 
-    if 'Ad ID' not in df.columns:
-        logging.debug("Column 'Ad ID' not found in metaRegiao. Generating 'Ad ID' using 'Campaign name' and 'Ad name'.")
-        if 'Campaign name' in df.columns and 'Ad name' in df.columns:
-            df['Ad ID'] = df['Campaign name'].str.strip() + "_" + df['Ad name'].str.strip()
-            logging.debug("Generated 'Ad ID' from 'Campaign name' and 'Ad name'.")
-        else:
-            df['Ad ID'] = df.index.astype(str)
-            logging.debug("Generated 'Ad ID' from DataFrame index due to missing 'Campaign name' or 'Ad name'.")
-    else:
-        logging.debug("Column 'Ad ID' already exists in metaRegiao.")
+    P = get_placements(df_in)
 
-    if 'Province name' not in df.columns:
-        logging.error("Missing required column 'Province name' in metaRegiao.")
-        raise KeyError("The dataset does not contain the 'Province name' column.")
-    else:
-        sample_region = df['Province name'].dropna().unique()[:5]
-        logging.debug(f"Sample unique provinces: {sample_region}")
+    # Garante métricas totais se não existirem
+    for m in METRICAS:
+        if m not in df_in.columns:
+            df_in[m] = df_in[[f"{pl}_{m}" for pl in P if f"{pl}_{m}" in df_in.columns]].sum(
+                axis=1
+            )
 
-    numeric_columns = ['Impressions', 'Link clicks', 'Cost', 'Video watches at 100%']
-    logging.debug(f"Converting numeric columns in metaRegiao: {numeric_columns}")
-    df = converter_colunas_numericas(df, numeric_columns)
-    logging.debug("Converted numeric columns for metaRegiao.")
+    out_rows: list[dict] = []
 
-    if 'Date' in df.columns:
-        df = converter_data(df, 'Date')
-        logging.debug("Converted 'Date' column to date format in metaRegiao.")
-    else:
-        logging.warning("Column 'Date' not found in metaRegiao.")
+    for _, row in df_in.iterrows():
+        peso_imp, _ = compute_pesos_impressao(row, P)
+        dist_metric = {}
+        for m in METRICAS:
+            val = _sanitize_metric_value(m, row.get(m, 0))
+            dist, used = _special_distribution(m, int(val), P, peso_imp)
+            if not used:
+                dist = _distribute_proportional(m, val, P, peso_imp)
+                dist = _fix_inconsistencies_and_types(m, dist, peso_imp)
+            dist_metric[m] = dist
 
-    logging.debug(f"Finished load_and_prepare_meta_region_data(), final DataFrame shape: {df.shape}")
-    return df
-
-
-def pivot_meta_region_data(df_region):
-    """
-    Agrupa os dados de metaRegiao por 'Ad ID', 'Date' e 'Province name'
-    somando as métricas numéricas.
-    """
-    logging.debug("Starting pivot_meta_region_data()")
-    numeric_columns = ["Impressions", "Link clicks", "Cost", "Video watches at 100%"]
-    group_columns = ["Ad ID", "Date", "Province name"]
-    logging.debug(f"Grouping by {group_columns} and summing numeric columns: {numeric_columns}")
-    df_grouped = df_region.groupby(group_columns, as_index=False).agg({col: "sum" for col in numeric_columns})
-    logging.debug(f"Finished pivot_meta_region_data(), result shape: {df_grouped.shape}")
-    return df_grouped
-
-
-def distribute_region_metrics(df_merged):
-    """
-    Distribui as métricas agregadas de região para cada plataforma (definida pelo pivot de Placement)
-    com base nas proporções dos valores obtidos por Placement.
-    
-    Cria uma nova linha para cada (Ad ID, Date, Province name, _Plataforma) com as métricas redistribuídas.
-    """
-    logging.debug("Starting distribute_region_metrics()")
-    metrics = ["Impressions", "Link clicks", "Cost", "Video watches at 100%"]
-    placement_cols = [col for col in df_merged.columns if col.endswith("_Impressions")]
-    placements = list({col.rsplit("_", 1)[0] for col in placement_cols})
-    logging.debug(f"Identified platforms: {placements}")
-    output_rows = []
-    for idx, row in df_merged.iterrows():
-        total_by_metric = {metric: sum(row.get(f"{pl}_{metric}", 0) for pl in placements) for metric in metrics}
-        for platform in placements:
-            distributed_metrics = {}
-            for metric in metrics:
-                col_name = f"{platform}_{metric}"
-                total = total_by_metric[metric]
-                if total > 0:
-                    distributed_value = round(row[metric] * (row.get(col_name, 0) / total))
-                else:
-                    distributed_value = 0
-                distributed_metrics[metric] = distributed_value
-            new_row = {
-                "Ad ID": row.get("Ad ID"),
-                "Date": row.get("Date"),
-                "Province name": row.get("Province name"),
-                "_Plataforma": platform,
-                **distributed_metrics
+        for pl in P:
+            rec = {
+                "Ad ID": row["Ad ID"],
+                "Date":  row["Date"],
+                "Age":   row["Age"],
+                "_Plataforma": pl,
+                **{m: dist_metric[m][pl] for m in METRICAS},
             }
-            output_rows.append(new_row)
-    output_df = pd.DataFrame(output_rows)
-    logging.debug(f"Finished distribute_region_metrics(), result shape: {output_df.shape}")
-    return output_df
+            out_rows.append(rec)
 
-# ====================================================
-# FIM DO ARQUIVO
-# ====================================================
+    df_out = pd.DataFrame(out_rows)
 
-if __name__ == "__main__":
-    # Exemplo de execução de teste para cada bloco (opcional)
-    logging.basicConfig(level=logging.DEBUG)
-    # As funções podem ser testadas individualmente aqui, se necessário.
-    pass
+    # Checagem de soma global
+    for m in METRICAS:
+        tol = 0.01 if m == "Cost" else 1e-6
+        if abs(df_in[m].sum() - df_out[m].sum()) > tol:
+            raise AssertionError(f"Soma global divergente em {m}")
+
+    log.info("✅  Distribuição concluída — %s linhas", len(df_out))
+    return df_out
+
+
+__all__ = [
+    "METRICAS",
+    "load_and_prepare_meta_age_data",
+    "load_and_prepare_meta_placement_data",
+    "pivot_meta_age_data",
+    "pivot_meta_placement_data",
+    "merge_placement_and_age_data",
+    "distribute_age_metrics",
+    "get_placements",
+    "compute_pesos_impressao",
+]
 
 
 # utils/common_pinterest.py
@@ -850,6 +801,24 @@ def concatenar_arquivos_em_txt(diretorio_base, nome_arquivo_saida='concatenado.t
 if __name__ == '__main__':
     diretorio = '/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils'
     concatenar_arquivos_em_txt(diretorio)
+
+
+# utils/consistency.py
+
+# utils/consistency.py
+import logging
+
+def verify_impressions_match(df_ref, df_cmp, ref_name, cmp_name):
+    """
+    Compara a soma da coluna 'Impressoes' entre dois DataFrames e emite
+    um log com 🟢 se baterem ou 🔴 se divergirem.
+    """
+    tot_ref = df_ref['Impressoes'].sum()
+    tot_cmp = df_cmp['Impressoes'].sum()
+    if tot_ref == tot_cmp:
+        logging.info(f"🟢 IMPRESSÕES IGUAIS: {ref_name} ({tot_ref}) == {cmp_name} ({tot_cmp})")
+    else:
+        logging.warning(f"🔴 IMPRESSÕES DIFERENTES: {ref_name} ({tot_ref}) != {cmp_name} ({tot_cmp})")
 
 
 # utils/creative_mapping.py
@@ -1770,19 +1739,31 @@ import pandas as pd
 def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     """
     Determina o link de visualização do anúncio para Meta Ads,
-    usando 'Preview Link FB' como fallback para 'URL_do_Anuncio'.
-    Renomeia a coluna se necessário e aplica a lógica de substituição.
+    usando na ordem:
+      1) qualquer valor já existente em 'URL_do_Anuncio'
+      2) o campo 'Preview_Link_FB'
+      3) o campo 'Preview_Link_IG'
+    e renomeia as colunas brutas 'Preview Link FB' e 'Preview Link IG'.
     """
+    # 1) Renomeia colunas brutas vinda do Google‑Sheets
     if 'Preview Link FB' in df.columns:
         df = df.rename(columns={'Preview Link FB': 'Preview_Link_FB'})
+    if 'Preview Link IG' in df.columns:
+        df = df.rename(columns={'Preview Link IG': 'Preview_Link_IG'})
 
-    if 'URL_do_Anuncio' in df.columns and 'Preview_Link_FB' in df.columns:
-        df['URL_do_Anuncio'] = df.apply(
-            lambda row: row['Preview_Link_FB']
-            if not row['URL_do_Anuncio'] or str(row['URL_do_Anuncio']).strip() == ""
-            else row['URL_do_Anuncio'],
-            axis=1
-        )
+    # 2) Preenche URL_do_Anuncio pela ordem de preferência
+    if 'URL_do_Anuncio' in df.columns:
+        def _pref_preview(row):
+            # já veio preenchido?
+            if row.get('URL_do_Anuncio') and str(row['URL_do_Anuncio']).strip():
+                return row['URL_do_Anuncio']
+            # senão tenta FB
+            if row.get('Preview_Link_FB'):
+                return row['Preview_Link_FB']
+            # senão IG (ou vazio se nem existir)
+            return row.get('Preview_Link_IG', '')
+
+        df['URL_do_Anuncio'] = df.apply(_pref_preview, axis=1)
 
     return df
 
@@ -1964,6 +1945,10 @@ def setup_logging(level=logging.DEBUG):
         level (int, opcional): Nível de log (ex: logging.INFO, logging.DEBUG). Padrão: logging.INFO.
     """
     logging.basicConfig(level=level, format='%(levelname)s: %(message)s')
+
+
+# utils/test_meta_idade.py
+
 
 
 # utils/testgeolocalizacao.py

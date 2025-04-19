@@ -1,18 +1,11 @@
-jupyter
-ipython
-pandas
-numpy
-matplotlib
-openpyxl
-requests
-beautifulsoup4
-lxml
-sqlalchemy
-psycopg2
-pymysql
-pyarrow
-jupyterlab
-gspread
-gspread_dataframe
-oauth2client
-pandas
+# dependências principais
+pandas>=1.5.0
+gspread>=5.7.2
+oauth2client>=4.1.3
+gspread-dataframe>=3.3.1
+google-api-python-client>=2.90.0
+
+# demais dependências (já são puxadas como sub‑dependências, mas você pode fixá‑las se quiser)
+# google-auth
+# google-auth-httplib2
+# google-auth-oauthlib
