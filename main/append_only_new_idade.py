@@ -16,7 +16,7 @@ from utils.get_campaign_parameterization import get_campaign_parameterization
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.get_missing_records import get_missing_records
 from utils.append_records_to_sheet import append_records_to_sheet
-
+from utils.normalize import format_columns_to_comma_decimal
 # Importação dos ETLs de idade
 from scripts.etl_idade import (
     MetaIdadeETL,
@@ -104,11 +104,19 @@ def run_etl_idade():
 
         logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
         missing_records = get_missing_records(df_processed, df_target)
+        numeric_cols = ["Investimento", "Impressoes", "Cliques_no_Link", "Visualizacoes_ate_100"]
+
         if missing_records.empty:
             logging.info("Não há registros faltantes para inserir.")
         else:
-            append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, missing_records)
-            logging.info(f"Inseridos {missing_records.shape[0]} registros na aba '{target_sheet}'.")
+            # seleciona só os que efetivamente faltam
+            to_write = missing_records.copy()
+            # formata as colunas numéricas
+            to_write = format_columns_to_comma_decimal(to_write, numeric_cols)
+            # garante a ordem exata de colunas do modelo
+            to_write = to_write[AGE_MODEL_COLUMN_ORDER]
+            append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, to_write)
+            logging.info(f"Inseridos {to_write.shape[0]} registros na aba '{target_sheet}'.")
 
         logging.info(f"Atualização da aba '{target_sheet}' concluída com sucesso.")
         logging.info("Aguardando 60 segundos antes do próximo ETL...")

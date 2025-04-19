@@ -34,8 +34,26 @@ def _read_sheet(sheet: str) -> pd.DataFrame:
 
 # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
 def load_and_prepare_meta_age_data() -> pd.DataFrame:
-    df = _read_sheet("metaIdade").dropna(subset=["Ad ID", "Date", "Age"])
-    df[METRICAS] = df[METRICAS].apply(pd.to_numeric, errors="coerce").fillna(0)
+    df = _read_sheet("metaIdade")
+    # 0) Strip em todos os nomes de coluna
+    df.columns = df.columns.str.strip()
+    # 1) Drop obrigatórios
+    df = df.dropna(subset=["Ad ID", "Date", "Age"])
+    # 2) Converte Cost (pode vir como 'Cost' ou 'cost' etc)
+    #    vamos buscar case‑insensitive:
+    cost_col = next((c for c in df.columns if c.lower() == "cost"), None)
+    if cost_col:
+        s = df[cost_col].astype(str)
+        s = s.str.replace("\u00a0", "")
+        s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)
+        s = s.str.replace(",", ".", regex=False)
+        df[cost_col] = pd.to_numeric(s, errors="coerce").fillna(0)
+        # já padroniza para 'Cost'
+        df.rename(columns={cost_col: "Cost"}, inplace=True)
+    # 3) Outras métricas
+    for col in ["Impressions", "Link clicks", "Video watches at 100%"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
     return df
 
 
