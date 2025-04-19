@@ -1,172 +1,250 @@
-# scripts/etl_idade.py
-
+from __future__ import annotations
 import logging
-from typing import Optional
+from collections import Counter
+from math import floor
+from decimal import Decimal, ROUND_DOWN
+from typing import Dict, List, Tuple, Union
 
 import pandas as pd
-from scripts.etl_geral import BaseGeralETL
-from utils.fields_lists import AGE_MODEL_COLUMN_ORDER
-from utils.organizar_dataframe import reordenar_colunas_para_modelo
-from utils.normalize import (
-    normalizar_faixa_etaria,
-    converter_colunas_numericas,
-)
-from utils.atribuicoes_via_lookup import (
-    atribuir_veiculo_e_id_meta,
-    aplicar_parametrizacao_campanha,
-)
-from utils.renomeacoes import (
-    renomear_colunas_origem_para_modelo,
-    aplicar_substituicoes_objetivo,
-)
-from utils.campos_calculados import gerar_id
-from utils.numeracao import gerar_numeracao
-from utils.common_pinterest import preencher_campos_com_campanha
-from utils.datas import generate_pinterest_dates
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 
-# Ferramentas de merge/distribute para Meta Idade
-from utils.common.meta.age_placements_merge import (
-    METRICAS,
-    load_and_prepare_meta_age_data,
-    load_and_prepare_meta_placement_data,
-    pivot_meta_age_data,
-    pivot_meta_placement_data,
-    merge_placement_and_age_data,
-    distribute_age_metrics,
-)
+# Logger setup
+log = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# Métricas padrão para Meta Gênero
+METRICAS: List[str] = [
+    "Impressions",
+    "Link clicks",
+    "Cost",
+    "Video watches at 100%",
+]
+
+# Contador de casos de distribuição especial
+DISTRIBUICAO_LOGS: Counter[str] = Counter()
+
+# Cliente e cache compartilhados
+_client = get_google_client(CREDS_PATH)
+_cache: dict[str, pd.DataFrame] = {}
 
 
-class BaseIdadeETL(BaseGeralETL):
-    """Pipeline genérico de Idade para todas as plataformas, exceto Meta."""
-
-    def ajustar_tipos_e_calculos(self):
-        super().ajustar_tipos_e_calculos()
-        # Faixa_Etaria → Idade
-        if "Faixa_Etaria" in self.df.columns:
-            self.df.rename(columns={"Faixa_Etaria": "Idade"}, inplace=True)
-        if "Idade" in self.df.columns:
-            self.df["Idade"] = self.df["Idade"].apply(normalizar_faixa_etaria)
-        return self.df
-
-    def criar_veiculo(self):
-        super().criar_veiculo()
-        return self.df
-
-    def reordenar_colunas_para_modelo(self):
-        self.df = reordenar_colunas_para_modelo(self.df, AGE_MODEL_COLUMN_ORDER)
-        return self.df
-
-    def processar(self, df_destino: Optional[pd.DataFrame] = None) -> pd.DataFrame:
-        self.renomear_colunas_origem_para_modelo()
-        self.ajustar_tipos_e_calculos()
-        self.aplicar_substituicoes_objetivo()
-        self.aplicar_parametrizacao_campanha_externa()
-        self.criar_veiculo()
-        self.remover_colunas_indesejadas()
-        self.reordenar_colunas_para_modelo()
-        self.gerar_id()
-        self.df = gerar_numeracao(self.df, df_destino, linha_insercao=2, coluna="Numero")
-        return self.df
-
-
-class MetaIdadeETL(BaseIdadeETL):
-    """ETL Idade dedicado ao Meta Ads."""
-
-    @staticmethod
-    def _ensure_numeric(df: pd.DataFrame) -> pd.DataFrame:
-        metric_substrings = METRICAS + [f"_{m}" for m in METRICAS]
-        cols = [c for c in df.columns if any(sub in c for sub in metric_substrings)]
-        df[cols] = df[cols].apply(pd.to_numeric, errors="coerce").fillna(0)
-        return df
-
-    def processar(self, df_destino: Optional[pd.DataFrame] = None) -> pd.DataFrame:
-        log = logging.getLogger("MetaIdadeETL")
-        log.info(">>> Iniciando MetaIdadeETL.processar()")
-
-        # A) Leitura raw para consistência de Investimento
-        client_raw = get_google_client(CREDS_PATH)
-        df_raw = read_sheet_as_dataframe_range(
-            client_raw, SPREADSHEET_ID,
-            sheet_name="metaIdade",
+def _read_sheet(sheet_name: str) -> pd.DataFrame:
+    """
+    Lê e armazena em cache a aba especificada do Google Sheets.
+    """
+    if sheet_name not in _cache:
+        _cache[sheet_name] = read_sheet_as_dataframe_range(
+            _client,
+            SPREADSHEET_ID,
+            sheet_name=sheet_name,
             range_str="A1:ZZ",
-            header_row_index=0
+            header_row_index=0,
         )
-        # soma raw em decimal
-        soma_raw = converter_colunas_numericas(df_raw, ["Cost"])["Cost"].sum()
+    return _cache[sheet_name].copy()
 
-        # 1) Carrega e converte vírgula→ponto decimal ------------------
-        df_age       = load_and_prepare_meta_age_data()
-        df_placement = load_and_prepare_meta_placement_data()
-        df_age       = converter_colunas_numericas(df_age, METRICAS)
-        df_placement = converter_colunas_numericas(df_placement, METRICAS)
 
-        # 2) Pivôs e garantia de numérico -----------------------------
-        df_age_piv   = self._ensure_numeric(pivot_meta_age_data(df_age))
-        df_place_piv = self._ensure_numeric(pivot_meta_placement_data(df_placement))
+def load_and_prepare_meta_gender_data() -> pd.DataFrame:
+    """
+    Lê a aba 'metaGenero' e garante colunas numéricas para as métricas.
+    """
+    df = _read_sheet("metaGenero")
+    df.columns = df.columns.str.strip()
+    df = df.dropna(subset=["Ad ID", "Date", "Gender"]) \
+           .reset_index(drop=True)
 
-        # 3) Merge + distribuição de métricas -------------------------
-        df_dist = distribute_age_metrics(merge_placement_and_age_data(df_age_piv, df_place_piv))
+    # Converte Cost (case-insensitive)
+    cost_col = next((c for c in df.columns if c.strip().lower() == "cost"), None)
+    if cost_col:
+        s = df[cost_col].astype(str)
+        s = s.str.replace("\u00a0", "", regex=False)
+        s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)
+        s = s.str.replace(",", ".", regex=False)
+        df[cost_col] = pd.to_numeric(s, errors="coerce").fillna(0)
+        df.rename(columns={cost_col: "Cost"}, inplace=True)
 
-        # 4) Campos descritivos via Ad ID -----------------------------
-        info_map = {
-            "Account name":            "Nome_da_Conta",
-            "Campaign name":           "Campaign_name",
-            "Campaign objective type": "Objetivo",
-            "Ad group name":           "Nome_do_Conjunto_de_Anuncio",
-            "Ad name":                 "Nome_do_Anuncio",
-        }
-        df_info = (
-            df_placement[["Ad ID"] + list(info_map.keys())]
-            .drop_duplicates("Ad ID")
-            .rename(columns=info_map)
+    # Converte demais métricas para numérico
+    for col in ["Impressions", "Link clicks", "Video watches at 100%"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    return df
+
+
+def load_and_prepare_meta_placement_data() -> pd.DataFrame:
+    """
+    Lê a aba 'metaGeral' e remove entradas sem Ad ID/Date.
+    """
+    return _read_sheet("metaGeral").dropna(subset=["Ad ID", "Date"]).reset_index(drop=True)
+
+
+def pivot_meta_gender_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Agrupa por ['Ad ID', 'Date', 'Gender'] somando as métricas.
+    """
+    return df.groupby(["Ad ID", "Date", "Gender"], as_index=False)[METRICAS].sum()
+
+
+def pivot_meta_placement_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Pivot das métricas por 'Placement' transformando em colunas '<Placement>_<Métrica>'.
+    """
+    id_vars = ["Ad ID", "Date"]
+    value_vars = [c for c in df.columns if c not in id_vars + ["Placement"]]
+
+    df_piv = (
+        df.pivot_table(
+            index=id_vars,
+            columns="Placement",
+            values=value_vars,
+            aggfunc="sum",
+            fill_value=0,
         )
-        df_dist = df_dist.merge(df_info, on=["Ad ID"], how="left")
+    )
+    df_piv.columns.name = None
+    df_piv.columns = [f"{pl}_{m}" for m, pl in df_piv.columns]
+    df_piv.reset_index(inplace=True)
+    return df_piv
 
-        # 5) Inferência de Veículo / ID_Veiculo -----------------------
-        df_dist["Placement"] = df_dist["_Plataforma"]
-        df_dist = atribuir_veiculo_e_id_meta(df_dist)
 
-        # 6) Renomeação padrão + Idade -------------------------------
-        df_dist = renomear_colunas_origem_para_modelo(df_dist)
-        if "Faixa_Etaria" in df_dist.columns:
-            df_dist.rename(columns={"Faixa_Etaria": "Idade"}, inplace=True)
-        df_dist["Idade"] = df_dist["Idade"].apply(normalizar_faixa_etaria)
+def merge_placement_and_gender_data(
+    df_placement: pd.DataFrame,
+    df_gender: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Faz o merge final entre dados de placement e gênero por ['Ad ID', 'Date'].
+    Usa 'inner' para manter somente correspondências.
+    """
+    return pd.merge(df_placement, df_gender, on=["Ad ID", "Date"], how="inner")
 
-        # 7) Tradução de Objetivo e lookup Campanha ------------------
-        df_dist = aplicar_substituicoes_objetivo(df_dist)
-        df_dist = aplicar_parametrizacao_campanha(
-            df_dist, self.mapping_campanha, self.mapping_sigla
+
+def get_placements(df: pd.DataFrame) -> List[str]:
+    """
+    Extrai lista de placements presentes (detectando colunas '*_Impressions').
+    """
+    return sorted({c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_Impressions")})
+
+
+def compute_pesos_impressao(
+    row: pd.Series,
+    placements: List[str],
+) -> Tuple[Dict[str, int], int]:
+    """
+    Calcula peso de cada placement com base em impressões.
+    Se todos forem zero, atribui peso=1 ao placement com maior métrica.
+    """
+    pesos = {pl: max(int(row.get(f"{pl}_Impressions", 0)), 0) for pl in placements}
+    if not any(pesos.values()):
+        top, _ = max(
+            ((pl, abs(float(row.get(f"{pl}_{m}", 0))))
+             for pl in placements for m in METRICAS),
+            key=lambda t: t[1], default=(placements[0], 0)
         )
-
-        # 8) Reordenação, geração de ID e numeração ------------------
-        df_dist = reordenar_colunas_para_modelo(df_dist, AGE_MODEL_COLUMN_ORDER)
-        df_dist = gerar_id(df_dist)
-        df_dist = gerar_numeracao(df_dist, df_destino, linha_insercao=2, coluna="Numero")
-
-        # 9) Consistência de Investimento ----------------------------
-        soma_final = df_dist["Investimento"].sum()
-        # formata para BR
-        orig_str = f"{soma_raw:.2f}".replace('.', ',')
-        final_str = f"{soma_final:.2f}".replace('.', ',')
-        log.info("🟢 Investimento original vs final: %s → %s", orig_str, final_str)
-        log.info("✅ MetaIdadeETL concluído — %s linhas", df_dist.shape[0])
-        return df_dist
+        pesos[top] = 1
+    return pesos, sum(pesos.values())
 
 
-class TikTokIdadeETL(BaseIdadeETL):
-    pass
+def _floor_cents(v: float) -> float:
+    """
+    Arredonda para baixo com duas casas decimais usando Decimal para evitar erros de ponto flutuante.
+    """
+    return float(Decimal(str(v)).quantize(Decimal("0.01"), rounding=ROUND_DOWN))
 
 
-class LinkedinIdadeETL(BaseIdadeETL):
-    pass
+def _special_distribution(
+    metric: str,
+    valor_int: int,
+    placements: List[str],
+    peso_imp: Dict[str, int],
+) -> Tuple[Dict[str, Union[int, float]], bool]:
+    """
+    Distribuição especial quando valor < número de placements (exceto para Cost).
+    """
+    if metric == "Cost" or valor_int > len(placements):
+        return {}, False
+
+    dist = {pl: 0 for pl in placements}
+    if valor_int < len(placements):
+        top = max(placements, key=lambda pl: peso_imp.get(pl, 0))
+        dist[top] = valor_int
+    else:
+        for pl in placements[:valor_int]:
+            dist[pl] = 1
+
+    DISTRIBUICAO_LOGS[f"{metric}_especial"] += 1
+    return dist, True
 
 
-class PinterestIdadeETL(BaseIdadeETL):
-    def ajustar_tipos_e_calculos(self):
-        super().ajustar_tipos_e_calculos()
-        self.df = generate_pinterest_dates(self.df)
-        self.df = preencher_campos_com_campanha(self.df)
-        return self.df
+def _distribute_proportional(
+    metric: str,
+    valor: Union[int, float],
+    placements: List[str],
+    peso_imp: Dict[str, int],
+) -> Dict[str, Union[int, float]]:
+    """
+    Distribuição proporcional clássica baseada em peso de impressões.
+    """
+    total = sum(peso_imp.values())
+    if valor == 0 or total == 0:
+        return {pl: 0 for pl in placements}
+
+    quots = {pl: (peso_imp[pl] / total) * valor for pl in placements}
+    if metric == "Cost":
+        base = {pl: _floor_cents(quots[pl]) for pl in placements}
+        resto = round(valor - sum(base.values()), 2)
+        inc = 0.01
+    else:
+        base = {pl: int(floor(quots[pl])) for pl in placements}
+        resto = int(round(valor - sum(base.values())))
+        inc = 1
+
+    if resto > 0:
+        frac = {pl: quots[pl] - base[pl] for pl in placements}
+        ordem = sorted(placements, key=lambda pl: (-frac[pl], pl))
+        for pl in ordem[: int(round(resto / inc))]:
+            base[pl] += inc
+
+    if metric == "Cost":
+        base = {pl: round(base[pl], 2) for pl in base}
+    return base
+
+
+def _fix_inconsistencies_and_types(
+    metric: str,
+    distrib: Dict[str, Union[int, float]],
+    peso_imp: Dict[str, int],
+) -> Dict[str, Union[int, float]]:
+    """
+    Garante consistência de tipos e detecta distribuições inválidas.
+    """
+    out: Dict[str, Union[int, float]] = {}
+    for pl, v in distrib.items():
+        if v > 0 and peso_imp.get(pl, 0) == 0:
+            log.critical("Placement %s recebeu cota mas peso 0", pl)
+        out[pl] = _floor_cents(v) if metric == "Cost" else int(round(v))
+    return out
+
+
+def distribute_gender_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
+    """
+    Redistribui as métricas por Gender delegando ao algoritmo de Idade,
+    preservando soma global e mantendo a interface para gênero.
+    """
+    log.info("🚚 Distribuindo métricas por Gender usando distribuidor de Age…")
+
+    # Renomeia 'Gender' para 'Age' para reaproveitar o algoritmo de distribuição de idade
+    df_age = df_in.rename(columns={"Gender": "Age"})
+
+    # Importa a função de distribuição de idade
+    from utils.common.meta.age_placements_merge import distribute_age_metrics as _dist_age
+
+    # Aplica distribuição
+    df_dist = _dist_age(df_age)
+
+    # Renomeia de volta para 'Gender'
+    df_dist = df_dist.rename(columns={"Age": "Gender"})
+
+    # Mantém apenas as colunas essenciais
+    cols = ["Ad ID", "Date", "Gender", "_Plataforma"] + METRICAS
+    return df_dist[cols]
