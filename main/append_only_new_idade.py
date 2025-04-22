@@ -12,6 +12,7 @@ from utils.google_sheets import (
     SPREADSHEET_URL as spreadsheet_url,
 )
 from utils.setup_logging import setup_logging
+from utils.filter_utils import remove_zero_impressoes
 from utils.get_campaign_parameterization import get_campaign_parameterization
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.get_missing_records import get_missing_records
@@ -48,7 +49,7 @@ def run_etl_idade():
     setup_logging(level=logging.DEBUG)
     garantir_cabecalho_idade()
 
-    plataformas = ["meta", "tiktok", "pinterest"]
+    plataformas = ["meta", "tiktok", "linkedin", "pinterest"]
     target_sheet = "modeloIdade"
 
     for plataforma in plataformas:
@@ -57,7 +58,7 @@ def run_etl_idade():
 
         if plataforma == "meta":
             etl_class = MetaIdadeETL
-            veiculo_nome = None  # Inferido dinamicamente por Placement
+            veiculo_nome = None
         elif plataforma == "tiktok":
             etl_class = TikTokIdadeETL
             veiculo_nome = "Tiktok"
@@ -73,7 +74,6 @@ def run_etl_idade():
 
         logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
         df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
-
         if "Date" in df_origin.columns:
             df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
         logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
@@ -101,29 +101,30 @@ def run_etl_idade():
 
         logging.info(f"Executando ETL de Idade para '{plataforma}'...")
         df_processed = etl_instance.processar(df_destino=df_target)
-
         logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
-        missing_records = get_missing_records(df_processed, df_target)
-        numeric_cols = ["Investimento", "Impressoes", "Cliques_no_Link", "Visualizacoes_ate_100"]
 
+        missing_records = get_missing_records(df_processed, df_target)
         if missing_records.empty:
             logging.info("Não há registros faltantes para inserir.")
         else:
-            # seleciona só os que efetivamente faltam
-            to_write = missing_records.copy()
-            # formata as colunas numéricas
-            to_write = format_columns_to_comma_decimal(to_write, numeric_cols)
-            # garante a ordem exata de colunas do modelo
-            to_write = to_write[AGE_MODEL_COLUMN_ORDER]
-            append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, to_write)
-            logging.info(f"Inseridos {to_write.shape[0]} registros na aba '{target_sheet}'.")
+            # Filtra só aqueles com Impressoes > 0
+            to_write = missing_records[missing_records["Impressoes"] > 0].copy()
+            if to_write.empty:
+                logging.info("Todos os registros faltantes têm Impressoes = 0; nada a inserir.")
+            else:
+                # Formata colunas numéricas
+                numeric_cols = ["Investimento", "Impressoes", "Cliques_no_Link", "Visualizacoes_ate_100"]
+                to_write = format_columns_to_comma_decimal(to_write, numeric_cols)
+                # Garante ordem de colunas exata do modelo
+                to_write = to_write[AGE_MODEL_COLUMN_ORDER]
+                append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, to_write)
+                logging.info(f"Inseridos {to_write.shape[0]} registros na aba '{target_sheet}'.")
 
         logging.info(f"Atualização da aba '{target_sheet}' concluída com sucesso.")
         logging.info("Aguardando 60 segundos antes do próximo ETL...")
         time.sleep(60)
 
     logging.info("Todos os ETLs de Idade foram executados com sucesso.")
-
 
 if __name__ == "__main__":
     run_etl_idade()
