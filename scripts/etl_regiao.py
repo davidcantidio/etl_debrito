@@ -28,7 +28,7 @@ from utils.common.meta.region_placements_merge import (
     merge_placement_and_region_data,
     distribute_region_metrics,
 )
-
+from utils.filter_utils import remove_zero_impressoes
 
 class BaseRegiaoETL(BaseGeralETL):
     """Pipeline genérico de Região para todas as plataformas, exceto Meta Ads."""
