@@ -22,22 +22,21 @@ from scripts.etl_regiao import (
     LinkedinRegiaoETL,
     PinterestRegiaoETL,
 )
-
+from utils.filter_utils import remove_zero_impressoes
 
 def run_etl_regiao():
     setup_logging(level=logging.DEBUG)
 
-    plataformas = ["meta", "tiktok", "pinterest"]
+    plataformas = ["meta", "tiktok", "linkedin", "pinterest"]
     target_sheet = "modeloRegiao"
 
     for plataforma in plataformas:
         logging.info(f"=== Iniciando ETL Região para plataforma: {plataforma} ===")
 
         source_sheet = f"{plataforma}Regiao"
-
         if plataforma == "meta":
             etl_class = MetaRegiaoETL
-            veiculo_nome = None  # Será inferido dinamicamente via Placement
+            veiculo_nome = None
         elif plataforma == "tiktok":
             etl_class = TikTokRegiaoETL
             veiculo_nome = "Tiktok"
@@ -53,7 +52,6 @@ def run_etl_regiao():
 
         logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
         df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
-
         if "Date" in df_origin.columns:
             df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
         logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
@@ -77,23 +75,22 @@ def run_etl_regiao():
 
         logging.info(f"Executando ETL de Região para '{plataforma}'...")
         df_processed = etl_instance.processar(df_destino=df_target)
-
         logging.info(f"ETL finalizado: {df_processed.shape[0]} linhas tratadas.")
+
         missing_records = get_missing_records(df_processed, df_target)
-        if missing_records.empty:
-            logging.info("Não há registros faltantes para inserir.")
+        # filtra antes de inserir apenas linhas com Impressoes > 0
+        df_to_append = remove_zero_impressoes(missing_records)
+
+        if df_to_append.empty:
+            logging.info("Não há registros válidos (Impressoes > 0) para inserir.")
         else:
-            append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, missing_records)
-            logging.info(f"Inseridos {missing_records.shape[0]} novos registros na aba '{target_sheet}'.")
+            append_records_to_sheet(creds_path, spreadsheet_id, target_sheet, df_to_append)
+            logging.info(f"Inseridos {df_to_append.shape[0]} novos registros na aba '{target_sheet}'.")
 
         logging.info(f"Atualização da aba '{target_sheet}' para '{plataforma}' concluída com sucesso.")
-        
-        # Delay entre plataformas
         logging.info("Aguardando 60 segundos antes do próximo ETL...")
         time.sleep(60)
 
     logging.info("Todos os ETLs de Região foram executados com sucesso.")
-
-
 if __name__ == "__main__":
     run_etl_regiao()

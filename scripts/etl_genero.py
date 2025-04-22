@@ -8,7 +8,7 @@ from scripts.etl_geral import BaseGeralETL
 from utils.fields_lists import GENDER_MODEL_COLUMN_ORDER
 from utils.organizar_dataframe import reordenar_colunas_para_modelo
 from utils.normalize import (
-    normalizar_faixa_etaria,
+    normalizar_genero,
     converter_colunas_numericas,
 )
 from utils.atribuicoes_via_lookup import (
@@ -27,7 +27,7 @@ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 
-# Ferramentas de merge/distribute para Meta Idade
+# Ferramentas de merge/distribute para Meta Genero
 from utils.common.meta.gender_placement_merge import (
     METRICAS,
     load_and_prepare_meta_gender_data,
@@ -39,16 +39,16 @@ from utils.common.meta.gender_placement_merge import (
 )
 
 
-class BaseIdadeETL(BaseGeralETL):
-    """Pipeline genérico de Idade para todas as plataformas, exceto Meta."""
+class BaseGeneroETL(BaseGeralETL):
+    """Pipeline genérico de Genero para todas as plataformas, exceto Meta."""
 
     def ajustar_tipos_e_calculos(self):
         super().ajustar_tipos_e_calculos()
-        # Faixa_Etaria → Idade
+        # Faixa_Etaria → Genero
         if "Faixa_Etaria" in self.df.columns:
-            self.df.rename(columns={"Faixa_Etaria": "Idade"}, inplace=True)
-        if "Idade" in self.df.columns:
-            self.df["Idade"] = self.df["Idade"].apply(normalizar_faixa_etaria)
+            self.df.rename(columns={"Faixa_Etaria": "Genero"}, inplace=True)
+        if "Genero" in self.df.columns:
+            self.df["Genero"] = self.df["Genero"].apply(normalizar_genero)
         return self.df
 
     def criar_veiculo(self):
@@ -72,8 +72,8 @@ class BaseIdadeETL(BaseGeralETL):
         return self.df
 
 
-class MetaIdadeETL(BaseIdadeETL):
-    """ETL Idade dedicado ao Meta Ads."""
+class MetaGeneroETL(BaseGeneroETL):
+    """ETL Genero dedicado ao Meta Ads."""
 
     @staticmethod
     def _ensure_numeric(df: pd.DataFrame) -> pd.DataFrame:
@@ -83,14 +83,14 @@ class MetaIdadeETL(BaseIdadeETL):
         return df
 
     def processar(self, df_destino: Optional[pd.DataFrame] = None) -> pd.DataFrame:
-        log = logging.getLogger("MetaIdadeETL")
-        log.info(">>> Iniciando MetaIdadeETL.processar()")
+        log = logging.getLogger("MetaGeneroETL")
+        log.info(">>> Iniciando MetaGeneroETL.processar()")
 
         # A) Leitura raw para consistência de Investimento
         client_raw = get_google_client(CREDS_PATH)
         df_raw = read_sheet_as_dataframe_range(
             client_raw, SPREADSHEET_ID,
-            sheet_name="metaIdade",
+            sheet_name="metaGenero",
             range_str="A1:ZZ",
             header_row_index=0
         )
@@ -129,11 +129,11 @@ class MetaIdadeETL(BaseIdadeETL):
         df_dist["Placement"] = df_dist["_Plataforma"]
         df_dist = atribuir_veiculo_e_id_meta(df_dist)
 
-        # 6) Renomeação padrão + Idade -------------------------------
+        # 6) Renomeação padrão + Genero -------------------------------
         df_dist = renomear_colunas_origem_para_modelo(df_dist)
         if "Faixa_Etaria" in df_dist.columns:
-            df_dist.rename(columns={"Faixa_Etaria": "Idade"}, inplace=True)
-        df_dist["Idade"] = df_dist["Idade"].apply(normalizar_faixa_etaria)
+            df_dist.rename(columns={"Faixa_Etaria": "Genero"}, inplace=True)
+        df_dist["Genero"] = df_dist["Genero"].apply(normalizar_genero)
 
         # 7) Tradução de Objetivo e lookup Campanha ------------------
         df_dist = aplicar_substituicoes_objetivo(df_dist)
@@ -152,19 +152,19 @@ class MetaIdadeETL(BaseIdadeETL):
         orig_str = f"{soma_raw:.2f}".replace('.', ',')
         final_str = f"{soma_final:.2f}".replace('.', ',')
         log.info("🟢 Investimento original vs final: %s → %s", orig_str, final_str)
-        log.info("✅ MetaIdadeETL concluído — %s linhas", df_dist.shape[0])
+        log.info("✅ MetaGeneroETL concluído — %s linhas", df_dist.shape[0])
         return df_dist
 
 
-class TikTokIdadeETL(BaseIdadeETL):
+class TikTokGeneroETL(BaseGeneroETL):
     pass
 
 
-class LinkedinIdadeETL(BaseIdadeETL):
+class LinkedinGeneroETL(BaseGeneroETL):
     pass
 
 
-class PinterestIdadeETL(BaseIdadeETL):
+class PinterestGeneroETL(BaseGeneroETL):
     def ajustar_tipos_e_calculos(self):
         super().ajustar_tipos_e_calculos()
         self.df = generate_pinterest_dates(self.df)

@@ -3,7 +3,7 @@
 import argparse
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 def run_etl_idade():
     from main.append_only_new_idade import run_etl_idade

@@ -1,5 +1,5 @@
 import json
-from geolocalizacao import (
+from geo_normalize import (
     carregar_cache_estados,
     carregar_cache_municipios,
     obter_estado_de_regiao

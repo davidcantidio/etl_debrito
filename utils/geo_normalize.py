@@ -5,8 +5,8 @@ import unicodedata
 
 
 def carregar_caches_padrao():
-    path_estados = "/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils/cache_estados.json"
-    path_municipios = "/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils/cache_municipios_estados.json"
+    path_estados = "/home/debrito/Documentos/etl_debrito/utils/cache_estados.json"
+    path_municipios = "/home/debrito/Documentos/etl_debrito/utils/cache_municipios_estados.json"
 
     cache_estados = carregar_cache_estados(path_estados)
     cache_municipios = carregar_cache_municipios(path_municipios)
