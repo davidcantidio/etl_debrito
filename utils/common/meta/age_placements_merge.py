@@ -9,6 +9,7 @@ import pandas as pd
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+from utils.normalize import normalizar_faixa_etaria
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -34,13 +35,18 @@ def _read_sheet(sheet: str) -> pd.DataFrame:
 
 # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
 def load_and_prepare_meta_age_data() -> pd.DataFrame:
-    df = _read_sheet("metaIdade")
+    df = _read_sheet("metaIdade")  # Carrega os dados da aba 'metaIdade'
+    
+    # Verificação de dados consistentes antes de qualquer transformação
+    df = df.dropna(subset=["Ad ID", "Date", "Impressions", "Cost"])  # Garante que não haja NaN nessas colunas essenciais
+    
     # 0) Strip em todos os nomes de coluna
     df.columns = df.columns.str.strip()
-    # 1) Drop obrigatórios
-    df = df.dropna(subset=["Ad ID", "Date", "Age"])
-    # 2) Converte Cost (pode vir como 'Cost' ou 'cost' etc)
-    #    vamos buscar case‑insensitive:
+    
+    # 1) Remove registros com dados ausentes em colunas críticas
+    df = df.dropna(subset=["Ad ID", "Date", "Age"])  # Garante que 'Age' está presente
+    
+    # 2) Converte Cost (pode vir como 'Cost' ou 'cost' etc) - busca case-insensitive
     cost_col = next((c for c in df.columns if c.lower() == "cost"), None)
     if cost_col:
         s = df[cost_col].astype(str)
@@ -48,14 +54,19 @@ def load_and_prepare_meta_age_data() -> pd.DataFrame:
         s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)
         s = s.str.replace(",", ".", regex=False)
         df[cost_col] = pd.to_numeric(s, errors="coerce").fillna(0)
-        # já padroniza para 'Cost'
         df.rename(columns={cost_col: "Cost"}, inplace=True)
+    
     # 3) Outras métricas
     for col in ["Impressions", "Link clicks", "Video watches at 100%"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    
+    # Verifique se 'Age' está presente
+    if 'Age' not in df.columns:
+        logging.error("A coluna 'Age' não foi encontrada na aba 'metaIdade'.")
+        raise KeyError("A coluna 'Age' não foi encontrada na aba 'metaIdade'.")
+    
     return df
-
 
 def load_and_prepare_meta_placement_data() -> pd.DataFrame:
     return _read_sheet("metaGeral").dropna(subset=["Ad ID", "Date"])
@@ -65,29 +76,34 @@ def load_and_prepare_meta_placement_data() -> pd.DataFrame:
 def pivot_meta_age_data(df: pd.DataFrame) -> pd.DataFrame:
     return df.groupby(["Ad ID", "Date", "Age"], as_index=False)[METRICAS].sum()
 
-
 def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
     id_vars = ["Ad ID", "Date"]
     value_vars = [c for c in df_placement.columns if c not in id_vars + ["Placement"]]
 
-    pivot_df = (
-        df_placement.pivot_table(
-            index=id_vars,
-            columns="Placement",
-            values=value_vars,
-            aggfunc="sum",
-            fill_value=0,
-        )
+    pivot_df = df_placement.pivot_table(
+        index=id_vars,
+        columns="Placement",
+        values=value_vars,
+        aggfunc="sum",
+        fill_value=0,
     )
-    # remove o name do eixo de colunas
+
+    # Após o pivotamento, garantir que as colunas com métricas sejam numéricas
+    pivot_df = pivot_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+
     pivot_df.columns.name = None
-    # achata MultiIndex  ->  "<placement>_<metric>"
     pivot_df.columns = [f"{pl}_{m}" for m, pl in pivot_df.columns]
     return pivot_df.reset_index()
 
-
 def merge_placement_and_age_data(df_age: pd.DataFrame, df_place: pd.DataFrame) -> pd.DataFrame:
-    return pd.merge(df_age, df_place, on=["Ad ID", "Date"], how="inner")
+    df_merged = pd.merge(df_age, df_place, on=["Ad ID", "Date"], how="inner")
+    
+    # Verificação para garantir que a coluna 'Age' foi incluída no merge
+    if 'Age' not in df_merged.columns:
+        logging.error("A coluna 'Age' não foi incluída após o merge.")
+        raise KeyError("A coluna 'Age' não foi incluída após o merge.")
+
+    return df_merged
 
 
 # --------------------- REDISTRIBUIÇÃO DE MÉTRICAS --------------------- #
@@ -149,10 +165,12 @@ DISTRIBUICAO_LOGS: Counter[str] = Counter()
 
 
 def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
-    """
-    Redistribui as métricas agregadas por Age para cada placement,
-    preservando a soma global.
-    """
+    # Verifique se 'Age' está presente no DataFrame antes de continuar
+    if "Age" not in df_in.columns:
+        logging.error("A coluna 'Age' não foi encontrada no DataFrame.")
+        raise KeyError("A coluna 'Age' não foi encontrada no DataFrame.")
+
+    # Continuação da lógica de distribuição
     placements = get_placements(df_in)
 
     # Garante colunas‑totais (Impressions, Cost, etc.)
@@ -161,25 +179,27 @@ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
             cols = [f"{pl}_{m}" for pl in placements if f"{pl}_{m}" in df_in.columns]
             df_in[m] = df_in[cols].sum(axis=1)
 
-    output_rows: list[dict] = []         # <-- agora declarado
+    # Garantir que as colunas de métricas sejam numéricas antes de qualquer operação de distribuição
+    df_in[METRICAS] = df_in[METRICAS].apply(pd.to_numeric, errors='coerce').fillna(0)
+
+    output_rows: list[dict] = []
 
     for _, row in df_in.iterrows():
         pesos, _ = compute_pesos_impressao(row, placements)
 
-        # distribuições por métrica
+        # Distribuição proporcional por métrica
         dist: Dict[str, Dict[str, float | int]] = {}
-        # Cost separado: float 2 casas – demais inteiros
         dist["Cost"] = _distribuir_cost(float(row["Cost"]), pesos)
         for m in ("Impressions", "Link clicks", "Video watches at 100%"):
             dist[m] = _distribuir_contagem(int(row[m]), pesos)
 
-        # gera 1 linha por placement
+        # Gera uma linha por placement
         for pl in placements:
             output_rows.append(
                 {
                     "Ad ID": row["Ad ID"],
-                    "Date":  row["Date"],
-                    "Age":   row["Age"],
+                    "Date": row["Date"],
+                    "Age": row["Age"],  # Garantir que 'Age' é incluída se necessário
                     "_Plataforma": pl,
                     **{m: dist[m][pl] for m in METRICAS},
                 }
@@ -187,18 +207,15 @@ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
 
     df_out = pd.DataFrame(output_rows)
 
-    # ---------- checagem de integridade global ----------
+    # Verificação de integridade
     for m in METRICAS:
         soma_in, soma_out = df_in[m].sum(), df_out[m].sum()
         tol = 0.01 if m == "Cost" else 0
         if abs(soma_in - soma_out) > tol:
-            raise AssertionError(
-                f"Soma global divergente em '{m}': {soma_in} → {soma_out}"
-            )
+            raise AssertionError(f"Soma global divergente em '{m}': {soma_in} → {soma_out}")
 
     log.info("✅ distribute_age_metrics — %s linhas", len(df_out))
     return df_out
-
 
 # --------------------------- re‐exports --------------------------- #
 __all__ = [
