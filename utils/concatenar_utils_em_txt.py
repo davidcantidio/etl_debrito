@@ -16,5 +16,5 @@ def concatenar_arquivos_em_txt(diretorio_base, nome_arquivo_saida='concatenado.t
     print(f"Arquivos concatenados com sucesso em: {caminho_saida}")
 
 if __name__ == '__main__':
-    diretorio = '/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils'
+    diretorio = '/home/debrito/Documentos/etl_debrito/utils'
     concatenar_arquivos_em_txt(diretorio)

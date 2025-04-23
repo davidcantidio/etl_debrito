@@ -1,11 +1,24 @@
-# dependências principais
-pandas>=1.5.0
-gspread>=5.7.2
-oauth2client>=4.1.3
-gspread-dataframe>=3.3.1
-google-api-python-client>=2.90.0
+# Manipulação de dados
+pandas>=1.5
+numpy>=1.23
 
-# demais dependências (já são puxadas como sub‑dependências, mas você pode fixá‑las se quiser)
-# google-auth
-# google-auth-httplib2
-# google-auth-oauthlib
+# Google Sheets API
+gspread>=5.10
+oauth2client>=4.1
+gspread-dataframe>=3.3
+
+# SQLite + ORM
+sqlalchemy>=2.0
+pysqlite3-binary>=0.5.1  # versão binária embutida do SQLite, útil em ambientes sem lib instalada
+
+# Leitura de datas com timezone (opcional)
+python-dateutil>=2.8
+
+# Logging estruturado
+loguru>=0.7.2
+
+# Tipagem avançada (opcional)
+typing-extensions>=4.5
+
+# Testes (caso esteja usando)
+pytest>=7.4

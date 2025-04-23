@@ -49,7 +49,7 @@ def run_etl_idade():
     setup_logging(level=logging.DEBUG)
     garantir_cabecalho_idade()
 
-    plataformas = ["meta", "tiktok", "linkedin", "pinterest"]
+    plataformas = ["meta", "tiktok", "pinterest"]
     target_sheet = "modeloIdade"
 
     for plataforma in plataformas:

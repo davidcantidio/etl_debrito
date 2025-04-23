@@ -4,35 +4,38 @@ import pandas as pd
 
 def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Determina o link de visualização do anúncio para Meta Ads,
-    usando na ordem:
-      1) qualquer valor já existente em 'URL_do_Anuncio'
-      2) o campo 'Preview_Link_FB'
-      3) o campo 'Preview_Link_IG'
-    e renomeia as colunas brutas 'Preview Link FB' e 'Preview Link IG'.
+    Preenche a coluna 'URL_do_Anuncio' priorizando:
+      1) valor já existente,
+      2) Preview_Link_IG  (Instagram – requisito #52),
+      3) Preview_Link_FB.
+    A função **cria** a coluna se ela ainda não existir.
     """
-    # 1) Renomeia colunas brutas vinda do Google‑Sheets
-    if 'Preview Link FB' in df.columns:
-        df = df.rename(columns={'Preview Link FB': 'Preview_Link_FB'})
-    if 'Preview Link IG' in df.columns:
-        df = df.rename(columns={'Preview Link IG': 'Preview_Link_IG'})
+    # Renomeia colunas brutas, se vierem assim do Sheets
+    df = df.rename(columns={
+        "Preview Link FB": "Preview_Link_FB",
+        "Preview Link IG": "Preview_Link_IG",
+    })
 
-    # 2) Preenche URL_do_Anuncio pela ordem de preferência
-    if 'URL_do_Anuncio' in df.columns:
-        def _pref_preview(row):
-            # já veio preenchido?
-            if row.get('URL_do_Anuncio') and str(row['URL_do_Anuncio']).strip():
-                return row['URL_do_Anuncio']
-            # senão tenta FB
-            if row.get('Preview_Link_FB'):
-                return row['Preview_Link_FB']
-            # senão IG (ou vazio se nem existir)
-            return row.get('Preview_Link_IG', '')
+    # Garante a coluna de destino
+    if "URL_do_Anuncio" not in df.columns:
+        df["URL_do_Anuncio"] = ""
 
-        df['URL_do_Anuncio'] = df.apply(_pref_preview, axis=1)
+    def _choose_preview(row):
+        current = str(row.get("URL_do_Anuncio", "")).strip()
+        ig      = str(row.get("Preview_Link_IG", "")).strip()
+        fb      = str(row.get("Preview_Link_FB", "")).strip()
 
+        # 1) já preenchido?
+        if current:
+            return current
+        # 2) IG primeiro (conforme requisito #52)
+        if ig:
+            return ig
+        # 3) fallback FB
+        return fb
+
+    df["URL_do_Anuncio"] = df.apply(_choose_preview, axis=1)
     return df
-
 
 def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao: pd.DataFrame) -> dict:
     """

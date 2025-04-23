@@ -27,7 +27,7 @@ from scripts.etl_alcance import (
 def run_etl_alcance():
     setup_logging(level=logging.DEBUG)
 
-    plataformas = ["meta"]
+    plataformas = ["meta", "tiktok", "pinterest", "linkedin"]
     target_sheet = "modeloAlcance"
 
     etl_class_map = {

@@ -32,7 +32,7 @@ def run_etl_genero():
     """
     setup_logging(level=logging.DEBUG)
 
-    plataformas = ["meta", "tiktok", "linkedin", "pinterest"]
+    plataformas = ["meta", "tiktok", "pinterest"]
     target_sheet = "modeloGenero"
     numeric_cols = ["Investimento", "Impressoes", "Cliques_no_Link", "Visualizacoes_ate_100"]
 

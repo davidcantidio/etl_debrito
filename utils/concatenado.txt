@@ -799,7 +799,7 @@ def concatenar_arquivos_em_txt(diretorio_base, nome_arquivo_saida='concatenado.t
     print(f"Arquivos concatenados com sucesso em: {caminho_saida}")
 
 if __name__ == '__main__':
-    diretorio = '/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils'
+    diretorio = '/home/debrito/Documentos/etl_debrito/utils'
     concatenar_arquivos_em_txt(diretorio)
 
 
@@ -1075,6 +1075,33 @@ REACH_MODEL_COLUMN_ORDER =  [
 ]
 
 
+# utils/filter_utils.py
+
+import pandas as pd
+
+
+def remove_zero_impressoes(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove todas as linhas cujo valor na coluna 'Impressoes' seja zero ou nulo.
+
+    Parâmetros:
+        df (pd.DataFrame): DataFrame de entrada com a coluna 'Impressoes'.
+
+    Retorna:
+        pd.DataFrame: DataFrame filtrado, sem linhas onde 'Impressoes' == 0.
+    """
+    if 'Impressoes' not in df.columns:
+        # Se não existir, nada a fazer
+        return df
+
+    # Garante que 'Impressoes' é numérico
+    df = df.copy()
+    df['Impressoes'] = pd.to_numeric(df['Impressoes'], errors='coerce').fillna(0)
+
+    # Filtra somente valores > 0
+    return df[df['Impressoes'] > 0]
+
+
 # utils/geo_normalize.py
 
 import json
@@ -1084,8 +1111,8 @@ import unicodedata
 
 
 def carregar_caches_padrao():
-    path_estados = "/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils/cache_estados.json"
-    path_municipios = "/home/debrito/Documentos/ETL/ELET_ETL_Projeto/utils/cache_municipios_estados.json"
+    path_estados = "/home/debrito/Documentos/etl_debrito/utils/cache_estados.json"
+    path_municipios = "/home/debrito/Documentos/etl_debrito/utils/cache_municipios_estados.json"
 
     cache_estados = carregar_cache_estados(path_estados)
     cache_municipios = carregar_cache_municipios(path_municipios)
@@ -1983,7 +2010,7 @@ def setup_logging(level=logging.DEBUG):
 # utils/testgeolocalizacao.py
 
 import json
-from geolocalizacao import (
+from geo_normalize import (
     carregar_cache_estados,
     carregar_cache_municipios,
     obter_estado_de_regiao
