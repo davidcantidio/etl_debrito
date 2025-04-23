@@ -9,10 +9,10 @@ from utils import build_pinterest_preview_link, determine_meta_ad_preview_link, 
 from utils.common_linkedin import preencher_nomes_anuncio_linkedin
 from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico, aplicar_parametrizacao_campanha
 from utils.campos_calculados import calcular_engajamento_total, inicializar_colunas_auxiliares, gerar_id
-from utils.normalize import converter_colunas_numericas
+from utils.normalize import converter_colunas_numericas, apply_arbitrary_id_content_replacements
 from utils.organizar_dataframe import remover_colunas_indesejadas, reordenar_colunas_para_modelo
 from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER, NUMERIC_COLUMNS
-
+from utils.substitutions_lists import ID_CONTENT_REPLACEMENTS
 
 
 class BaseGeralETL:
@@ -58,7 +58,14 @@ class BaseGeralETL:
 
     def processar(self, df_destino=None):
         logging.debug(">>> In processar (BaseGeralETL)")
+
+        # 1) Renomeia as colunas de origem para o modelo
         self.renomear_colunas_origem_para_modelo()
+
+        # 2) Agora que 'Content (utm)' já virou 'ID_Content', aplicamos as exceções
+        self.df = apply_arbitrary_id_content_replacements(self.df, ID_CONTENT_REPLACEMENTS)
+
+        # 3) Continuação do pipeline
         self.ajustar_tipos_e_calculos()
         self.aplicar_substituicoes_objetivo()
         self.aplicar_parametrizacao_campanha_externa()

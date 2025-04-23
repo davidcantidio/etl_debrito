@@ -85,3 +85,4 @@ def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
         df['URL_do_Anuncio'] = ""
     return df
 
+

@@ -6,9 +6,36 @@ import logging
 
 
 def normalize_campaign_name(value):
+    """
+    Normaliza o nome de campanha:
+
+    - Se for string, faz strip() e converte para uppercase.
+    - Se não for string, retorna o valor inalterado.
+
+    Parâmetros:
+        value: qualquer objeto; se for string, será normalizado.
+
+    Retorna:
+        str | qualquer: nome de campanha normalizado em uppercase, ou
+                        o valor original se não for string.
+    """
+    logger = logging.getLogger(__name__)
+    logger.debug("normalize_campaign_name: recebendo %r", value)
+
     if not isinstance(value, str):
+        logger.debug(
+            "normalize_campaign_name: valor não é string, retornando original %r",
+            value,
+        )
         return value
-    return value.strip().upper()
+
+    normalized = value.strip().upper()
+    logger.debug(
+        "normalize_campaign_name: normalizado de %r para %r",
+        value,
+        normalized,
+    )
+    return normalized
 
 
 def normalize_nome(nome):
@@ -201,3 +228,44 @@ def extrair_veiculo(placement: str) -> str:
     # fallback: só Facebook ou Instagram são possíveis neste contexto
     return "Facebook"
 
+
+def apply_arbitrary_id_content_replacements(
+    df: pd.DataFrame,
+    mapping_excecoes: dict[str, str]
+) -> pd.DataFrame:
+    """
+    Aplica substituições manuais para o campo 'ID_Content' com base em exceções.
+
+    Para cada linha, normaliza o valor atual de 'ID_Content' (strip + lowercase)
+    e, se existir em `mapping_excecoes`, substitui pelo valor mapeado.
+    Caso contrário, mantém o original.
+
+    Parâmetros:
+        df (pd.DataFrame): DataFrame de entrada contendo a coluna 'ID_Content'.
+        mapping_excecoes (dict[str, str]): Dicionário de exceções a aplicar.
+            - Chave: valor original normalizado de 'ID_Content'.
+            - Valor: nova string a escrever em 'ID_Content'.
+
+    Retorna:
+        pd.DataFrame: cópia do DataFrame com a coluna 'ID_Content' atualizada
+                      segundo as exceções definidas.
+    """
+    logger = logging.getLogger(__name__)
+
+    if "ID_Content" not in df.columns:
+        logger.debug("Coluna 'ID_Content' não encontrada. Nenhuma substituição aplicada.")
+        return df
+
+    df = df.copy()
+    orig_series = df["ID_Content"].astype(str)
+    norm_series = orig_series.str.strip().str.lower()
+    
+    logger.debug("apply_arbitrary_id_content_replacements: carregadas %d regras", len(mapping_excecoes))
+    # Aplica o mapeamento
+    df["ID_Content"] = norm_series.map(lambda x: mapping_excecoes.get(x, x))
+    
+    # Conta quantas efetivamente mudaram (comparing normalized originals)
+    replaced = int((norm_series != df["ID_Content"].astype(str).str.strip().str.lower()).sum())
+    logger.debug("Total de valores substituídos em 'ID_Content': %d", replaced)
+
+    return df
