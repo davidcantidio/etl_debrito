@@ -13,7 +13,7 @@ from utils.common.meta.gender_placement_merge import (
     METRICAS,
     DISTRIBUICAO_LOGS,
 )
-from utils.normalize import normalizar_genero
+from utils.normalize import normalize_gender
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -56,7 +56,7 @@ def test_distribuicao_e_somas(df_genero_mergeado):
     # Checagem 3: valores válidos em 'Genero'
     generos = df_distribuido['Genero'].dropna().unique()
     for g in generos:
-        g_norm = normalizar_genero(g)
+        g_norm = normalize_gender(g)
         assert g_norm in ["Homem", "Mulher", "Não classificado"], f"Gênero inválido: {g_norm}"
 
 

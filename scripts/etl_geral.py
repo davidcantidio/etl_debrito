@@ -9,7 +9,7 @@ from utils import build_pinterest_preview_link, determine_meta_ad_preview_link, 
 from utils.common_linkedin import preencher_nomes_anuncio_linkedin
 from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico, aplicar_parametrizacao_campanha
 from utils.campos_calculados import calcular_engajamento_total, inicializar_colunas_auxiliares, gerar_id
-from utils.normalize import converter_colunas_numericas, apply_arbitrary_id_content_replacements
+from utils.normalize import convert_numeric_columns, apply_arbitrary_id_content_replacements
 from utils.organizar_dataframe import remover_colunas_indesejadas, reordenar_colunas_para_modelo
 from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER, NUMERIC_COLUMNS
 from utils.substitutions_lists import ID_CONTENT_REPLACEMENTS
@@ -31,7 +31,7 @@ class BaseGeralETL:
         self.df = converter_data(self.df, 'Data')
         self.df = converter_data(self.df, 'Inicio_da_Campanha')
         self.df = converter_data(self.df, 'Fim_da_Campanha')
-        self.df = converter_colunas_numericas(self.df, NUMERIC_COLUMNS)
+        self.df = convert_numeric_columns(self.df, NUMERIC_COLUMNS)
         self.df = calcular_engajamento_total(self.df)
         self.df = inicializar_colunas_auxiliares(self.df)
 

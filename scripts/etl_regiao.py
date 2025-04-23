@@ -7,7 +7,7 @@ import pandas as pd
 from scripts.etl_geral import BaseGeralETL
 from utils.fields_lists import REGION_MODEL_COLUMN_ORDER
 from utils.organizar_dataframe import reordenar_colunas_para_modelo
-from utils.normalize import converter_colunas_numericas
+from utils.normalize import convert_numeric_columns
 from utils.geo_normalize import carregar_caches_padrao, limpeza_basica, obter_estado_de_regiao
 from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, aplicar_parametrizacao_campanha
 from utils.renomeacoes import renomear_colunas_origem_para_modelo, aplicar_substituicoes_objetivo
@@ -76,14 +76,14 @@ class MetaRegiaoETL(BaseRegiaoETL):
             range_str="A1:ZZ",
             header_row_index=0,
         )
-        soma_raw = converter_colunas_numericas(df_raw, ["Cost"])["Cost"].sum()
+        soma_raw = convert_numeric_columns(df_raw, ["Cost"])["Cost"].sum()
 
         # 1) Leitura e preparação (inclui Province→Estado + geo-normalização)
         df_region = load_and_prepare_meta_region_data()
         df_placement = load_and_prepare_meta_placement_data()
 
-        df_region = converter_colunas_numericas(df_region, METRICAS)
-        df_placement = converter_colunas_numericas(df_placement, METRICAS)
+        df_region = convert_numeric_columns(df_region, METRICAS)
+        df_placement = convert_numeric_columns(df_placement, METRICAS)
 
         # 2) Pivot
         df_region_piv = self._ensure_numeric(pivot_meta_region_data(df_region))

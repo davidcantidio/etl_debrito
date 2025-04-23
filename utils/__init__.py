@@ -3,12 +3,12 @@
 # Importa funcionalidades de normalização e transformação
 from .normalize import (
     normalize_campaign_name,
-    normalizar_genero,
-    normalizar_faixa_etaria,
+    normalize_gender,
+    normalize_age,
     normalize_columns,
     normalize_parametrizacao_values,
-    inferir_veiculo_meta_por_placement,
-    atribuir_veiculo_por_criativo,
+    infer_vehicle_meta_by_placement,
+    assign_vehicle_by_creative,
 )
 from .datas import transformar_para_date, converter_data, generate_pinterest_dates
 from .renomeacoes import renomear_colunas_origem_para_modelo, aplicar_substituicoes_objetivo

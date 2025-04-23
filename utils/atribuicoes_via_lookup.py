@@ -2,7 +2,7 @@
 
 import logging
 from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_ID, SPREADSHEET_URL
-from utils.normalize import inferir_veiculo_meta_por_placement
+from utils.normalize import infer_vehicle_meta_by_placement
 from utils.campanha_mapper import buscar_mapping
 
 import pandas as pd
@@ -32,7 +32,7 @@ def atribuir_id_veiculo_generico(df: pd.DataFrame) -> pd.DataFrame:
 import logging
 import pandas as pd
 from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_ID, SPREADSHEET_URL
-from utils.normalize import extrair_veiculo
+from utils.normalize import extract_meta_platform_from_placement
 from utils.campanha_mapper import buscar_mapping
 
 # -------------------------------------------------------------------------
@@ -76,7 +76,7 @@ def atribuir_veiculo_e_id_meta(df: pd.DataFrame) -> pd.DataFrame:
     else:
         logging.debug("Inferindo 'Veiculo' a partir da coluna 'Placement'")
         df['Veiculo'] = df['Placement'].apply(
-            lambda p: extrair_veiculo(p) if isinstance(p, str) else "Não identificado"
+            lambda p: extract_meta_platform_from_placement(p) if isinstance(p, str) else "Não identificado"
         )
 
     logging.debug("Buscando 'ID_Veiculo' a partir da coluna 'Veiculo'")

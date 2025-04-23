@@ -8,8 +8,8 @@ from scripts.etl_geral import BaseGeralETL
 from utils.fields_lists import GENDER_MODEL_COLUMN_ORDER
 from utils.organizar_dataframe import reordenar_colunas_para_modelo
 from utils.normalize import (
-    normalizar_genero,
-    converter_colunas_numericas,
+    normalize_gender,
+    convert_numeric_columns,
 )
 from utils.atribuicoes_via_lookup import (
     atribuir_veiculo_e_id_meta,
@@ -48,7 +48,7 @@ class BaseGeneroETL(BaseGeralETL):
         if "Faixa_Etaria" in self.df.columns:
             self.df.rename(columns={"Faixa_Etaria": "Genero"}, inplace=True)
         if "Genero" in self.df.columns:
-            self.df["Genero"] = self.df["Genero"].apply(normalizar_genero)
+            self.df["Genero"] = self.df["Genero"].apply(normalize_gender)
         return self.df
 
     def criar_veiculo(self):
@@ -95,13 +95,13 @@ class MetaGeneroETL(BaseGeneroETL):
             header_row_index=0
         )
         # soma raw em decimal
-        soma_raw = converter_colunas_numericas(df_raw, ["Cost"])["Cost"].sum()
+        soma_raw = convert_numeric_columns(df_raw, ["Cost"])["Cost"].sum()
 
         # 1) Carrega e converte vírgula→ponto decimal ------------------
         df_gender       = load_and_prepare_meta_gender_data()
         df_placement = load_and_prepare_meta_placement_data()
-        df_gender       = converter_colunas_numericas(df_gender, METRICAS)
-        df_placement = converter_colunas_numericas(df_placement, METRICAS)
+        df_gender       = convert_numeric_columns(df_gender, METRICAS)
+        df_placement = convert_numeric_columns(df_placement, METRICAS)
 
         # 2) Pivôs e garantia de numérico -----------------------------
         df_gender_piv   = self._ensure_numeric(pivot_meta_gender_data(df_gender))
@@ -133,7 +133,7 @@ class MetaGeneroETL(BaseGeneroETL):
         df_dist = renomear_colunas_origem_para_modelo(df_dist)
         if "Faixa_Etaria" in df_dist.columns:
             df_dist.rename(columns={"Faixa_Etaria": "Genero"}, inplace=True)
-        df_dist["Genero"] = df_dist["Genero"].apply(normalizar_genero)
+        df_dist["Genero"] = df_dist["Genero"].apply(normalize_gender)
 
         # 7) Tradução de Objetivo e lookup Campanha ------------------
         df_dist = aplicar_substituicoes_objetivo(df_dist)

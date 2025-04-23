@@ -8,8 +8,8 @@ from scripts.etl_geral import BaseGeralETL
 from utils.fields_lists import AGE_MODEL_COLUMN_ORDER
 from utils.organizar_dataframe import reordenar_colunas_para_modelo
 from utils.normalize import (
-    normalizar_faixa_etaria,
-    converter_colunas_numericas,
+    normalize_age,
+    convert_numeric_columns,
 )
 from utils.atribuicoes_via_lookup import (
     atribuir_veiculo_e_id_meta,
@@ -48,7 +48,7 @@ class BaseIdadeETL(BaseGeralETL):
         if "Faixa_Etaria" in self.df.columns:
             self.df.rename(columns={"Faixa_Etaria": "Idade"}, inplace=True)
         if "Idade" in self.df.columns:
-            self.df["Idade"] = self.df["Idade"].apply(normalizar_faixa_etaria)
+            self.df["Idade"] = self.df["Idade"].apply(normalize_age)
         return self.df
 
     def criar_veiculo(self):
@@ -95,13 +95,13 @@ class MetaIdadeETL(BaseIdadeETL):
             range_str="A1:ZZ",
             header_row_index=0
         )
-        soma_raw = converter_colunas_numericas(df_raw, ["Cost"])["Cost"].sum()
+        soma_raw = convert_numeric_columns(df_raw, ["Cost"])["Cost"].sum()
 
         # 1) Carrega e converte vírgula→ponto decimal ------------------
         df_age = load_and_prepare_meta_age_data()  # Carrega os dados de Age (Idade)
         df_placement = load_and_prepare_meta_placement_data()
-        df_age = converter_colunas_numericas(df_age, METRICAS)
-        df_placement = converter_colunas_numericas(df_placement, METRICAS)
+        df_age = convert_numeric_columns(df_age, METRICAS)
+        df_placement = convert_numeric_columns(df_placement, METRICAS)
 
         # 2) Pivôs e garantia de numérico -----------------------------
         df_age_piv = self._ensure_numeric(pivot_meta_age_data(df_age))
@@ -114,7 +114,7 @@ class MetaIdadeETL(BaseIdadeETL):
         if "Age" in df_dist.columns:
             log.debug("Coluna 'Age' encontrada no DataFrame.")
             df_dist.rename(columns={"Age": "Idade"}, inplace=True)  # Renomeia para 'Idade'
-            df_dist["Idade"] = df_dist["Idade"].apply(normalizar_faixa_etaria)  # Normaliza 'Idade'
+            df_dist["Idade"] = df_dist["Idade"].apply(normalize_age)  # Normaliza 'Idade'
         else:
             log.error("A coluna 'Age' não foi encontrada no DataFrame. Não é possível gerar 'Idade'.")
             raise KeyError("A coluna 'Age' não foi encontrada.")
@@ -140,7 +140,7 @@ class MetaIdadeETL(BaseIdadeETL):
 
         # 7) Renomeação padrão + Idade -------------------------------
         df_dist = renomear_colunas_origem_para_modelo(df_dist)
-        df_dist["Idade"] = df_dist["Idade"].apply(normalizar_faixa_etaria)
+        df_dist["Idade"] = df_dist["Idade"].apply(normalize_age)
 
         # 8) Tradução de Objetivo e lookup Campanha ------------------
         df_dist = aplicar_substituicoes_objetivo(df_dist)
