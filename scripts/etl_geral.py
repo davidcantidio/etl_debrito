@@ -1,37 +1,65 @@
-import pandas as pd
 import logging
 
-from utils import aplicar_substituicoes_objetivo, renomear_colunas_origem_para_modelo
-from utils.campanha_mapper import buscar_mapping
+from utils import (
+    aplicar_substituicoes_objetivo,
+    renomear_colunas_origem_para_modelo,
+)
 from utils.numeracao import gerar_numeracao
-from utils import transformar_para_date, converter_data
-from utils import build_pinterest_preview_link, determine_meta_ad_preview_link, generate_linkedin_ad_preview_link_from_lookup
+from utils import converter_data
+from utils import (
+    
+    determine_meta_ad_preview_link,
+)
 from utils.common_linkedin import preencher_nomes_anuncio_linkedin
-from utils.atribuicoes_via_lookup import atribuir_veiculo_e_id_meta, atribuir_id_veiculo_generico, aplicar_parametrizacao_campanha
-from utils.campos_calculados import calcular_engajamento_total, inicializar_colunas_auxiliares, gerar_id
-from utils.normalize import convert_numeric_columns, apply_arbitrary_id_content_replacements
-from utils.organizar_dataframe import remover_colunas_indesejadas, reordenar_colunas_para_modelo
+from utils.atribuicoes_via_lookup import (
+    atribuir_veiculo_e_id_meta,
+    atribuir_id_veiculo_generico,
+    aplicar_parametrizacao_campanha,
+)
+from utils.campos_calculados import (
+    calcular_engajamento_total,
+    inicializar_colunas_auxiliares,
+    gerar_id,
+)
+from utils.normalize import (
+    convert_numeric_columns,
+
+)
+from utils.organizar_dataframe import (
+    remover_colunas_indesejadas,
+    reordenar_colunas_para_modelo,
+)
 from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER, NUMERIC_COLUMNS
 from utils.substitutions_lists import ID_CONTENT_REPLACEMENTS
-
+from utils.utm_lookup import load_utm_mapping, fill_missing_start_end_from_utm
 
 class BaseGeralETL:
+    """
+    Base pipeline for general ETL, now applying arbitrary ID_Content replacements
+    for ALL platforms (not just LinkedIn), plus UTM-based Start/End lookup.
+    """
     def __init__(self, df, id_veiculo, veiculo, mapping_campanha=None, mapping_sigla=None):
-        logging.debug(">>> In BaseGeralETL.__init__")
+        logging.debug(">>> Initializing BaseGeralETL")
         self.df = df.copy()
         self.id_veiculo = id_veiculo
         self.veiculo = veiculo
         self.mapping_campanha = mapping_campanha or {}
         self.mapping_sigla = mapping_sigla or {}
+        self.utm_mapping = load_utm_mapping()
 
     def renomear_colunas_origem_para_modelo(self):
         self.df = renomear_colunas_origem_para_modelo(self.df)
 
     def ajustar_tipos_e_calculos(self):
+        logging.debug("Filling missing Start/End from UTM mapping")
+        self.df = fill_missing_start_end_from_utm(self.df, self.utm_mapping)
+        logging.debug("Converting date fields")
         self.df = converter_data(self.df, 'Data')
         self.df = converter_data(self.df, 'Inicio_da_Campanha')
         self.df = converter_data(self.df, 'Fim_da_Campanha')
+        logging.debug(f"Converting numeric columns: {NUMERIC_COLUMNS}")
         self.df = convert_numeric_columns(self.df, NUMERIC_COLUMNS)
+        logging.debug("Calculating engagement and initializing auxiliaries")
         self.df = calcular_engajamento_total(self.df)
         self.df = inicializar_colunas_auxiliares(self.df)
 
@@ -39,10 +67,12 @@ class BaseGeralETL:
         self.df = aplicar_substituicoes_objetivo(self.df)
 
     def aplicar_parametrizacao_campanha_externa(self):
-        self.df = aplicar_parametrizacao_campanha(self.df, self.mapping_campanha, self.mapping_sigla)
+        self.df = aplicar_parametrizacao_campanha(
+            self.df, self.mapping_campanha, self.mapping_sigla
+        )
 
     def criar_veiculo(self):
-        logging.debug(">>> In criar_veiculo (default) com atribuição genérica")
+        logging.debug("Assigning generic vehicle")
         self.df['Veiculo'] = self.veiculo
         self.df = atribuir_id_veiculo_generico(self.df)
 
@@ -55,17 +85,21 @@ class BaseGeralETL:
     def gerar_id(self):
         self.df = gerar_id(self.df)
 
-
     def processar(self, df_destino=None):
-        logging.debug(">>> In processar (BaseGeralETL)")
+        logging.debug(">>> Starting BaseGeralETL.processar()")
+        # 1) Apply arbitrary Content→ID_Content replacements for ALL ETLs
+        logging.debug("Applying ID_Content replacements using substitutions list")
+        self.df = fill_missing_start_end_from_utm(self.df, self.utm_mapping)
 
-        # 1) Renomeia as colunas de origem para o modelo
+        self.df = converter_data(self.df, 'Data')
+        self.df = converter_data(self.df, 'Inicio_da_Campanha')
+        self.df = converter_data(self.df, 'Fim_da_Campanha')
+        self.df = convert_numeric_columns(self.df, NUMERIC_COLUMNS)
+        self.df = calcular_engajamento_total(self.df)
+        self.df = inicializar_colunas_auxiliares(self.df)
+
+        # 2) Standard pipeline steps
         self.renomear_colunas_origem_para_modelo()
-
-        # 2) Agora que 'Content (utm)' já virou 'ID_Content', aplicamos as exceções
-        self.df = apply_arbitrary_id_content_replacements(self.df, ID_CONTENT_REPLACEMENTS)
-
-        # 3) Continuação do pipeline
         self.ajustar_tipos_e_calculos()
         self.aplicar_substituicoes_objetivo()
         self.aplicar_parametrizacao_campanha_externa()
@@ -74,6 +108,12 @@ class BaseGeralETL:
         self.remover_colunas_indesejadas()
         self.reordenar_colunas_para_modelo()
         self.gerar_id()
+
+        # 3) Optional filtering by campaign name block list
+
+
+
+        # 4) Add sequential numbering
         self.df = gerar_numeracao(self.df, df_destino, linha_insercao=2, coluna='Numero')
         return self.df
 

@@ -337,47 +337,58 @@ def normalize_gender(value) -> str:
     logging.debug("Capitalized '%s' to '%s'", val, result)
     return result
 
-def convert_numeric_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+def _clean_numeric_series(s: pd.Series) -> pd.Series:
     """
-    Convert specified columns from Brazilian-style numeric strings
-    ('.' thousands separator, ',' decimal separator) to numeric dtype,
-    filling invalid or missing entries with zero.
-
-    Logs each step for easier debugging.
-    
-    Parameters:
-        df (pd.DataFrame): Input DataFrame.
-        columns (list[str]): List of column names to convert.
-
-    Returns:
-        pd.DataFrame: The same DataFrame, with the specified columns converted.
+    Converte uma Series de strings no formato BR para float,
+    trocando vírgula por ponto, removendo separador de milhar
+    e preenchendo vazios com zero.
     """
-    logging.debug(">>> In converter_colunas_numericas; columns to convert: %s", columns)
+    s = s.astype(str)
+    s = s.str.replace("\u00a0", "", regex=False)                         # NB-space
+    s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)            # milhar
+    s = s.str.replace(",", ".", regex=False)                             # decimal
+    return pd.to_numeric(s, errors="coerce").fillna(0)
+
+
+def convert_numeric_columns(df: pd.DataFrame,
+                            columns: list[str]) -> pd.DataFrame:
+    out = df.copy()
+
     for col in columns:
-        if col not in df.columns:
-            logging.debug("Column '%s' not found in DataFrame; skipping.", col)
+        if col not in out.columns:
+            logging.debug("convert_numeric_columns: Column '%s' not found; skipping.", col)
             continue
 
-        logging.debug("Converting column '%s'", col)
-        # Work on a string Series to strip and replace formatting
-        s = df[col].astype(str)
-        logging.debug("  Original head: %s", s.head(5).tolist())
+        obj = out[col]
 
-        # 1) Remove non-breaking spaces
-        s = s.str.replace("\u00a0", "", regex=False)
-        # 2) Remove thousands separators (dots)
-        s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)
-        # 3) Convert comma decimals to dot
-        s = s.str.replace(",", ".", regex=False)
+        # ------------------------------------------------------------------
+        # 1) Coluna única
+        # ------------------------------------------------------------------
+        if isinstance(obj, pd.Series):
+            out[col] = _clean_numeric_series(obj)
+            logging.debug("convert_numeric_columns: Converted '%s' – first 5 values: %s",
+                          col, out[col].head(5).tolist())
+            continue
 
-        # 4) Convert to numeric, coercing errors to NaN, then fill with 0
-        converted = pd.to_numeric(s, errors="coerce").fillna(0)
-        logging.debug("  Converted head: %s", converted.head(5).tolist())
+        # ------------------------------------------------------------------
+        # 2) Coluna duplicada
+        # ------------------------------------------------------------------
+        n_copies = obj.shape[1]
+        logging.warning("[convert_numeric_columns] Duplicate column '%s' detected "
+                        "(%d copies) – aggregating with sum.", col, n_copies)
 
-        df[col] = converted
+        cleaned_parts = [_clean_numeric_series(obj.iloc[:, i]) for i in range(n_copies)]
+        agg_series = pd.concat(cleaned_parts, axis=1).sum(axis=1)
 
-    return df
+        # ---> coloca apenas UMA coluna com o resultado
+        out[col] = agg_series
+        # remove as demais cópias agora
+        out = out.loc[:, ~out.columns.duplicated(keep="first")]
 
+        logging.debug("convert_numeric_columns: Aggregated '%s' – first 5 values: %s",
+                      col, agg_series.head(5).tolist())
+
+    return out
 
 def format_columns_to_comma_decimal(df: pd.DataFrame, cols: list[str], decimals: int = 2) -> pd.DataFrame:
     """
@@ -418,8 +429,6 @@ def format_columns_to_comma_decimal(df: pd.DataFrame, cols: list[str], decimals:
         logging.debug("  Formatted head: %s", formatted_values)
 
     return df
-
-import logging
 
 def extract_meta_platform_from_placement(placement: str) -> str:
     """

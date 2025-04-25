@@ -9,6 +9,7 @@ from utils.google_sheets import (
     SPREADSHEET_URL as spreadsheet_url,
 )
 from utils.setup_logging import setup_logging
+from utils.substitute_origin_values import apply_all_origin_substitutions
 from utils.get_campaign_parameterization import get_campaign_parameterization
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.get_missing_records import get_missing_records
@@ -54,6 +55,12 @@ def run_etl_geral():
 
         logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
         df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
+        df_origin = apply_all_origin_substitutions(
+            df_origin,
+            sheet_name=source_sheet,   # << obrigatório para gravação
+            write_back=True,           # confirma que deve gravar no Sheets
+            inplace=True               # altera o df em memória
+        )
 
         if "Date" in df_origin.columns:
             df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
