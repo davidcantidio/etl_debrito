@@ -76,6 +76,32 @@ def normalize_name(nome):
     return no_accents
 
 
+def normalize_campaign_series(series: pd.Series) -> pd.Series:
+    """
+    Normaliza uma Series contendo nomes de campanhas:
+    
+    - Converte cada valor para string.
+    - Remove espaços no início e fim.
+    - Converte para minúsculo.
+    - Remove acentuação e caracteres especiais.
+
+    Parâmetros:
+        series (pd.Series): Série contendo os nomes de campanha.
+
+    Retorna:
+        pd.Series: Série normalizada.
+    """
+    logger = logging.getLogger(__name__)
+    logger.debug("normalize_campaign_series: normalizando série com %d elementos", len(series))
+
+    return (
+        series
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .map(lambda x: unicodedata.normalize("NFKD", x))
+        .map(lambda x: ''.join(c for c in x if not unicodedata.combining(c)))
+    )
 
 
 
@@ -460,43 +486,43 @@ def extract_meta_platform_from_placement(placement: str) -> str:
     return "Facebook"
 
 
-def apply_arbitrary_id_content_replacements(
-    df: pd.DataFrame,
-    mapping_excecoes: dict[str, str]
-) -> pd.DataFrame:
-    """
-    Aplica substituições manuais para o campo 'ID_Content' com base em exceções.
+# def apply_arbitrary_id_content_replacements(
+#     df: pd.DataFrame,
+#     mapping_excecoes: dict[str, str]
+# ) -> pd.DataFrame:
+#     """
+#     Aplica substituições manuais para o campo 'ID_Content' com base em exceções.
 
-    Para cada linha, normaliza o valor atual de 'ID_Content' (strip + lowercase)
-    e, se existir em `mapping_excecoes`, substitui pelo valor mapeado.
-    Caso contrário, mantém o original.
+#     Para cada linha, normaliza o valor atual de 'ID_Content' (strip + lowercase)
+#     e, se existir em `mapping_excecoes`, substitui pelo valor mapeado.
+#     Caso contrário, mantém o original.
 
-    Parâmetros:
-        df (pd.DataFrame): DataFrame de entrada contendo a coluna 'ID_Content'.
-        mapping_excecoes (dict[str, str]): Dicionário de exceções a aplicar.
-            - Chave: valor original normalizado de 'ID_Content'.
-            - Valor: nova string a escrever em 'ID_Content'.
+#     Parâmetros:
+#         df (pd.DataFrame): DataFrame de entrada contendo a coluna 'ID_Content'.
+#         mapping_excecoes (dict[str, str]): Dicionário de exceções a aplicar.
+#             - Chave: valor original normalizado de 'ID_Content'.
+#             - Valor: nova string a escrever em 'ID_Content'.
 
-    Retorna:
-        pd.DataFrame: cópia do DataFrame com a coluna 'ID_Content' atualizada
-                      segundo as exceções definidas.
-    """
-    logger = logging.getLogger(__name__)
+#     Retorna:
+#         pd.DataFrame: cópia do DataFrame com a coluna 'ID_Content' atualizada
+#                       segundo as exceções definidas.
+#     """
+#     logger = logging.getLogger(__name__)
 
-    if "ID_Content" not in df.columns:
-        logger.debug("Coluna 'ID_Content' não encontrada. Nenhuma substituição aplicada.")
-        return df
+#     if "ID_Content" not in df.columns:
+#         logger.debug("Coluna 'ID_Content' não encontrada. Nenhuma substituição aplicada.")
+#         return df
 
-    df = df.copy()
-    orig_series = df["ID_Content"].astype(str)
-    norm_series = orig_series.str.strip().str.lower()
+#     df = df.copy()
+#     orig_series = df["ID_Content"].astype(str)
+#     norm_series = orig_series.str.strip().str.lower()
     
-    logger.debug("apply_arbitrary_id_content_replacements: carregadas %d regras", len(mapping_excecoes))
-    # Aplica o mapeamento
-    df["ID_Content"] = norm_series.map(lambda x: mapping_excecoes.get(x, x))
+#     logger.debug("apply_arbitrary_id_content_replacements: carregadas %d regras", len(mapping_excecoes))
+#     # Aplica o mapeamento
+#     df["ID_Content"] = norm_series.map(lambda x: mapping_excecoes.get(x, x))
     
-    # Conta quantas efetivamente mudaram (comparing normalized originals)
-    replaced = int((norm_series != df["ID_Content"].astype(str).str.strip().str.lower()).sum())
-    logger.debug("Total de valores substituídos em 'ID_Content': %d", replaced)
+#     # Conta quantas efetivamente mudaram (comparing normalized originals)
+#     replaced = int((norm_series != df["ID_Content"].astype(str).str.strip().str.lower()).sum())
+#     logger.debug("Total de valores substituídos em 'ID_Content': %d", replaced)
 
-    return df
+#     return df

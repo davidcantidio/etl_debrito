@@ -1,4 +1,10 @@
 import logging
+from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER, NUMERIC_COLUMNS
+from utils.substitutions_lists import ID_CONTENT_REPLACEMENTS
+from utils.utm_lookup import load_utm_mapping, fill_missing_start_end_from_utm
+from utils.setup_logging import setup_logging
+
+setup_logging(level=logging.DEBUG, log_file='etl_geral.log')
 
 from utils import (
     aplicar_substituicoes_objetivo,
@@ -29,9 +35,7 @@ from utils.organizar_dataframe import (
     remover_colunas_indesejadas,
     reordenar_colunas_para_modelo,
 )
-from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER, NUMERIC_COLUMNS
-from utils.substitutions_lists import ID_CONTENT_REPLACEMENTS
-from utils.utm_lookup import load_utm_mapping, fill_missing_start_end_from_utm
+
 
 class BaseGeralETL:
     """

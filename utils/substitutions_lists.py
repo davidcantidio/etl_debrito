@@ -31,3 +31,13 @@ AD_GROUP_NAME_REPLACEMENTS: dict[str, str] = {
 Chave: valor exato vindo da origem (após strip e lowercase).  
 Valor: string que deve substituir o nome do grupo de anúncio.  
 """
+
+
+AD_NAME_REPLACEMENTS: dict[str, str] = {
+    "Ad name2025-03-20 18:28:41": "2025_3_BR_VÍDEO_RESPOSTA_BRANDED_MISSION_1_ACAO_DBT_SBRAE_2025_EMP_FEM0062",
+}
+"""Substituições específicas para o campo 'Ad name'.
+
+Chave: valor exato vindo da origem (após strip e lowercase).  
+Valor: string que deve substituir o nome do grupo de anúncio.  
+"""
