@@ -12,10 +12,7 @@ from utils import (
 )
 from utils.numeracao import gerar_numeracao
 from utils import converter_data
-from utils import (
-    
-    determine_meta_ad_preview_link,
-)
+from utils import determine_meta_ad_preview_link
 from utils.common_linkedin import preencher_nomes_anuncio_linkedin
 from utils.atribuicoes_via_lookup import (
     atribuir_veiculo_e_id_meta,
@@ -27,14 +24,13 @@ from utils.campos_calculados import (
     inicializar_colunas_auxiliares,
     gerar_id,
 )
-from utils.normalize import (
-    convert_numeric_columns,
-
-)
+from utils.normalize import convert_numeric_columns
 from utils.organizar_dataframe import (
     remover_colunas_indesejadas,
     reordenar_colunas_para_modelo,
 )
+from utils.datas import generate_pinterest_dates
+from utils.preview_links import generate_pinterest_ad_preview_link
 
 
 class BaseGeralETL:
@@ -91,20 +87,17 @@ class BaseGeralETL:
 
     def processar(self, df_destino=None):
         logging.debug(">>> Starting BaseGeralETL.processar()")
-        # 1) Apply arbitrary Content→ID_Content replacements for ALL ETLs
-        logging.debug("Applying ID_Content replacements using substitutions list")
-        self.df = fill_missing_start_end_from_utm(self.df, self.utm_mapping)
 
-        self.df = converter_data(self.df, 'Data')
-        self.df = converter_data(self.df, 'Inicio_da_Campanha')
-        self.df = converter_data(self.df, 'Fim_da_Campanha')
-        self.df = convert_numeric_columns(self.df, NUMERIC_COLUMNS)
-        self.df = calcular_engajamento_total(self.df)
-        self.df = inicializar_colunas_auxiliares(self.df)
-
-        # 2) Standard pipeline steps
+        # 1) Renomeia colunas de origem para o modelo
         self.renomear_colunas_origem_para_modelo()
+
+        # 1.1) Elimina eventuais colunas duplicadas (criada por pré-fill)
+        self.df = self.df.loc[:, ~self.df.columns.duplicated()]
+
+        # 2) Ajusta tipos, preenche datas faltantes, converte numéricos, etc.
         self.ajustar_tipos_e_calculos()
+
+        # 3) Continua pipeline padrão
         self.aplicar_substituicoes_objetivo()
         self.aplicar_parametrizacao_campanha_externa()
         self.determine_ad_preview_link()
@@ -113,11 +106,7 @@ class BaseGeralETL:
         self.reordenar_colunas_para_modelo()
         self.gerar_id()
 
-        # 3) Optional filtering by campaign name block list
-
-
-
-        # 4) Add sequential numbering
+        # 4) Numera e retorna
         self.df = gerar_numeracao(self.df, df_destino, linha_insercao=2, coluna='Numero')
         return self.df
 
@@ -128,7 +117,7 @@ class BaseGeralETL:
 class MetaGeralETL(BaseGeralETL):
     def determine_ad_preview_link(self):
         self.df = determine_meta_ad_preview_link(self.df)
-    
+
     def criar_veiculo(self):
         logging.debug(">>> In MetaGeralETL.criar_veiculo")
         self.df = atribuir_veiculo_e_id_meta(self.df)
@@ -142,38 +131,27 @@ class LinkedinGeralETL(BaseGeralETL):
 
     def ajustar_tipos_e_calculos(self):
         super().ajustar_tipos_e_calculos()
-
-        # Duplicar Content (utm) como ID_Content e utm_content
+        # Duplica Content (utm) para ID_Content e utm_content
         if "Content (utm)" in self.df.columns:
             self.df["ID_Content"] = self.df["Content (utm)"]
             self.df["utm_content"] = self.df["Content (utm)"]
             logging.debug("[LinkedIn] Campo 'Content (utm)' duplicado em 'ID_Content' e 'utm_content'.")
         else:
-            logging.warning("[LinkedIn] Coluna 'Content (utm)' ausente. Não será possível gerar 'ID_Content' nem 'utm_content'.")
-
-        # Preenche Nome_do_Anuncio e Nome_do_Conjunto_de_Anuncio com base no mapping_criativo
+            logging.warning("[LinkedIn] Coluna 'Content (utm)' ausente; não será possível gerar 'ID_Content' nem 'utm_content'.")
+        # Preenche nomes de anúncio via mapeamento
         self.df = preencher_nomes_anuncio_linkedin(self.df, self.mapping_criativo)
-
         return self.df
-    
+
     def determine_ad_preview_link(self):
         logging.debug(">>> In LinkedinGeralETL.determine_ad_preview_link (via ID_Content)")
-
         if "ID_Content" not in self.df.columns:
-            logging.warning("[LinkedIn] Coluna 'ID_Content' ausente. Não será possível gerar 'URL_do_Anuncio'.")
+            logging.warning("[LinkedIn] Coluna 'ID_Content' ausente; não será possível gerar 'URL_do_Anuncio'.")
             return
-
         self.df["URL_do_Anuncio"] = self.df["ID_Content"].map(self.mapping_preview)
-
         nao_mapeados = self.df[self.df["URL_do_Anuncio"].isna()]["ID_Content"].dropna().unique()
         if len(nao_mapeados) > 0:
-            logging.warning(f"[LinkedIn] ID_Content sem preview link (até 10): {nao_mapeados[:10]}")
+            logging.warning(f"[LinkedIn] ID_Content sem preview (até 10): {nao_mapeados[:10]}")
 
-
-
-
-from utils.datas import generate_pinterest_dates
-from utils.preview_links import generate_pinterest_ad_preview_link
 
 class PinterestGeralETL(BaseGeralETL):
     def ajustar_tipos_e_calculos(self):
@@ -185,5 +163,9 @@ class PinterestGeralETL(BaseGeralETL):
 class TiktokGeralETL(BaseGeralETL):
     def ajustes_preview(self):
         logging.debug(">>> In TiktokGeralETL.ajustes_preview")
-        logging.debug(f"Inicio_da_Campanha preview: {self.df['Inicio_da_Campanha'].dropna().head(3) if 'Inicio_da_Campanha' in self.df.columns else 'Não encontrada'}")
-        logging.debug(f"Fim_da_Campanha preview: {self.df['Fim_da_Campanha'].dropna().head(3) if 'Fim_da_Campanha' in self.df.columns else 'Não encontrada'}")
+        logging.debug(
+            f"Inicio_da_Campanha: {self.df.get('Inicio_da_Campanha', '').head(3)}"
+        )
+        logging.debug(
+            f"Fim_da_Campanha: {self.df.get('Fim_da_Campanha', '').head(3)}"
+        )

@@ -156,21 +156,47 @@ def transformar_para_date(valor):
     raise ValueError(f"Tipo de valor não suportado: {type(valor)}")
 
 
-def converter_data(df: pd.DataFrame, coluna: str = 'Data') -> pd.DataFrame:
+def converter_data(df: pd.DataFrame, coluna: str = "Data") -> pd.DataFrame:
     """
-    Converte a coluna especificada do DataFrame para o tipo `date` (sem hora).
+    Converte a coluna especificada para objeto `date`, aceitando strings com
+    hora, milissegundos, 'T', fuso horário ou quebras de linha.
 
-    Parâmetros:
-        df (pd.DataFrame): DataFrame contendo a coluna de data.
-        coluna (str): Nome da coluna a ser convertida.
-
-    Retorna:
-        pd.DataFrame: DataFrame com a coluna convertida para `date`.
+    Passos:
+    1. Tenta a conversão direta com pandas.
+    2. Onde falhar, corta os 10 primeiros caracteres (YYYY-MM-DD) e tenta novamente.
+    3. Resultado final vira `date` (YYYY-MM-DD) ou campo vazio.
     """
-    if coluna in df.columns:
-        df[coluna] = pd.to_datetime(df[coluna], errors='coerce').dt.date
+    if coluna not in df.columns:
+        return df
+
+    log = logging.getLogger(__name__)
+    s = df[coluna].astype(str).str.strip()
+
+    # 1) tentativa direta -------------------------------------------------
+    parsed = pd.to_datetime(s, errors="coerce")
+
+    # 2) fallback: pega só a parte da data (primeiros 10 chars) -----------
+    mask_na = parsed.isna()
+    if mask_na.any():
+        fallback = (
+            s[mask_na]
+            .str.replace("T", " ", regex=False)        # 2025-03-08T17…
+            .str.split().str[0]                        # antes do espaço / fuso / \n
+            .str.slice(0, 10)                          # garante AAAA-MM-DD
+        )
+        parsed.loc[mask_na] = pd.to_datetime(fallback, errors="coerce")
+
+    # 3) final: converte em objeto date -----------------------------------
+    df[coluna] = parsed.dt.date.where(parsed.notna(), "")
+
+    # log rápido de quantos valores foram realmente convertidos
+    log.debug(
+        "[converter_data] coluna '%s': convertidos %d de %d registros",
+        coluna,
+        parsed.notna().sum(),
+        len(parsed),
+    )
     return df
-
 
 def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
     """

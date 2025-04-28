@@ -867,8 +867,128 @@ def obter_nome_por_utm_content(utm_content: str, mapping_criativo: dict) -> str:
 
 # utils/datas.py
 
-from datetime import datetime, date
+import logging
 import pandas as pd
+from typing import Optional, Any, Dict, List
+from gspread import Worksheet
+from gspread.utils import rowcol_to_a1
+from utils.get_google_client import get_google_client
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+from utils.normalize import normalize_campaign_series
+
+MAX_CELLS = 500
+
+def _chunk(updates: List[Dict[str, Any]], size: int):
+    for i in range(0, len(updates), size):
+        yield updates[i:i+size]
+
+def fill_missing_start_end_from_params(
+    df: pd.DataFrame,
+    sheet_name: Optional[str] = None,
+    *,
+    worksheet: Worksheet | None = None,
+    write_back: bool = True,
+    inplace: bool = True,
+) -> pd.DataFrame:
+    """
+    Preenche células vazias em 'Start' e 'End' via lookup em BI_PARAMETRIZAÇÃO usando o 'Ad name' ↔ 'CRIATIVO'.
+    Retorna DataFrame alterado (ou cópia, se inplace=False).
+    Se write_back=True, grava de volta no Google Sheet especificado.
+    """
+    log = logging.getLogger(__name__)
+    if not inplace:
+        df = df.copy()
+
+    # Preparar worksheet para write-back
+    if write_back:
+        if worksheet is None:
+            if sheet_name is None:
+                raise ValueError(
+                    "sheet_name must be provided when write_back=True and no worksheet is given."
+                )
+            client = get_google_client(CREDS_PATH)
+            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+        orig_headers = worksheet.row_values(1)
+        header_sheet_lc = [h.strip().lower() for h in orig_headers]
+
+    # Carrega BI_PARAMETRIZAÇÃO
+    client = get_google_client(CREDS_PATH)
+    sh = client.open_by_key(SPREADSHEET_ID)
+    ws_param = sh.worksheet("BI_PARAMETRIZAÇÃO")
+    data = ws_param.get_all_values()
+    if len(data) < 3:
+        log.error("BI_PARAMETRIZAÇÃO insuficiente (<3 linhas), abortando fill_missing_start_end")
+        return df
+    header_param = [c.strip().replace('\n', ' ').upper() for c in data[1]]
+    df_param = pd.DataFrame(data[2:], columns=header_param)
+    log.info("BI_PARAMETRIZAÇÃO loaded: %d rows", len(df_param))
+
+    # Verifica colunas obrigatórias
+    for key in ("CRIATIVO", "START", "END"):
+        if key not in df_param.columns:
+            log.error("Coluna '%s' faltando em BI_PARAMETRIZAÇÃO, skipping fill_missing_start_end", key)
+            return df
+
+    # Constroi mapas normalizados
+    df_param["criativo_norm"] = normalize_campaign_series(df_param["CRIATIVO"])
+    map_start = dict(zip(df_param["criativo_norm"], df_param["START"]))
+    map_end   = dict(zip(df_param["criativo_norm"], df_param["END"]))
+
+    updates: List[Dict[str, Any]] = []
+    df.reset_index(drop=True, inplace=True)
+
+    # Normaliza criativos do df de origem
+    if "Ad name" not in df.columns:
+        log.error("DataFrame origem sem coluna 'Ad name', não pode preencher datas")
+        return df
+
+    df["criativo_norm"] = normalize_campaign_series(df["Ad name"])
+
+    # Preenche Start
+    if "Start" in df.columns:
+        empty_mask = df["Start"].astype(str).str.strip().eq("")
+        fill_vals = df["criativo_norm"].map(map_start)
+        to_fill = empty_mask & fill_vals.notna()
+
+        filled = int(to_fill.sum())
+        log.info("Preenchendo 'Start' via Ad name: %d células", filled)
+
+        df.loc[to_fill, "Start"] = fill_vals[to_fill]
+
+        if write_back and filled > 0:
+            idx_col = header_sheet_lc.index("start") + 1 if "start" in header_sheet_lc else None
+            if idx_col:
+                for r in df.index[to_fill]:
+                    cell = rowcol_to_a1(r + 2, idx_col)
+                    updates.append({"range": cell, "values": [[df.at[r, "Start"]]]})
+
+    # Preenche End
+    if "End" in df.columns:
+        empty_mask = df["End"].astype(str).str.strip().eq("")
+        fill_vals = df["criativo_norm"].map(map_end)
+        to_fill = empty_mask & fill_vals.notna()
+
+        filled = int(to_fill.sum())
+        log.info("Preenchendo 'End' via Ad name: %d células", filled)
+
+        df.loc[to_fill, "End"] = fill_vals[to_fill]
+
+        if write_back and filled > 0:
+            idx_col = header_sheet_lc.index("end") + 1 if "end" in header_sheet_lc else None
+            if idx_col:
+                for r in df.index[to_fill]:
+                    cell = rowcol_to_a1(r + 2, idx_col)
+                    updates.append({"range": cell, "values": [[df.at[r, "End"]]]})
+
+    # Executa write-back
+    if write_back and updates:
+        for block in _chunk(updates, MAX_CELLS):
+            worksheet.batch_update(block, value_input_option="RAW")
+        log.info("fill_missing_start_end: wrote %d cells", len(updates))
+    else:
+        log.info("fill_missing_start_end: no updates needed.")
+
+    return df
 
 
 def transformar_para_date(valor):
@@ -935,6 +1055,7 @@ def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
         df['Fim_da_Campanha'] = ""
 
     return df
+
 
 
 # utils/fields_lists.py
@@ -1075,10 +1196,23 @@ REACH_MODEL_COLUMN_ORDER =  [
 ]
 
 
+# utils/filter_lists.py
+
+from typing import List
+
+# List of campaign names to be filtered out before writing to destination
+CAMPAIGN_NAME_FILTER_LIST: List[str] = [
+    # Add campaign names here that should be excluded
+    # e.g.: "Test Campaign", "Internal Promo"
+"TOPVIEW-20250321-Q-20250301460526-2025031002130"]
+
+
 # utils/filter_utils.py
 
 import pandas as pd
-
+from utils.filter_lists import CAMPAIGN_NAME_FILTER_LIST
+import logging
+from typing import List
 
 def remove_zero_impressoes(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -1101,6 +1235,34 @@ def remove_zero_impressoes(df: pd.DataFrame) -> pd.DataFrame:
     # Filtra somente valores > 0
     return df[df['Impressoes'] > 0]
 
+
+def filter_campaign_names(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove rows where the 'Campanha' column matches any name in CAMPAIGN_NAME_FILTER_LIST.
+
+    Logs:
+      • INFO: total number of rows removed
+      • INFO: the unique list of campaign names filtered
+      • If no filtering occurred, logs that as well.
+    """
+    logging.debug("Applying campaign name filter: %s", CAMPAIGN_NAME_FILTER_LIST)
+    if 'Campanha' not in df.columns:
+        logging.warning("'Campanha' column not found; skipping campaign name filter.")
+        return df
+
+    mask = df['Campanha'].isin(CAMPAIGN_NAME_FILTER_LIST)
+    removed_count = int(mask.sum())
+    filtered_campaigns = df.loc[mask, 'Campanha'].drop_duplicates().tolist()
+
+    if removed_count > 0:
+        logging.info("🚫 Filtered out %d row(s) matching blocked campaign names:", removed_count)
+        for name in filtered_campaigns:
+            logging.info("   • %s", name)
+    else:
+        logging.info("✅ No campaign names matched the filter list; nothing removed.")
+
+    # Return only the rows we keep
+    return df.loc[~mask].copy()
 
 # utils/geo_normalize.py
 
@@ -1591,6 +1753,32 @@ def normalize_name(nome):
     return no_accents
 
 
+def normalize_campaign_series(series: pd.Series) -> pd.Series:
+    """
+    Normaliza uma Series contendo nomes de campanhas:
+    
+    - Converte cada valor para string.
+    - Remove espaços no início e fim.
+    - Converte para minúsculo.
+    - Remove acentuação e caracteres especiais.
+
+    Parâmetros:
+        series (pd.Series): Série contendo os nomes de campanha.
+
+    Retorna:
+        pd.Series: Série normalizada.
+    """
+    logger = logging.getLogger(__name__)
+    logger.debug("normalize_campaign_series: normalizando série com %d elementos", len(series))
+
+    return (
+        series
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .map(lambda x: unicodedata.normalize("NFKD", x))
+        .map(lambda x: ''.join(c for c in x if not unicodedata.combining(c)))
+    )
 
 
 
@@ -1852,47 +2040,58 @@ def normalize_gender(value) -> str:
     logging.debug("Capitalized '%s' to '%s'", val, result)
     return result
 
-def convert_numeric_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+def _clean_numeric_series(s: pd.Series) -> pd.Series:
     """
-    Convert specified columns from Brazilian-style numeric strings
-    ('.' thousands separator, ',' decimal separator) to numeric dtype,
-    filling invalid or missing entries with zero.
-
-    Logs each step for easier debugging.
-    
-    Parameters:
-        df (pd.DataFrame): Input DataFrame.
-        columns (list[str]): List of column names to convert.
-
-    Returns:
-        pd.DataFrame: The same DataFrame, with the specified columns converted.
+    Converte uma Series de strings no formato BR para float,
+    trocando vírgula por ponto, removendo separador de milhar
+    e preenchendo vazios com zero.
     """
-    logging.debug(">>> In converter_colunas_numericas; columns to convert: %s", columns)
+    s = s.astype(str)
+    s = s.str.replace("\u00a0", "", regex=False)                         # NB-space
+    s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)            # milhar
+    s = s.str.replace(",", ".", regex=False)                             # decimal
+    return pd.to_numeric(s, errors="coerce").fillna(0)
+
+
+def convert_numeric_columns(df: pd.DataFrame,
+                            columns: list[str]) -> pd.DataFrame:
+    out = df.copy()
+
     for col in columns:
-        if col not in df.columns:
-            logging.debug("Column '%s' not found in DataFrame; skipping.", col)
+        if col not in out.columns:
+            logging.debug("convert_numeric_columns: Column '%s' not found; skipping.", col)
             continue
 
-        logging.debug("Converting column '%s'", col)
-        # Work on a string Series to strip and replace formatting
-        s = df[col].astype(str)
-        logging.debug("  Original head: %s", s.head(5).tolist())
+        obj = out[col]
 
-        # 1) Remove non-breaking spaces
-        s = s.str.replace("\u00a0", "", regex=False)
-        # 2) Remove thousands separators (dots)
-        s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)
-        # 3) Convert comma decimals to dot
-        s = s.str.replace(",", ".", regex=False)
+        # ------------------------------------------------------------------
+        # 1) Coluna única
+        # ------------------------------------------------------------------
+        if isinstance(obj, pd.Series):
+            out[col] = _clean_numeric_series(obj)
+            logging.debug("convert_numeric_columns: Converted '%s' – first 5 values: %s",
+                          col, out[col].head(5).tolist())
+            continue
 
-        # 4) Convert to numeric, coercing errors to NaN, then fill with 0
-        converted = pd.to_numeric(s, errors="coerce").fillna(0)
-        logging.debug("  Converted head: %s", converted.head(5).tolist())
+        # ------------------------------------------------------------------
+        # 2) Coluna duplicada
+        # ------------------------------------------------------------------
+        n_copies = obj.shape[1]
+        logging.warning("[convert_numeric_columns] Duplicate column '%s' detected "
+                        "(%d copies) – aggregating with sum.", col, n_copies)
 
-        df[col] = converted
+        cleaned_parts = [_clean_numeric_series(obj.iloc[:, i]) for i in range(n_copies)]
+        agg_series = pd.concat(cleaned_parts, axis=1).sum(axis=1)
 
-    return df
+        # ---> coloca apenas UMA coluna com o resultado
+        out[col] = agg_series
+        # remove as demais cópias agora
+        out = out.loc[:, ~out.columns.duplicated(keep="first")]
 
+        logging.debug("convert_numeric_columns: Aggregated '%s' – first 5 values: %s",
+                      col, agg_series.head(5).tolist())
+
+    return out
 
 def format_columns_to_comma_decimal(df: pd.DataFrame, cols: list[str], decimals: int = 2) -> pd.DataFrame:
     """
@@ -1934,8 +2133,6 @@ def format_columns_to_comma_decimal(df: pd.DataFrame, cols: list[str], decimals:
 
     return df
 
-import logging
-
 def extract_meta_platform_from_placement(placement: str) -> str:
     """
     Determine the ad vehicle based on the placement string.
@@ -1966,46 +2163,46 @@ def extract_meta_platform_from_placement(placement: str) -> str:
     return "Facebook"
 
 
-def apply_arbitrary_id_content_replacements(
-    df: pd.DataFrame,
-    mapping_excecoes: dict[str, str]
-) -> pd.DataFrame:
-    """
-    Aplica substituições manuais para o campo 'ID_Content' com base em exceções.
+# def apply_arbitrary_id_content_replacements(
+#     df: pd.DataFrame,
+#     mapping_excecoes: dict[str, str]
+# ) -> pd.DataFrame:
+#     """
+#     Aplica substituições manuais para o campo 'ID_Content' com base em exceções.
 
-    Para cada linha, normaliza o valor atual de 'ID_Content' (strip + lowercase)
-    e, se existir em `mapping_excecoes`, substitui pelo valor mapeado.
-    Caso contrário, mantém o original.
+#     Para cada linha, normaliza o valor atual de 'ID_Content' (strip + lowercase)
+#     e, se existir em `mapping_excecoes`, substitui pelo valor mapeado.
+#     Caso contrário, mantém o original.
 
-    Parâmetros:
-        df (pd.DataFrame): DataFrame de entrada contendo a coluna 'ID_Content'.
-        mapping_excecoes (dict[str, str]): Dicionário de exceções a aplicar.
-            - Chave: valor original normalizado de 'ID_Content'.
-            - Valor: nova string a escrever em 'ID_Content'.
+#     Parâmetros:
+#         df (pd.DataFrame): DataFrame de entrada contendo a coluna 'ID_Content'.
+#         mapping_excecoes (dict[str, str]): Dicionário de exceções a aplicar.
+#             - Chave: valor original normalizado de 'ID_Content'.
+#             - Valor: nova string a escrever em 'ID_Content'.
 
-    Retorna:
-        pd.DataFrame: cópia do DataFrame com a coluna 'ID_Content' atualizada
-                      segundo as exceções definidas.
-    """
-    logger = logging.getLogger(__name__)
+#     Retorna:
+#         pd.DataFrame: cópia do DataFrame com a coluna 'ID_Content' atualizada
+#                       segundo as exceções definidas.
+#     """
+#     logger = logging.getLogger(__name__)
 
-    if "ID_Content" not in df.columns:
-        logger.debug("Coluna 'ID_Content' não encontrada. Nenhuma substituição aplicada.")
-        return df
+#     if "ID_Content" not in df.columns:
+#         logger.debug("Coluna 'ID_Content' não encontrada. Nenhuma substituição aplicada.")
+#         return df
 
-    df = df.copy()
-    orig_series = df["ID_Content"].astype(str)
-    norm_series = orig_series.str.strip().str.lower()
+#     df = df.copy()
+#     orig_series = df["ID_Content"].astype(str)
+#     norm_series = orig_series.str.strip().str.lower()
     
-    logger.debug("apply_arbitrary_id_content_replacements: carregadas %d regras", len(mapping_excecoes))
-    # Aplica o mapeamento
-    df["ID_Content"] = norm_series.map(lambda x: mapping_excecoes.get(x, x))
+#     logger.debug("apply_arbitrary_id_content_replacements: carregadas %d regras", len(mapping_excecoes))
+#     # Aplica o mapeamento
+#     df["ID_Content"] = norm_series.map(lambda x: mapping_excecoes.get(x, x))
     
-    # Conta quantas efetivamente mudaram (comparing normalized originals)
-    replaced = int((norm_series != df["ID_Content"].astype(str).str.strip().str.lower()).sum())
-    logger.debug("Total de valores substituídos em 'ID_Content': %d", replaced)
+#     # Conta quantas efetivamente mudaram (comparing normalized originals)
+#     replaced = int((norm_series != df["ID_Content"].astype(str).str.strip().str.lower()).sum())
+#     logger.debug("Total de valores substituídos em 'ID_Content': %d", replaced)
 
-    return df
+#     return df
 
 
 # utils/numeracao.py
@@ -2285,16 +2482,212 @@ def renomear_colunas_origem_para_modelo(df):
 
 # utils/setup_logging.py
 
-import logging
+# utils/setup_logging.py
 
-def setup_logging(level=logging.DEBUG):
+import logging
+from logging import StreamHandler, FileHandler, Formatter
+from typing import Optional
+
+def setup_logging(
+    level: int = logging.INFO,
+    log_file: Optional[str] = "etl_geral.log",
+    console: bool = True,
+):
     """
-    Configura o log do projeto com o nível especificado e um formato padrão.
-    
-    Parâmetros:
-        level (int, opcional): Nível de log (ex: logging.INFO, logging.DEBUG). Padrão: logging.INFO.
+    Configura logging padrão para console e (opcionalmente) para arquivo.
+
+    Parameters
+    ----------
+    level : int
+        Nível de logging (e.g. logging.DEBUG, logging.INFO).
+    log_file : str | None
+        Caminho do arquivo de log. Se None, não grava em arquivo.
+    console : bool
+        Se True, adiciona handler para stdout.
     """
-    logging.basicConfig(level=level, format='%(levelname)s: %(message)s')
+    # Remove handlers pré-existentes (evita duplicação)
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        root.removeHandler(h)
+
+    handlers = []
+    fmt = Formatter("%(asctime)s | %(levelname)-5s | %(name)s:%(lineno)d | %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S")
+
+    if console:
+        ch = StreamHandler()
+        ch.setLevel(level)
+        ch.setFormatter(fmt)
+        handlers.append(ch)
+
+    if log_file:
+        fh = FileHandler(log_file, encoding="utf-8")
+        fh.setLevel(level)
+        fh.setFormatter(fmt)
+        handlers.append(fh)
+
+    logging.basicConfig(level=level, handlers=handlers)
+
+
+# utils/substitute_origin_values.py
+
+import logging
+import itertools
+from typing import Mapping, Iterable, Optional, List, Dict
+
+import pandas as pd
+from gspread.utils import rowcol_to_a1
+from gspread import Worksheet
+
+from utils.substitutions_lists import (
+    ID_CONTENT_REPLACEMENTS,
+    CAMPAIGN_NAME_REPLACEMENTS,
+    AD_GROUP_NAME_REPLACEMENTS,
+    AD_NAME_REPLACEMENTS
+)
+from utils.get_google_client import get_google_client
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+
+__all__ = [
+    "apply_all_origin_substitutions",
+]
+
+# ---------------------------------------------------------------------------
+# Configurações
+# ---------------------------------------------------------------------------
+
+_REPLACEMENT_SPECS: list[tuple[str, Mapping[str, str]]] = [
+    ("Content (utm)", ID_CONTENT_REPLACEMENTS),
+    ("Campaign name", CAMPAIGN_NAME_REPLACEMENTS),
+    ("Ad group name", AD_GROUP_NAME_REPLACEMENTS),
+    ("Ad group name", AD_NAME_REPLACEMENTS)
+]
+
+# Segurança contra payloads enormes; 10k células ≅ 5 MiB.
+_MAX_CELLS_PER_BATCH = 10_000
+
+# ---------------------------------------------------------------------------
+# Helpers internos (mantidos privados deliberadamente)
+# ---------------------------------------------------------------------------
+
+
+def _normalize_series(s: pd.Series) -> pd.Series:
+    """Normaliza *strings* – strip + lower. Preserva NaN como string vazia."""
+    return s.fillna("").astype(str).str.strip().str.lower()
+
+
+def _chunk(it: Iterable, n: int):
+    """Yield blocos de tamanho *n* sem levantar StopIteration externamente."""
+    it = iter(it)
+    while True:
+        block = list(itertools.islice(it, n))
+        if not block:
+            break
+        yield block
+
+
+# ---------------------------------------------------------------------------
+# Função pública
+# ---------------------------------------------------------------------------
+
+
+def apply_all_origin_substitutions(
+    df: pd.DataFrame,
+    sheet_name: Optional[str] = None,
+    *,
+    worksheet: Worksheet | None = None,
+    write_back: bool = True,
+    inplace: bool = True,
+) -> pd.DataFrame:
+    """Substitui valores *in‑place* nas colunas de origem e, opcionalmente,
+    grava as mudanças na planilha Google.
+
+    A lógica é idêntica à versão original, porém:
+    • Header do Sheets é normalizado para *lower* → robusto a capitalização.
+    • Menos conversões redundantes (normaliza série **uma** vez).
+    • Evita re‑normalizar amostras de log.
+    • Usa list‑comprehension mais enxuta para construir *updates*.
+    • Mantém compatibilidade 100 % com a API e com os parâmetros da função.
+    """
+
+    log = logging.getLogger(__name__)
+
+    if not inplace:
+        df = df.copy()
+
+    # --- prepara worksheet / cabeçalho ------------------------------------ #
+    if write_back:
+        if worksheet is None:
+            if not sheet_name:
+                raise ValueError("sheet_name é obrigatório se write_back=True e worksheet=None.")
+            client = get_google_client(CREDS_PATH)
+            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+        header_sheet: list[str] = worksheet.row_values(1)
+        header_sheet_lc: list[str] = [h.strip().lower() for h in header_sheet]
+
+    # Mantemos um index consistente para mapear linhas → A1.
+    df.reset_index(drop=True, inplace=True)
+
+    # --- loop pelas colunas alvo ----------------------------------------- #
+    updates: list[Dict[str, object]] = []
+
+    for col_name, mapping in _REPLACEMENT_SPECS:
+        if col_name not in df.columns:
+            log.debug("[subst] coluna ausente: %s", col_name)
+            continue
+        if not mapping:
+            log.debug("[subst] mapping vazio para %s", col_name)
+            continue
+
+        # Normaliza apenas UMA vez
+        s_norm = _normalize_series(df[col_name])
+        mask = s_norm.isin(mapping)  # bool Series
+        n_changes = int(mask.sum())
+        if n_changes == 0:
+            log.debug("[subst] nenhuma ocorrência em %s", col_name)
+            continue
+
+        # Logging de amostra (não re‑normaliza)
+        sample_before = df.loc[mask, col_name].head(3).to_list()
+        sample_after = [mapping[_normalize_series(pd.Series([v]))[0]] for v in sample_before]
+        log.debug(
+            "[subst] %d alterações em '%s'. Ex.: %s → %s",
+            n_changes,
+            col_name,
+            sample_before,
+            sample_after,
+        )
+
+        # Aplica substituição usando Series.map
+        df.loc[mask, col_name] = s_norm[mask].map(mapping)
+
+        # --- write‑back --------------------------------------------------- #
+        if write_back:
+            col_lookup = col_name.strip().lower()
+            try:
+                col_idx_1based = header_sheet_lc.index(col_lookup) + 1
+            except ValueError:
+                log.warning("[subst] '%s' não encontrado no header da planilha – skip write‑back", col_name)
+                continue
+
+            updates.extend(
+                {
+                    "range": rowcol_to_a1(row_i + 2, col_idx_1based),
+                    "values": [[df.at[row_i, col_name]]],
+                }
+                for row_i in df.index[mask]
+            )
+            log.info("[subst] %d células preparadas para gravação em '%s'", n_changes, col_name)
+
+    # --- envia batch updates --------------------------------------------- #
+    if write_back and updates:
+        for block in _chunk(updates, _MAX_CELLS_PER_BATCH):
+            worksheet.batch_update(block, value_input_option="RAW")
+        log.info("[subst] gravação concluída – total de %d células", len(updates))
+    elif write_back:
+        log.info("[subst] nenhuma célula a gravar – nada foi alterado")
+
+    return df
 
 
 # utils/substitutions_lists.py
@@ -2313,6 +2706,34 @@ ID_CONTENT_REPLACEMENTS: dict[str, str] = {
 
 Chave: valor exato vindo de 'Content (utm)' (após strip e lowercase).  
 Valor: string que deve substituir o original em 'ID_Content'.  
+"""
+
+CAMPAIGN_NAME_REPLACEMENTS: dict[str, str] = {
+    "topview-20250321-q-20250301460526-2025031002130": "2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM",
+}
+"""Substituições específicas para o campo 'Campaign name'.
+
+Chave: valor exato vindo da origem (após strip e lowercase).  
+Valor: string que deve substituir o nome da campanha.  
+"""
+
+AD_GROUP_NAME_REPLACEMENTS: dict[str, str] = {
+    "topview-br-20250321-q-20250301460526-2025031076487": "2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM",
+}
+"""Substituições específicas para o campo 'Ad group name'.
+
+Chave: valor exato vindo da origem (após strip e lowercase).  
+Valor: string que deve substituir o nome do grupo de anúncio.  
+"""
+
+
+AD_NAME_REPLACEMENTS: dict[str, str] = {
+    "Ad name2025-03-20 18:28:41": "2025_3_BR_VÍDEO_RESPOSTA_BRANDED_MISSION_1_ACAO_DBT_SBRAE_2025_EMP_FEM0062",
+}
+"""Substituições específicas para o campo 'Ad name'.
+
+Chave: valor exato vindo da origem (após strip e lowercase).  
+Valor: string que deve substituir o nome do grupo de anúncio.  
 """
 
 
@@ -2375,5 +2796,126 @@ for valor in valores_para_teste:
 
 # Exibe o resultado como JSON formatado
 print(json.dumps(resultados, indent=2, ensure_ascii=False))
+
+
+# utils/utm_lookup.py
+
+import pandas as pd
+import logging
+
+def load_utm_mapping() -> dict[str, dict[str, str]]:
+    """
+    Loads the BI_PARAMETRIZAÇÃO sheet and returns a mapping:
+    { utm_content_lower -> {"START": start_date_str, "END": end_date_str} }.
+    """
+    from utils.get_google_client import get_google_client
+    from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+    from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+
+    logger = logging.getLogger("load_utm_mapping")
+    logger.debug("Loading UTM mapping from BI_PARAMETRIZAÇÃO")
+
+    client = get_google_client(CREDS_PATH)
+    df = read_sheet_as_dataframe_range(
+        client,
+        SPREADSHEET_ID,
+        sheet_name="BI_PARAMETRIZAÇÃO",
+        range_str="A2:ZZ",
+        header_row_index=0
+    )
+
+    # Safely get the UTM_CONTENT column or create an empty one
+    if "UTM_CONTENT" in df.columns:
+        utm_series = (
+            df["UTM_CONTENT"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+    else:
+        logger.warning("Column 'UTM_CONTENT' not found in BI_PARAMETRIZAÇÃO; using empty keys")
+        utm_series = pd.Series([""] * len(df), index=df.index)
+
+    df = df.copy()
+    df["utm_content"] = utm_series
+
+    mapping: dict[str, dict[str, str]] = {}
+    for _, row in df.iterrows():
+        key = row["utm_content"]
+        if key:
+            mapping[key] = {
+                "START": row.get("START", ""),
+                "END":   row.get("END",   "")
+            }
+
+    logger.info(f"Loaded {len(mapping)} UTM entries for start/end lookup")
+    return mapping
+
+
+# utils/utm_lookup.py
+import logging
+import pandas as pd
+
+log = logging.getLogger(__name__)
+
+def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.DataFrame:
+    """
+    Fill missing 'Inicio_da_Campanha' / 'Fim_da_Campanha' by looking-up the
+    utm_content in *utm_mapping* (dict: utm -> {"START":…, "END":…}).
+
+    • Ignora linhas cujo “Content (utm)” esteja vazio.  
+    • Mantém valores originais quando já preenchidos.  
+    • Faz log INFO com contagem de linhas realmente preenchidas.
+    """
+    if not utm_mapping:
+        log.info("[utm_lookup] Empty mapping – nothing to fill.")
+        return df
+
+    df = df.copy()
+
+    # 1) Normalised key
+    df["_utm_key"] = (
+        df.get("Content (utm)", "")
+          .astype(str)
+          .str.strip()
+          .str.lower()
+    )
+
+    # 2) Build lookup Series once
+    start_lkp = pd.Series(
+        {k: v["START"] for k, v in utm_mapping.items()},
+        name="Inicio_da_Campanha_lookup",
+    )
+    end_lkp = pd.Series(
+        {k: v["END"] for k, v in utm_mapping.items()},
+        name="Fim_da_Campanha_lookup",
+    )
+
+    # 3) Existing cols (may not exist yet)
+    if "Inicio_da_Campanha" not in df.columns:
+        df["Inicio_da_Campanha"] = ""
+    if "Fim_da_Campanha" not in df.columns:
+        df["Fim_da_Campanha"] = ""
+
+    # 4) Only replace blanks / NA
+    before_start_na = df["Inicio_da_Campanha"].eq("").sum()
+    before_end_na   = df["Fim_da_Campanha"].eq("").sum()
+
+    df.loc[df["Inicio_da_Campanha"].eq(""), "Inicio_da_Campanha"] = (
+        df.loc[df["Inicio_da_Campanha"].eq(""), "_utm_key"].map(start_lkp)
+    )
+    df.loc[df["Fim_da_Campanha"].eq(""), "Fim_da_Campanha"] = (
+        df.loc[df["Fim_da_Campanha"].eq(""), "_utm_key"].map(end_lkp)
+    )
+
+    filled_start = before_start_na - df["Inicio_da_Campanha"].eq("").sum()
+    filled_end   = before_end_na   - df["Fim_da_Campanha"].eq("").sum()
+
+    log.info(
+        "[utm_lookup] Filled Start/End from UTM — Start:%s  End:%s",
+        filled_start, filled_end
+    )
+
+    return df.drop(columns="_utm_key")
 
 
