@@ -10,6 +10,7 @@ from gspread.utils import rowcol_to_a1
 from utils.get_google_client import get_google_client
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 import unicodedata
+
 # regex para detectar exatamente "YYYY-MM-DD hh:mm:ss"
 _TIME_STAMP_RE = _re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
@@ -122,6 +123,72 @@ def normalize_date_columns(
     if write_back and updates:
         worksheet.batch_update(updates, value_input_option="RAW")
         log.info(f"[normalize_date_columns] {len(updates)} células atualizadas no Sheets")
+
+    return df
+
+
+def fill_empty_objective_with_reach(
+    df: pd.DataFrame,
+    *,
+    sheet_name: Optional[str] = None,
+    worksheet: Worksheet | None = None,
+    write_back: bool = False,
+    inplace: bool = False,
+) -> pd.DataFrame:
+    """
+    Substitui células vazias na coluna 'Campaign objective type' por 'REACH'.
+    Se write_back=True, grava os valores diretamente na aba de origem do Google-Sheets.
+
+    Parâmetros
+    ----------
+    df : pd.DataFrame
+    sheet_name : nome da aba (necessário para write_back)
+    worksheet : objeto Worksheet já inicializado (opcional)
+    write_back : se True, faz batch_update no Sheets
+    inplace : se False, trabalha em cópia de df
+    """
+    log = logging.getLogger(__name__)
+    if not inplace:
+        df = df.copy()
+
+    col = "Campaign objective type"
+    if col not in df.columns:
+        log.warning(f"[fill_empty_objective_with_reach] coluna '{col}' não encontrada; nada a fazer.")
+        return df
+
+    # preparar worksheet se for gravar
+    if write_back:
+        if worksheet is None:
+            if not sheet_name:
+                raise ValueError("sheet_name é obrigatório quando write_back=True")
+            client = get_google_client(CREDS_PATH)
+            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+        header = worksheet.row_values(1)
+        header_lc = [h.strip().lower() for h in header]
+
+        try:
+            col_idx = header_lc.index(col.lower()) + 1
+        except ValueError:
+            log.warning(f"[fill_empty_objective_with_reach] header não contém '{col}'; skip write-back")
+            write_back = False
+
+    # máscara de vazios
+    mask = df[col].astype(str).str.strip() == ""
+    total = int(mask.sum())
+    if total == 0:
+        log.debug(f"[fill_empty_objective_with_reach] nenhuma célula vazia em '{col}'")
+        return df
+
+    log.info(f"[fill_empty_objective_with_reach] preenchendo {total} células vazias em '{col}' com 'REACH'")
+    df.loc[mask, col] = "REACH"
+
+    if write_back:
+        updates = []
+        for r in df.index[mask]:
+            a1 = rowcol_to_a1(r + 2, col_idx)
+            updates.append({"range": a1, "values": [["REACH"]]})
+        worksheet.batch_update(updates, value_input_option="RAW")
+        log.info(f"[fill_empty_objective_with_reach] gravadas {len(updates)} células no Sheets")
 
     return df
 

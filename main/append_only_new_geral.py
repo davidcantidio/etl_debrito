@@ -19,7 +19,7 @@ from utils.get_missing_records import get_missing_records
 from utils.append_records_to_sheet import append_records_to_sheet
 from utils.get_google_client import get_google_client
 from utils.common_linkedin import preparar_kwargs_linkedin
-from utils.normalize import normalize_date_columns
+from utils.normalize import normalize_date_columns, fill_empty_objective_with_reach
 from scripts.etl_geral import (
     MetaGeralETL,
     TiktokGeralETL,
@@ -88,9 +88,15 @@ def run_etl_geral():
             sheet_name=source_sheet,   # necessário para batch_update
             write_back=True,
             inplace=True            # grava também no Sheets
-        )
+                )
 
-        # 4) Filtra linhas vazias de Date
+        df_origin = fill_empty_objective_with_reach(
+            df_origin,
+            sheet_name=source_sheet,   # necessário para gravação
+            write_back=True,
+            inplace=True,
+        )
+                # 4) Filtra linhas vazias de Date
         if "Date" in df_origin.columns:
             df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
         logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
