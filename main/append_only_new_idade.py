@@ -18,6 +18,8 @@ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.get_missing_records import get_missing_records
 from utils.append_records_to_sheet import append_records_to_sheet
 from utils.normalize import format_columns_to_comma_decimal
+from utils.substitute_origin_values import apply_all_origin_substitutions
+
 # Importação dos ETLs de idade
 from scripts.etl_idade import (
     MetaIdadeETL,
@@ -77,6 +79,15 @@ def run_etl_idade():
         if "Date" in df_origin.columns:
             df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
         logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
+
+        # --- substituições manuais de valores vindos da origem --------------
+        df_origin = apply_all_origin_substitutions(
+            df_origin,
+            sheet_name=source_sheet,   # para que o write-back funcione
+            write_back=True,
+            inplace=True
+        )
+
 
         logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
         mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)

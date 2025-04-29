@@ -19,7 +19,7 @@ from utils.get_missing_records import get_missing_records
 from utils.append_records_to_sheet import append_records_to_sheet
 from utils.get_google_client import get_google_client
 from utils.common_linkedin import preparar_kwargs_linkedin
-
+from utils.normalize import normalize_date_columns
 from scripts.etl_geral import (
     MetaGeralETL,
     TiktokGeralETL,
@@ -59,12 +59,13 @@ def run_etl_geral():
         # 1) Leitura dos dados de origem
         logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
         df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
-        # 🔵 ADICIONE ISSO AQUI PARA VERIFICAR O CABEÇALHO REAL:
+
         client = get_google_client(creds_path)
         sheet = client.open_by_key(spreadsheet_id).worksheet(source_sheet)
         headers = sheet.row_values(1)
         logging.debug(f"Cabeçalho real encontrado na aba '{source_sheet}': {headers}")
-        # 2) Substituições de exceção (in-place + grava no Sheets)
+        # 2) Substituições de exceção (in-place + grava no Sheets)]
+
         df_origin = apply_all_origin_substitutions(
             df_origin,
             sheet_name=source_sheet,
@@ -72,6 +73,14 @@ def run_etl_geral():
             inplace=True
         )
 
+        
+        df_origin = normalize_date_columns(
+            df_origin,
+            date_columns=["Date", "Start", "End"],
+            sheet_name=source_sheet,
+            write_back=True,
+            inplace=True,
+        )
         # 3) Preenche Start/End faltantes via BI_PARAMETRIZAÇÃO (com write_back se desejar)
         logging.info("Preenchendo datas Start/End faltantes a partir de BI_PARAMETRIZAÇÃO…")
         df_origin = fill_missing_start_end_from_params(

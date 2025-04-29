@@ -1,8 +1,129 @@
 # utils/normalize.py
 
-import unicodedata
-import pandas as pd
 import logging
+import datetime as _dt
+import re as _re
+import pandas as pd
+from typing import List, Optional
+from gspread import Worksheet
+from gspread.utils import rowcol_to_a1
+from utils.get_google_client import get_google_client
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+import unicodedata
+# regex para detectar exatamente "YYYY-MM-DD hh:mm:ss"
+_TIME_STAMP_RE = _re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+
+def _try_manual_parse(val: str) -> Optional[_dt.date]:
+    """
+    Tenta converter strings no formato 'YYYY-MM-DD HH:MM:SS' em date.
+    Retorna date ou None.
+    """
+    if not isinstance(val, str):
+        return None
+    txt = val.strip()
+    if not _TIME_STAMP_RE.fullmatch(txt):
+        return None
+    try:
+        return _dt.datetime.strptime(txt, "%Y-%m-%d %H:%M:%S").date()
+    except ValueError:
+        return None
+
+def normalize_date_columns(
+    df: pd.DataFrame,
+    date_columns: Optional[List[str]] = None,
+    *,
+    sheet_name: Optional[str] = None,
+    worksheet: Worksheet | None = None,
+    write_back: bool = False,
+    inplace: bool = False,
+) -> pd.DataFrame:
+    """
+    Converte colunas datetime → YYYY-MM-DD.
+    Se write_back=True, grava as strings no Google Sheets.
+    """
+    log = logging.getLogger(__name__)
+    if not inplace:
+        df = df.copy()
+
+    # prepara worksheet para write_back
+    if write_back:
+        if worksheet is None:
+            if not sheet_name:
+                raise ValueError("sheet_name é obrigatório quando write_back=True")
+            client = get_google_client(CREDS_PATH)
+            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+        header = worksheet.row_values(1)
+        header_lc = [h.strip().lower() for h in header]
+
+    # mapeia lower→real col name
+    col_lookup = {c.lower(): c for c in df.columns}
+    if date_columns is None:
+        # auto detecta colunas date, start, end
+        date_columns = [
+            real for low, real in col_lookup.items()
+            if "date" in low or low in {"start", "end"}
+        ]
+
+    updates = []
+    for col in date_columns:
+        low = col.lower()
+        if low not in col_lookup:
+            log.debug(f"[normalize_date_columns] coluna '{col}' não encontrada; pulando.")
+            continue
+        real = col_lookup[low]
+        orig = df[real]
+
+        # 1) parse principal
+        parsed = pd.to_datetime(orig, errors="coerce")
+
+        # 2) extraia só date para quem parseou bem
+        good_mask = ~parsed.isna()
+        dates = parsed.dt.date
+
+        # 3) second pass manual apenas nas falhas
+        bad_idx = parsed[~good_mask].index
+        manual_dates = orig.loc[bad_idx].apply(_try_manual_parse)
+        # manual_dates é Series de date ou None
+        # combine: para idx bons use dates, para idx manuais use manual_dates, pro resto ""
+        final_values = []
+        for i in df.index:
+            if good_mask.iat[i]:
+                final_values.append(dates.iat[i])
+            else:
+                md = manual_dates.get(i)
+                final_values.append(md if isinstance(md, _dt.date) else "")
+
+        # 4) logging das falhas
+        failed = sum(1 for v in final_values if v == "")
+        if failed:
+            samples = orig[ [i for i,v in enumerate(final_values) if v==""] ][:3].astype(str).drop_duplicates().tolist()
+            log.warning(f"[normalize_date_columns] {failed} valores inválidos em '{real}' (ex.: {samples})")
+
+        # 5) prepare write-back e atribuição
+        changed_mask = orig.astype(str) != [ (v.isoformat() if isinstance(v,_dt.date) else "") for v in final_values ]
+
+        # atribui no DataFrame (date ou string)
+        df[real] = final_values
+
+        if write_back and changed_mask.any():
+            # busca coluna no header do Sheet
+            try:
+                col_idx = header_lc.index(real.lower()) + 1
+            except ValueError:
+                log.warning(f"'{real}' não existe no header do Sheets; skip write-back")
+                continue
+
+            for r in df.index[changed_mask]:
+                v = df.at[r, real]
+                cell_val = v.isoformat() if isinstance(v, _dt.date) else ""
+                updates.append({"range": rowcol_to_a1(r+2, col_idx), "values": [[cell_val]]})
+
+    # 6) envia batch
+    if write_back and updates:
+        worksheet.batch_update(updates, value_input_option="RAW")
+        log.info(f"[normalize_date_columns] {len(updates)} células atualizadas no Sheets")
+
+    return df
 
 
 def normalize_campaign_name(value):
@@ -135,7 +256,6 @@ def normalize_columns(columns: pd.Index) -> pd.Index:
 
     logger.debug("normalize_columns: colunas normalizadas %r", list(result))
     return result
-
 
 
 def normalize_parametrizacao_values(df: pd.DataFrame, cols: list[str] = None) -> pd.DataFrame:

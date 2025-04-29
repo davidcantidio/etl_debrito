@@ -56,6 +56,11 @@ class BaseGeralETL:
         logging.debug("Converting date fields")
         self.df = converter_data(self.df, 'Data')
         self.df = converter_data(self.df, 'Inicio_da_Campanha')
+        log = logging.getLogger(__name__)
+
+        log.info("TIPOS em 'Fim_da_Campanha':")
+        log.info("\n%s", self.df["Fim_da_Campanha"].apply(lambda x: type(x)).value_counts())
+
         self.df = converter_data(self.df, 'Fim_da_Campanha')
         logging.debug(f"Converting numeric columns: {NUMERIC_COLUMNS}")
         self.df = convert_numeric_columns(self.df, NUMERIC_COLUMNS)
