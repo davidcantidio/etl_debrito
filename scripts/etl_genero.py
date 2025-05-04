@@ -95,7 +95,7 @@ class MetaGeneroETL(BaseGeneroETL):
             header_row_index=0
         )
         # soma raw em decimal
-        soma_raw = convert_numeric_columns(df_raw, ["Cost"])["Cost"].sum()
+        soma_raw = convert_numeric_columns(df_raw, ["cost"])["cost"].sum()
 
         # 1) Carrega e converte vírgula→ponto decimal ------------------
         df_gender       = load_and_prepare_meta_gender_data()
@@ -110,23 +110,23 @@ class MetaGeneroETL(BaseGeneroETL):
         # 3) Merge + distribuição de métricas -------------------------
         df_dist = distribute_gender_metrics(merge_placement_and_gender_data(df_gender_piv, df_place_piv))
 
-        # 4) Campos descritivos via Ad ID -----------------------------
+        # 4) Campos descritivos via ad_id -----------------------------
         info_map = {
-            "Account name":            "Nome_da_Conta",
-            "Campaign name":           "Campaign_name",
-            "Campaign objective type": "Objetivo",
-            "Ad group name":           "Nome_do_Conjunto_de_Anuncio",
-            "Ad name":                 "Nome_do_Anuncio",
+            "account_name":            "Nome_da_Conta",
+            "campaign_name":           "Campaign_name",
+            "objective":               "Objetivo",
+            "ad_group_name":           "Nome_do_Conjunto_de_Anuncio",
+            "ad_name":                 "Nome_do_Anuncio",
         }
         df_info = (
-            df_placement[["Ad ID"] + list(info_map.keys())]
-            .drop_duplicates("Ad ID")
+            df_placement[["ad_id"] + list(info_map.keys())]
+            .drop_duplicates("ad_id")
             .rename(columns=info_map)
         )
-        df_dist = df_dist.merge(df_info, on=["Ad ID"], how="left")
+        df_dist = df_dist.merge(df_info, on=["ad_id"], how="left")
 
         # 5) Inferência de Veículo / ID_Veiculo -----------------------
-        df_dist["Placement"] = df_dist["_Plataforma"]
+        df_dist["placement"] = df_dist["_Plataforma"]
         df_dist = atribuir_veiculo_e_id_meta(df_dist)
 
         # 6) Renomeação padrão + Genero -------------------------------

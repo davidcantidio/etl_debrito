@@ -95,7 +95,7 @@ class MetaIdadeETL(BaseIdadeETL):
             range_str="A1:ZZ",
             header_row_index=0
         )
-        soma_raw = convert_numeric_columns(df_raw, ["Cost"])["Cost"].sum()
+        soma_raw = convert_numeric_columns(df_raw, ["cost"])["cost"].sum()
 
         # 1) Carrega e converte vírgula→ponto decimal ------------------
         df_age = load_and_prepare_meta_age_data()  # Carrega os dados de Age (Idade)
@@ -111,21 +111,21 @@ class MetaIdadeETL(BaseIdadeETL):
         df_dist = distribute_age_metrics(merge_placement_and_age_data(df_age_piv, df_place_piv))
 
         # 4) Garantir que 'Age' seja renomeado para 'Idade'
-        if "Age" in df_dist.columns:
-            log.debug("Coluna 'Age' encontrada no DataFrame.")
-            df_dist.rename(columns={"Age": "Idade"}, inplace=True)  # Renomeia para 'Idade'
+        if "age" in df_dist.columns:
+            log.debug("Coluna 'age' encontrada no DataFrame.")
+            df_dist.rename(columns={"age": "Idade"}, inplace=True)  # Renomeia para 'Idade'
             df_dist["Idade"] = df_dist["Idade"].apply(normalize_age)  # Normaliza 'Idade'
         else:
-            log.error("A coluna 'Age' não foi encontrada no DataFrame. Não é possível gerar 'Idade'.")
+            log.error("A coluna 'age' não foi encontrada no DataFrame. Não é possível gerar 'Idade'.")
             raise KeyError("A coluna 'Age' não foi encontrada.")
 
         # 5) Campos descritivos via Ad ID -----------------------------
         info_map = {
-            "Account name": "Nome_da_Conta",
-            "Campaign name": "Campaign_name",
-            "Campaign objective type": "Objetivo",
-            "Ad group name": "Nome_do_Conjunto_de_Anuncio",
-            "Ad name": "Nome_do_Anuncio",
+            "account_name": "Nome_da_Conta",
+            "campaign_name": "Campaign_name",
+            "objective": "Objetivo",
+            "ad_group_name": "Nome_do_Conjunto_de_Anuncio",
+            "ad_name": "Nome_do_Anuncio",
         }
         df_info = (
             df_placement[["Ad ID"] + list(info_map.keys())]
@@ -135,7 +135,7 @@ class MetaIdadeETL(BaseIdadeETL):
         df_dist = df_dist.merge(df_info, on=["Ad ID"], how="left")
 
         # 6) Inferência de Veículo / ID_Veiculo -----------------------
-        df_dist["Placement"] = df_dist["_Plataforma"]
+        df_dist["placement"] = df_dist["_Plataforma"]
         df_dist = atribuir_veiculo_e_id_meta(df_dist)
 
         # 7) Renomeação padrão + Idade -------------------------------

@@ -12,14 +12,16 @@ from utils.setup_logging import setup_logging
 from utils.substitute_origin_values import (
     apply_all_origin_substitutions,
     )
+
+from utils.creative_mapping import get_utm_content_from_ad_name, load_ad_name_mapping
 from utils.datas import fill_missing_start_end_from_params
-from utils.get_campaign_parameterization import get_campaign_parameterization
+from utils.lookups_bi_parametrizacao import get_campaign_parameterization
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.get_missing_records import get_missing_records
 from utils.append_records_to_sheet import append_records_to_sheet
 from utils.get_google_client import get_google_client
 from utils.common_linkedin import preparar_kwargs_linkedin
-from utils.normalize import normalize_date_columns, fill_empty_objective_with_reach
+from utils.normalize import normalize_date_columns, fill_empty_objective_with_reach, normalize_columns
 from scripts.etl_geral import (
     MetaGeralETL,
     TiktokGeralETL,
@@ -35,7 +37,7 @@ def run_etl_geral():
     """
     setup_logging(level=logging.DEBUG)
 
-    plataformas = ["tiktok"]
+    plataformas = ["tiktok", "meta"]
     target_sheet = "modeloGeral"
 
     for plataforma in plataformas:
@@ -96,6 +98,9 @@ def run_etl_geral():
             write_back=True,
             inplace=True,
         )
+
+
+
                 # 4) Filtra linhas vazias de Date
         if "Date" in df_origin.columns:
             df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
@@ -104,8 +109,30 @@ def run_etl_geral():
         # 5) Carrega parametrização de campanha
         logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
         mapping_campanha, mapping_sigla = get_campaign_parameterization(creds_path, spreadsheet_id)
+      
+        # --- aqui, carrega a BI_PARAMETRIZAÇÃO com header na segunda linha ---
+        client = get_google_client(creds_path)
+        df_param = read_sheet_as_dataframe_range(
+            client,
+            spreadsheet_id,
+            sheet_name="BI_PARAMETRIZAÇÃO",
+            range_str="A2:ZZ",
+            header_row_index=0
+        )
+        df_param.columns = normalize_columns(df_param.columns)
+        ad_name_mapping = load_ad_name_mapping(df_param)
+
+        # 6) Preenche utm_content via lookup
+        df_origin = get_utm_content_from_ad_name(
+            df_origin,
+            ad_name_mapping,
+            coluna_ad_name="ad_name",
+            coluna_destino="utm_content"
+        )
 
         extra_kwargs = {}
+   
+   
         if plataforma == "linkedin":
             extra_kwargs.update(preparar_kwargs_linkedin())
 

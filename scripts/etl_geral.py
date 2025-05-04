@@ -19,6 +19,7 @@ from utils.atribuicoes_via_lookup import (
     atribuir_id_veiculo_generico,
     aplicar_parametrizacao_campanha,
 )
+
 from utils.campos_calculados import (
     calcular_engajamento_total,
     inicializar_colunas_auxiliares,
@@ -136,13 +137,13 @@ class LinkedinGeralETL(BaseGeralETL):
 
     def ajustar_tipos_e_calculos(self):
         super().ajustar_tipos_e_calculos()
-        # Duplica Content (utm) para ID_Content e utm_content
-        if "Content (utm)" in self.df.columns:
-            self.df["ID_Content"] = self.df["Content (utm)"]
-            self.df["utm_content"] = self.df["Content (utm)"]
-            logging.debug("[LinkedIn] Campo 'Content (utm)' duplicado em 'ID_Content' e 'utm_content'.")
+        # Duplica utm_content para ID_Content e utm_content
+        if "utm_content" in self.df.columns:
+            self.df["ID_Content"] = self.df["utm_content"]
+            self.df["utm_content"] = self.df["utm_content"]
+            logging.debug("[LinkedIn] Campo 'utm_content' duplicado em 'ID_Content' e 'utm_content'.")
         else:
-            logging.warning("[LinkedIn] Coluna 'Content (utm)' ausente; não será possível gerar 'ID_Content' nem 'utm_content'.")
+            logging.warning("[LinkedIn] Coluna 'utm_content' ausente; não será possível gerar 'ID_Content' nem 'utm_content'.")
         # Preenche nomes de anúncio via mapeamento
         self.df = preencher_nomes_anuncio_linkedin(self.df, self.mapping_criativo)
         return self.df

@@ -96,11 +96,11 @@ class MetaRegiaoETL(BaseRegiaoETL):
 
         # 4) Campos descritivos via Ad ID
         info_map = {
-            "Account name":            "Nome_da_Conta",
-            "Campaign name":           "Campaign_name",
-            "Campaign objective type": "Objetivo",
-            "Ad group name":           "Nome_do_Conjunto_de_Anuncio",
-            "Ad name":                 "Nome_do_Anuncio",
+            "acount_name":            "Nome_da_Conta",
+            "campaign_name":           "Campaign_name",
+            "objective": "Objetivo",
+            "ad_group_name":           "Nome_do_Conjunto_de_Anuncio",
+            "ad_name":                 "Nome_do_Anuncio",
         }
         df_info = (
             df_placement[["Ad ID"] + list(info_map.keys())]
@@ -116,7 +116,7 @@ class MetaRegiaoETL(BaseRegiaoETL):
         )
 
         # 6) Veículo
-        df_dist["Placement"] = df_dist["_Plataforma"]
+        df_dist["placement"] = df_dist["_Plataforma"]
         df_dist = atribuir_veiculo_e_id_meta(df_dist)
         df_dist = renomear_colunas_origem_para_modelo(df_dist)
 

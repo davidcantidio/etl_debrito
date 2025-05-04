@@ -1,0 +1,13 @@
+meta:
+  - metaGeral
+  - metaIdade
+  - metaGenero
+  - metaRegiao
+  - metaAlcance
+tiktok:
+  - tiktokGeral
+linkedin:
+  - linkedinGeral
+Parametrizacao:
+  - BI_PARAMETRIZACAO
+# etc.

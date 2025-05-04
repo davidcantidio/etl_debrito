@@ -22,16 +22,16 @@ def load_utm_mapping() -> dict[str, dict[str, str]]:
         header_row_index=0
     )
 
-    # Safely get the UTM_CONTENT column or create an empty one
-    if "UTM_CONTENT" in df.columns:
+    # Safely get the utm_content column or create an empty one
+    if "utm_content" in df.columns:
         utm_series = (
-            df["UTM_CONTENT"]
+            df["utm_content"]
             .astype(str)
             .str.strip()
             .str.lower()
         )
     else:
-        logger.warning("Column 'UTM_CONTENT' not found in BI_PARAMETRIZAÇÃO; using empty keys")
+        logger.warning("Column 'utm_content' not found in BI_PARAMETRIZAÇÃO; using empty keys")
         utm_series = pd.Series([""] * len(df), index=df.index)
 
     df = df.copy()
@@ -42,23 +42,19 @@ def load_utm_mapping() -> dict[str, dict[str, str]]:
         key = row["utm_content"]
         if key:
             mapping[key] = {
-                "START": row.get("START", ""),
-                "END":   row.get("END",   "")
+                "start": row.get("start", ""),
+                "end":   row.get("end",   "")
             }
 
     logger.info(f"Loaded {len(mapping)} UTM entries for start/end lookup")
     return mapping
 
 
-# utils/utm_lookup.py
-import logging
-import pandas as pd
-
 log = logging.getLogger(__name__)
 
 def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.DataFrame:
     """
-    Fill missing 'Inicio_da_Campanha' / 'Fim_da_Campanha' by looking-up the
+    Fill missing 'start' / 'end' by looking-up the
     utm_content in *utm_mapping* (dict: utm -> {"START":…, "END":…}).
 
     • Ignora linhas cujo “Content (utm)” esteja vazio.  
@@ -81,33 +77,33 @@ def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.D
 
     # 2) Build lookup Series once
     start_lkp = pd.Series(
-        {k: v["START"] for k, v in utm_mapping.items()},
-        name="Inicio_da_Campanha_lookup",
+        {k: v["start"] for k, v in utm_mapping.items()},
+        name="start_lookup",
     )
     end_lkp = pd.Series(
-        {k: v["END"] for k, v in utm_mapping.items()},
-        name="Fim_da_Campanha_lookup",
+        {k: v["end"] for k, v in utm_mapping.items()},
+        name="end_lookup",
     )
 
     # 3) Existing cols (may not exist yet)
-    if "Inicio_da_Campanha" not in df.columns:
-        df["Inicio_da_Campanha"] = ""
-    if "Fim_da_Campanha" not in df.columns:
-        df["Fim_da_Campanha"] = ""
+    if "start" not in df.columns:
+        df["start"] = ""
+    if "end" not in df.columns:
+        df["end"] = ""
 
     # 4) Only replace blanks / NA
-    before_start_na = df["Inicio_da_Campanha"].eq("").sum()
-    before_end_na   = df["Fim_da_Campanha"].eq("").sum()
+    before_start_na = df["start"].eq("").sum()
+    before_end_na   = df["end"].eq("").sum()
 
-    df.loc[df["Inicio_da_Campanha"].eq(""), "Inicio_da_Campanha"] = (
-        df.loc[df["Inicio_da_Campanha"].eq(""), "_utm_key"].map(start_lkp)
+    df.loc[df["start"].eq(""), "start"] = (
+        df.loc[df["start"].eq(""), "_utm_key"].map(start_lkp)
     )
-    df.loc[df["Fim_da_Campanha"].eq(""), "Fim_da_Campanha"] = (
-        df.loc[df["Fim_da_Campanha"].eq(""), "_utm_key"].map(end_lkp)
+    df.loc[df["end"].eq(""), "end"] = (
+        df.loc[df["end"].eq(""), "_utm_key"].map(end_lkp)
     )
 
-    filled_start = before_start_na - df["Inicio_da_Campanha"].eq("").sum()
-    filled_end   = before_end_na   - df["Fim_da_Campanha"].eq("").sum()
+    filled_start = before_start_na - df["start"].eq("").sum()
+    filled_end   = before_end_na   - df["end"].eq("").sum()
 
     log.info(
         "[utm_lookup] Filled Start/End from UTM — Start:%s  End:%s",

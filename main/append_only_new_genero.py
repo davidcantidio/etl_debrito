@@ -9,7 +9,7 @@ from utils.google_sheets import (
     SPREADSHEET_URL as spreadsheet_url,
 )
 from utils.setup_logging import setup_logging
-from utils.get_campaign_parameterization import get_campaign_parameterization
+from utils.lookups_bi_parametrizacao import get_campaign_parameterization
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.get_missing_records import get_missing_records
 from utils.append_records_to_sheet import append_records_to_sheet

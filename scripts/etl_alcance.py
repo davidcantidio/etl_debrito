@@ -45,9 +45,9 @@ class BaseAlcanceETL(BaseGeralETL):
         self.determine_ad_preview_link()
         self.criar_veiculo()
 
-        if "Reach" in self.df.columns:
-            logging.debug("Copiando 'Reach' para 'Alcance'")
-            self.df["Alcance"] = self.df["Reach"]
+        if "reach" in self.df.columns:
+            logging.debug("Copiando 'reach' para 'Alcance'")
+            self.df["Alcance"] = self.df["reach"]
 
         self.remover_colunas_indesejadas()
         self.reordenar_colunas_para_modelo()

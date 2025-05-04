@@ -1,54 +1,37 @@
 # main.py
 
-import argparse
-import logging
+import os
+import yaml
+from extract.sheets_fetcher import SheetsFetcher
+from treat.meta import treat_meta  # Exemplo de função de treat
+# from treat.tiktok import treat_tiktok
+# etc.
 
-logging.basicConfig(level=logging.DEBUG)
+# 1) Carrega configuração de abas
+with open("sheets_config.yaml", "r") as f:
+    SHEETS_TO_FETCH = yaml.safe_load(f)
 
-def run_etl_idade():
-    from main.append_only_new_idade import run_etl_idade
-    run_etl_idade()
+# 2) Instancia o fetcher (uma só vez)
+fetcher = SheetsFetcher(
+    creds_path=os.getenv("GOOGLE_CREDS_PATH", "creds.json"),
+    spreadsheet_id=os.getenv("SPREADSHEET_ID")
+)
 
-def run_etl_genero():
-    from main.append_only_new_genero import run_etl_genero
-    run_etl_genero()
+def main():
+    # 3) Extração
+    dfs_meta = fetcher.get(SHEETS_TO_FETCH["meta"])      # lista de abas meta
+    dfs_tiktok = fetcher.get(SHEETS_TO_FETCH["tiktok"])  # lista de abas tiktok
+    # ...
 
-def run_etl_regiao():
-    from main.append_only_new_regiao import run_etl_regiao
-    run_etl_regiao()
+    # 4) Tratamento
+    df_meta_geral = treat_meta(dfs_meta)                 # implementado em treat/meta.py
+    # df_tiktok_geral = treat_tiktok(dfs_tiktok)
+    # ...
 
-def run_etl_alcance():
-    from main.append_only_new_alcance import run_etl_alcance
-    run_etl_alcance()
-
-def run_etl_geral():
-    from main.append_only_new_geral import run_etl_geral
-    run_etl_geral()
+    # 5) Load (exemplo)
+    # from load.common import write_to_sheet
+    # write_to_sheet(df_meta_geral, "modeloGeral")
+    # ...
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Executa módulos ETL de forma isolada")
-    parser.add_argument(
-        "--modulo",
-        choices=["idade", "genero", "regiao", "alcance", "geral", "todos"],
-        required=True,
-        help="Escolha qual ETL rodar (ou todos)",
-    )
-
-    args = parser.parse_args()
-
-    if args.modulo == "idade":
-        run_etl_idade()
-    elif args.modulo == "genero":
-        run_etl_genero()
-    elif args.modulo == "regiao":
-        run_etl_regiao()
-    elif args.modulo == "alcance":
-        run_etl_alcance()
-    elif args.modulo == "geral":
-        run_etl_geral()
-    elif args.modulo == "todos":
-        run_etl_geral()
-        run_etl_idade()
-        run_etl_genero()
-        run_etl_regiao()
-        run_etl_alcance()
+    main()
