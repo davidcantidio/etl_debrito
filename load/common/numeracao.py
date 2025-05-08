@@ -1,37 +1,65 @@
 # utils/numeracao.py
 import pandas as pd
+from typing import List, Optional
 
-def gerar_numeracao(df, df_destino=None, linha_insercao=2, coluna='Numero'):
+
+def next_numbers(
+    df_dest: Optional[pd.DataFrame],
+    count: int,
+    column: str = "Numero"
+) -> List[int]:
     """
-    Gera uma numeração sequencial para as linhas de um DataFrame de novos dados,
-    levando em conta a numeração já existente na planilha (df_destino).
-
-    Se df_destino for fornecido e contiver a coluna, essa função converte os valores
-    para numérico e utiliza o maior valor + 1 como ponto de partida.
-    Caso contrário, usa o valor padrão (linha_insercao - 1).
+    Gera uma lista de números sequenciais iniciando após o maior valor presente
+    em df_dest[column]. Se df_dest não contiver a coluna ou estiver vazio,
+    inicia em 1.
 
     Parâmetros:
-        df (pandas.DataFrame): DataFrame dos novos dados.
-        df_destino (pandas.DataFrame, opcional): DataFrame já existente na planilha, contendo a coluna de numeração.
-        linha_insercao (int, opcional): Valor base caso df_destino esteja vazio (por exemplo, 2 se a linha 1 for cabeçalho).
-        coluna (str, opcional): Nome da coluna onde a numeração será inserida. Padrão é 'Numero'.
-    
+        df_dest (pd.DataFrame | None): DataFrame destino com a coluna de numeração.
+        count (int): quantidade de números a gerar.
+        column (str): nome da coluna de numeração.
+
     Retorna:
-        pandas.DataFrame: O DataFrame com a coluna de numeração atualizada.
+        List[int]: sequência de números.
     """
-    numero_inicial = linha_insercao - 1  # valor padrão se não houver dados no destino
-    if df_destino is not None and not df_destino.empty:
-        # Tente localizar a coluna; se não achar "Numero", pode haver problemas de capitalização ou espaços.
+    # Determina ponto de partida
+    start = 1
+    if df_dest is not None and not df_dest.empty:
+        # Localiza coluna ignorando case
         col_dest = None
-        for col in df_destino.columns:
-            if col.strip().lower() == coluna.strip().lower():
+        for col in df_dest.columns:
+            if col.strip().lower() == column.strip().lower():
                 col_dest = col
                 break
         if col_dest:
-            # Converte os valores para numérico
-            serie = pd.to_numeric(df_destino[col_dest], errors='coerce')
-            ultimo = serie.max()
-            if pd.notna(ultimo):
-                numero_inicial = int(ultimo) + 1
-    df[coluna] = range(numero_inicial, numero_inicial + len(df))
+            serie = pd.to_numeric(df_dest[col_dest], errors='coerce')
+            max_val = serie.max()
+            if pd.notna(max_val):
+                start = int(max_val) + 1
+
+    # Gera sequência
+    return list(range(start, start + count))
+
+
+def gerar_numeracao(
+    df: pd.DataFrame,
+    df_destino: Optional[pd.DataFrame] = None,
+    coluna: str = "Numero"
+) -> pd.DataFrame:
+    """
+    Adiciona ao DataFrame uma coluna de numeração sequencial usando next_numbers.
+
+    Parâmetros:
+        df (pd.DataFrame): DataFrame de novos registros.
+        df_destino (pd.DataFrame | None): DataFrame já existente com números.
+        coluna (str): nome da coluna a ser criada.
+
+    Retorna:
+        pd.DataFrame: mesmo df com a coluna de numeração adicionada.
+    """
+    count = len(df)
+    # Gera os números
+    numbers = next_numbers(df_destino, count, coluna)
+    # Atribui ao DataFrame
+    df = df.copy()
+    df[coluna] = numbers
     return df

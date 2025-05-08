@@ -366,7 +366,7 @@ def inicializar_colunas_auxiliares(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def remover_colunas_indesejadas(self):
-    for col in ['Placement', 'Campaign_ID', 'Campaign_name', 'Content_utm']:
+    for col in ['placement', 'campaign_id', 'campaign_name', 'utm_content']:
         if col in self.df.columns:
             self.df.drop(columns=col, inplace=True)
 
@@ -392,7 +392,7 @@ from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.normalize import normalize_columns, normalize_parametrizacao_values
 from utils.preview_links import generate_linkedin_ad_preview_link_from_lookup
-from utils.creative_mapping import carregar_mapeamento_nome_creativo, obter_nome_por_utm_content
+from utils.creative_mapping import load_ad_name_mapping, get_ad_name_from_utm_content
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 
 
@@ -409,7 +409,7 @@ def carregar_mapeamentos_linkedin():
     from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
     from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
     from utils.normalize import normalize_columns, normalize_parametrizacao_values
-    from utils.creative_mapping import carregar_mapeamento_nome_creativo
+    from utils.creative_mapping import load_ad_name_mapping
 
     logging.info("Carregando mapeamentos do LinkedIn (preview e criativo)...")
 
@@ -432,7 +432,7 @@ def carregar_mapeamentos_linkedin():
 
     # Gerar o mapeamento preview: o lookup usará a coluna 'utm_content' e os valores deverão ser extraídos da coluna 'preview'
     mapping_preview = generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao)
-    mapping_criativo = carregar_mapeamento_nome_creativo(df_parametrizacao)
+    mapping_criativo = load_ad_name_mapping(df_parametrizacao)
 
     return mapping_preview, mapping_criativo
 
@@ -443,7 +443,7 @@ def buscar_nome_criativo_com_log(utm_content, mapping_criativo):
     Se não encontrar, loga uma mensagem de debug.
     """
     utm_str = str(utm_content).strip()
-    nome = obter_nome_por_utm_content(utm_str, mapping_criativo)
+    nome = get_ad_name_from_utm_content(utm_str, mapping_criativo)
     if not nome:
         logging.debug(f"[LinkedIn] utm_content '{utm_str}' NÃO encontrado no mapping_criativo.")
     return nome
@@ -462,6 +462,7 @@ def preparar_kwargs_linkedin() -> dict:
 
 
 def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
+    
     """
     Preenche as colunas 'Nome_do_Anuncio' e 'Nome_do_Conjunto_de_Anuncio' no DataFrame de LinkedIn.
     - 'Nome_do_Anuncio' recebe o valor presente na coluna 'ID_Content'
@@ -470,6 +471,7 @@ def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
 
     Se algum valor em 'ID_Content' não tiver correspondência, é feito log de aviso.
     """
+    
     df = df.copy()
 
     if "ID_Content" not in df.columns:
@@ -779,6 +781,47 @@ def preencher_campos_com_campanha(df):
     return df
 
 
+# utils/concatenar_todos_os_codigos.py
+
+import os
+
+def concatenar_todos_codigos(destino='concatenado_projeto.txt', raiz='.', incluir_dirs=None, excluir_dirs=None):
+    """
+    Percorre os diretórios relevantes e concatena os .py em um único arquivo .txt,
+    ignorando ambientes virtuais e pastas de cache.
+    """
+    if incluir_dirs is None:
+        incluir_dirs = {'main', 'scripts', 'tests', 'utils'}
+    if excluir_dirs is None:
+        excluir_dirs = {'__pycache__', 'venv', '.venv', 'env', '.git'}
+
+    with open(destino, 'w', encoding='utf-8') as out:
+        for root, dirs, files in os.walk(raiz):
+            # Remove diretórios que não nos interessam
+            dirs[:] = [d for d in dirs if d not in excluir_dirs]
+
+            # Mantém apenas os diretórios permitidos ou arquivos na raiz
+            caminho_relativo = os.path.relpath(root, raiz)
+            if caminho_relativo != '.' and caminho_relativo.split(os.sep)[0] not in incluir_dirs:
+                continue
+
+            for file in sorted(files):
+                if file.endswith('.py') and not file.startswith('test_') or file.startswith('test_'):
+                    caminho = os.path.join(root, file)
+                    out.write(f"\n# ==== {caminho} ====\n\n")
+                    try:
+                        with open(caminho, 'r', encoding='utf-8') as f:
+                            out.write(f.read())
+                            out.write("\n\n")
+                    except Exception as e:
+                        print(f"Erro ao ler {caminho}: {e}")
+
+    print(f"Todos os .py relevantes foram concatenados em '{destino}'")
+
+if __name__ == "__main__":
+    concatenar_todos_codigos()
+
+
 # utils/concatenar_utils_em_txt.py
 
 import os
@@ -823,44 +866,116 @@ def verify_impressions_match(df_ref, df_cmp, ref_name, cmp_name):
 
 # utils/creative_mapping.py
 
+#creative_mappging.py
+
 import logging
 import pandas as pd
+from gspread.utils import rowcol_to_a1
+from utils.get_google_client import get_google_client
+from utils.google_sheets import CREDS_PATH as creds_path, SPREADSHEET_ID
+from utils.normalize import normalize_columns 
+import unicodedata
 
-def carregar_mapeamento_nome_creativo(df_parametrizacao: pd.DataFrame) -> dict:
+def _normalize(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.strip().lower().replace("\n", " ")
+
+def load_ad_name_mapping(df_parametrizacao: pd.DataFrame) -> dict[str, str]:
     """
-    Cria e retorna um dicionário {utm_content -> criativo},
-    baseado nas colunas 'utm_content' e 'criativo' na aba BI_PARAMETRIZAÇÃO.
+    Devolve {utm_content -> CRIATIVO} normalizando cabeçalhos
+    ('UTM_CONTENT', 'CRIATIVO', etc.) para lower-case.
     """
     if df_parametrizacao.empty:
-        logging.warning("DataFrame de parametrização vazio. Não foi possível construir o mapeamento.")
+        logging.warning("[load_ad_name_mapping] DataFrame vazio")
         return {}
 
-    required_cols = {'utm_content', 'criativo'}
-    colunas_atuais = set(df_parametrizacao.columns)
-    if not required_cols.issubset(colunas_atuais):
-        logging.warning("Colunas 'utm_content' e/ou 'criativo' não foram encontradas na parametrização.")
+    # ── normaliza cabeçalhos ──────────────────────────────────────────────────
+    df_norm = df_parametrizacao.copy()
+    df_norm.columns = [_normalize(c) for c in df_norm.columns]
+
+    missing = {"utm_content", "CRIATIVO"} - set(df_norm.columns)
+    if missing:
+        logging.warning("[load_ad_name_mapping] faltam colunas: %s", ", ".join(sorted(missing)))
         return {}
 
-    mapping = {}
-    for _, row in df_parametrizacao.iterrows():
-        utm = str(row.get('utm_content', '')).strip()
-        criativo = str(row.get('criativo', '')).strip()
-        if utm:
-            mapping[utm] = criativo
-
-    return mapping
+    mapping = (df_norm[["utm_content", "CRIATIVO"]]
+               .dropna()
+               .astype(str)
+               .applymap(str.strip))          # remove espaços
+    return dict(zip(mapping["utm_content"], mapping["CRIATIVO"]))
 
 
-def obter_nome_por_utm_content(utm_content: str, mapping_criativo: dict) -> str:
+def get_ad_name_from_utm_content(utm_content: str, mapping_criativo: dict) -> str:
     """
-    Dado um valor de utm_content (ex.: 'abc123') e um dicionário {utm_content -> criativo},
-    retorna o 'criativo' correspondente.
+    Dado um valor de utm_content (ex.: 'abc123') e um dicionário {utm_content -> CRIATIVO},
+    retorna o 'CRIATIVO' correspondente.
 
     Se não encontrar, retorna string vazia.
     """
     if not isinstance(utm_content, str):
         return ""
     return mapping_criativo.get(utm_content.strip(), "")
+
+
+def get_utm_content_from_ad_name(
+    df: pd.DataFrame,
+    mapping_criativo: dict[str, str],
+    coluna_ad_name: str = "Ad name",
+    coluna_destino: str = "Content (utm)",
+    *,
+    sheet_name: str | None = None,
+    worksheet=None,
+    write_back: bool = False
+) -> pd.DataFrame:
+    """
+    Mapeia 'Ad name' → 'Content (utm)' invertendo o mapping_criativo (utm_content -> CRIATIVO)
+    e, se write_back=True, grava somente as células vazias que receberam um novo utm.
+    """
+    log = logging.getLogger(__name__)
+    df = df.copy()
+
+    # Inverte mapping criativo→utm_content para utm_content lookup
+    inv = {v: k for k, v in mapping_criativo.items()}
+
+    # Prepara worksheet para write-back
+    if write_back:
+        if worksheet is None:
+            if sheet_name is None:
+                raise ValueError("sheet_name é obrigatório quando write_back=True")
+            client = get_google_client(creds_path)
+            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+        header = worksheet.row_values(1)
+        header_lc = [h.strip().lower() for h in header]
+
+    updates: list[dict] = []
+    # Itera somente para preencher vazios
+    for idx, ad_name in df[coluna_ad_name].astype(str).str.strip().items():
+        original = str(df.at[idx, coluna_destino]).strip()
+        # só tenta mapear se estiver vazio
+        if not original:
+            utm = inv.get(ad_name, "")
+            if utm:
+                df.at[idx, coluna_destino] = utm
+                if write_back:
+                    try:
+                        col_idx = header_lc.index(coluna_destino.lower()) + 1
+                    except ValueError:
+                        log.warning(
+                            "Coluna '%s' não encontrada no header; pulando write-back", coluna_destino
+                        )
+                        continue
+                    cell = rowcol_to_a1(idx + 2, col_idx)
+                    updates.append({"range": cell, "values": [[utm]]})
+
+    if write_back and updates:
+        worksheet.batch_update(updates, value_input_option="RAW")
+        log.info(
+            "[get_utm_content_from_ad_name] %d células atualizadas em '%s'",
+            len(updates), coluna_destino
+        )
+
+    return df
 
 
 # utils/datas.py
@@ -875,6 +990,7 @@ from gspread.utils import rowcol_to_a1
 from utils.get_google_client import get_google_client
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 from utils.normalize import normalize_campaign_series
+from datetime import datetime, date   
 
 MAX_CELLS = 500
 
@@ -891,7 +1007,7 @@ def fill_missing_start_end_from_params(
     inplace: bool = True,
 ) -> pd.DataFrame:
     """
-    Preenche células vazias em 'Start' e 'End' via lookup em BI_PARAMETRIZAÇÃO usando o 'Ad name' ↔ 'CRIATIVO'.
+    Preenche células vazias em 'end' e 'end' via lookup em BI_PARAMETRIZAÇÃO usando o 'ad_name' ↔ 'taxonomy_ad_name'.
     Retorna DataFrame alterado (ou cópia, se inplace=False).
     Se write_back=True, grava de volta no Google Sheet especificado.
     """
@@ -924,61 +1040,61 @@ def fill_missing_start_end_from_params(
     log.info("BI_PARAMETRIZAÇÃO loaded: %d rows", len(df_param))
 
     # Verifica colunas obrigatórias
-    for key in ("CRIATIVO", "START", "END"):
+    for key in ("taxonomy_ad_name", "start", "end"):
         if key not in df_param.columns:
             log.error("Coluna '%s' faltando em BI_PARAMETRIZAÇÃO, skipping fill_missing_start_end", key)
             return df
 
     # Constroi mapas normalizados
-    df_param["criativo_norm"] = normalize_campaign_series(df_param["CRIATIVO"])
-    map_start = dict(zip(df_param["criativo_norm"], df_param["START"]))
-    map_end   = dict(zip(df_param["criativo_norm"], df_param["END"]))
+    df_param["criativo_norm"] = normalize_campaign_series(df_param["taxonomy_ad_name"])
+    map_start = dict(zip(df_param["criativo_norm"], df_param["start"]))
+    map_end   = dict(zip(df_param["criativo_norm"], df_param["end"]))
 
     updates: List[Dict[str, Any]] = []
     df.reset_index(drop=True, inplace=True)
 
     # Normaliza criativos do df de origem
-    if "Ad name" not in df.columns:
-        log.error("DataFrame origem sem coluna 'Ad name', não pode preencher datas")
+    if "ad_name" not in df.columns:
+        log.error("DataFrame origem sem coluna 'ad_name', não pode preencher datas")
         return df
 
-    df["criativo_norm"] = normalize_campaign_series(df["Ad name"])
+    df["criativo_norm"] = normalize_campaign_series(df["ad_name"])
 
-    # Preenche Start
-    if "Start" in df.columns:
-        empty_mask = df["Start"].astype(str).str.strip().eq("")
+    # Preenche end
+    if "end" in df.columns:
+        empty_mask = df["end"].astype(str).str.strip().eq("")
         fill_vals = df["criativo_norm"].map(map_start)
         to_fill = empty_mask & fill_vals.notna()
 
         filled = int(to_fill.sum())
-        log.info("Preenchendo 'Start' via Ad name: %d células", filled)
+        log.info("Preenchendo 'end' via ad_name: %d células", filled)
 
-        df.loc[to_fill, "Start"] = fill_vals[to_fill]
+        df.loc[to_fill, "end"] = fill_vals[to_fill]
 
         if write_back and filled > 0:
             idx_col = header_sheet_lc.index("start") + 1 if "start" in header_sheet_lc else None
             if idx_col:
                 for r in df.index[to_fill]:
                     cell = rowcol_to_a1(r + 2, idx_col)
-                    updates.append({"range": cell, "values": [[df.at[r, "Start"]]]})
+                    updates.append({"range": cell, "values": [[df.at[r, "end"]]]})
 
-    # Preenche End
-    if "End" in df.columns:
-        empty_mask = df["End"].astype(str).str.strip().eq("")
+    # Preenche end
+    if "end" in df.columns:
+        empty_mask = df["end"].astype(str).str.strip().eq("")
         fill_vals = df["criativo_norm"].map(map_end)
         to_fill = empty_mask & fill_vals.notna()
 
         filled = int(to_fill.sum())
-        log.info("Preenchendo 'End' via Ad name: %d células", filled)
+        log.info("Preenchendo 'end' via ad_name: %d células", filled)
 
-        df.loc[to_fill, "End"] = fill_vals[to_fill]
+        df.loc[to_fill, "end"] = fill_vals[to_fill]
 
         if write_back and filled > 0:
             idx_col = header_sheet_lc.index("end") + 1 if "end" in header_sheet_lc else None
             if idx_col:
                 for r in df.index[to_fill]:
                     cell = rowcol_to_a1(r + 2, idx_col)
-                    updates.append({"range": cell, "values": [[df.at[r, "End"]]]})
+                    updates.append({"range": cell, "values": [[df.at[r, "end"]]]})
 
     # Executa write-back
     if write_back and updates:
@@ -1023,20 +1139,13 @@ def transformar_para_date(valor):
     raise ValueError(f"Tipo de valor não suportado: {type(valor)}")
 
 
-def converter_data(df: pd.DataFrame, coluna: str = 'Data') -> pd.DataFrame:
-    """
-    Converte a coluna especificada do DataFrame para o tipo `date` (sem hora).
-
-    Parâmetros:
-        df (pd.DataFrame): DataFrame contendo a coluna de data.
-        coluna (str): Nome da coluna a ser convertida.
-
-    Retorna:
-        pd.DataFrame: DataFrame com a coluna convertida para `date`.
-    """
+def converter_data(df: pd.DataFrame, coluna: str) -> pd.DataFrame:
     if coluna in df.columns:
-        df[coluna] = pd.to_datetime(df[coluna], errors='coerce').dt.date
+        parsed = pd.to_datetime(df[coluna], errors="coerce")
+        df[coluna] = parsed.dt.date.where(~parsed.isna(), "")
     return df
+
+
 
 
 def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
@@ -1273,8 +1382,9 @@ import unicodedata
 
 
 def carregar_caches_padrao():
-    path_estados = "/home/debrito/Documentos/etl_debrito/utils/cache_estados.json"
-    path_municipios = "/home/debrito/Documentos/etl_debrito/utils/cache_municipios_estados.json"
+    MODULE_DIR = os.path.dirname(__file__)
+    path_estados   = os.path.join(MODULE_DIR, "cache_estados.json")
+    path_municipios = os.path.join(MODULE_DIR, "cache_municipios_estados.json")
 
     cache_estados = carregar_cache_estados(path_estados)
     cache_municipios = carregar_cache_municipios(path_municipios)
@@ -1445,76 +1555,6 @@ if __name__ == "__main__":
     print(json.dumps(resultados, indent=2, ensure_ascii=False))
 
 
-# utils/get_campaign_parameterization.py
-
-import logging
-import pandas as pd
-from utils.get_google_client import get_google_client
-
-def get_campaign_parameterization(creds_path, spreadsheet_id):
-    """
-    Lê a aba 'BI_PARAMETRIZAÇÃO' e retorna dois dicionários de mapeamento:
-      - mapping_campanha: mapeia o valor da coluna de lookup "NOME CAMPANHA" para o valor desejado para a coluna "Campanha"
-      - mapping_sigla: mapeia o valor da coluna de lookup "NOME CAMPANHA" para o valor desejado para a coluna "ID_Campanha"
-    
-    Considera que:
-      - Os cabeçalhos reais estão na linha 2 e os dados começam na linha 3.
-      - A coluna de lookup é "NOME CAMPANHA".
-      - Para mapeamento, busca-se a coluna que contenha "NOME CAMPANHA" (para Campanha) e a coluna que contenha "SIGLA".
-    
-    Parâmetros:
-        creds_path (str): Caminho para o arquivo de credenciais.
-        spreadsheet_id (str): ID da planilha.
-    
-    Retorna:
-        tuple: (mapping_campanha, mapping_sigla) – dois dicionários com os mapeamentos.
-    """
-    client = get_google_client(creds_path)
-    sh = client.open_by_key(spreadsheet_id)
-    worksheet = sh.worksheet("BI_PARAMETRIZAÇÃO")
-    data = worksheet.get_all_values()
-    
-    if len(data) < 3:
-        raise ValueError("A aba 'BI_PARAMETRIZAÇÃO' não tem dados suficientes (cabeçalho na linha 2 e dados a partir da linha 3).")
-    
-    # Normaliza os cabeçalhos reais (linha 2)
-    raw_headers = data[1]
-    headers = [col.strip().replace('\n', ' ').replace('"', '').upper() for col in raw_headers]
-    logging.info(f"Colunas reais detectadas (linha 2): {headers}")
-    
-    df_param = pd.DataFrame(data[2:], columns=headers)
-    
-    lookup = "NOME CAMPANHA"
-    if lookup not in df_param.columns:
-        raise ValueError(f"A coluna de lookup '{lookup}' não foi encontrada na aba BI_PARAMETRIZAÇÃO.")
-    
-    # Define a coluna para Campanha: busca aquela que contenha "NOME CAMPANHA"
-    col_dest_campanha = next((col for col in df_param.columns if "NOME CAMPANHA" in col), lookup)
-    # Define a coluna para SIGLA: busca aquela que contenha "SIGLA"
-    col_sigla = next((col for col in df_param.columns if "SIGLA" in col), None)
-    
-    if not col_dest_campanha or not col_sigla:
-        raise ValueError("As colunas 'NOME CAMPANHA' e/ou 'SIGLA' não foram encontradas após normalização.")
-    
-    logging.info(f"Coluna de lookup: '{lookup}'")
-    logging.info(f"Coluna usada para Campanha (destino): '{col_dest_campanha}'")
-    logging.info(f"Coluna usada para SIGLA: '{col_sigla}'")
-    
-    mapping_campanha = {
-        str(k).strip().upper(): str(v).strip()
-        for k, v in zip(df_param[lookup], df_param[col_dest_campanha])
-    }
-    mapping_sigla = {
-        str(k).strip().upper(): str(v).strip()
-        for k, v in zip(df_param[lookup], df_param[col_sigla])
-    }
-    
-    logging.info(f"Total de campanhas mapeadas: {len(mapping_campanha)}")
-    logging.info(f"Exemplos de chaves no mapping (Campanha): {list(mapping_campanha.keys())[:10]}")
-    
-    return mapping_campanha, mapping_sigla
-
-
 # utils/get_google_client.py
 
 import gspread
@@ -1673,13 +1713,448 @@ if __name__ == "__main__":
             print(f"Erro ao limpar aba '{aba}': {e}")
 
 
-# utils/normalize.py
+# utils/lookups_bi_parametrizacao.py
 
-# utils/normalize.py
+# utils/bi_param_utils.py
+"""
+Módulo único para todas as funções que leem e manipulam
+conteúdo da aba BI_PARAMETRIZAÇÃO (lookup, preenchimento, preview etc.),
+antes de dividirmos em treat/common/.
+"""
 
-import unicodedata
-import pandas as pd
 import logging
+import time
+import pandas as pd
+import unicodedata
+from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, date
+from gspread import Worksheet
+from gspread.utils import rowcol_to_a1
+from utils.get_google_client import get_google_client
+from utils.normalize import normalize_columns, normalize_campaign_series
+from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+
+log = logging.getLogger(__name__)
+
+# ------------------------------------------------------------------------------
+# 1) BIParamLookup: cache e geração de lookup dicts da planilha BI_PARAMETRIZAÇÃO
+# ------------------------------------------------------------------------------
+class BIParamLookup:
+    SHEET_NAME = "BI_PARAMETRIZAÇÃO"
+    HEADER_ROW = 1     # 0-indexed
+    _TTL = 60 * 10     # 10 minutos
+
+    def __init__(self, creds_path: str, spreadsheet_id: str):
+        self.creds_path = creds_path
+        self.spreadsheet_id = spreadsheet_id
+        self._df: Optional[pd.DataFrame] = None
+        self._last_load: float = 0.0
+        self._col_cache: Dict[str, Optional[str]] = {}
+        log.debug("Inicializado BIParamLookup for %s", spreadsheet_id)
+
+    def _load_df(self) -> pd.DataFrame:
+        client = get_google_client(self.creds_path)
+        sheet = client.open_by_key(self.spreadsheet_id)
+        rows = sheet.worksheet(self.SHEET_NAME).get_all_values()
+        if len(rows) <= self.HEADER_ROW:
+            raise ValueError("BI_PARAMETRIZAÇÃO sem dados suficientes.")
+        raw_hdr = rows[self.HEADER_ROW]
+        hdr = normalize_columns(pd.Index(raw_hdr))
+        df = pd.DataFrame(rows[self.HEADER_ROW + 1 :], columns=hdr)
+        log.info("BI_PARAM loaded %d rows", len(df))
+        return df
+
+    def _ensure_df(self):
+        if self._df is None or time.time() - self._last_load > self._TTL:
+            self._df = self._load_df()
+            self._last_load = time.time()
+            self._col_cache.clear()
+
+    def _find_col(self, keyword: str) -> Optional[str]:
+        key = keyword.lower()
+        if key in self._col_cache:
+            return self._col_cache[key]
+        self._ensure_df()
+        for c in self._df.columns:  # type: ignore
+            if key in c:
+                self._col_cache[key] = c
+                return c
+        self._col_cache[key] = None
+        log.warning("Coluna p/ %s não encontrada", keyword)
+        return None
+
+    def _map_columns(
+        self, key_kw: str, val_kws: List[str], upper_keys: bool = True
+    ) -> Dict[str, Tuple[str, ...]]:
+        self._ensure_df()
+        key_col = self._find_col(key_kw)
+        val_cols = [self._find_col(v) for v in val_kws]
+        if key_col is None or any(vc is None for vc in val_cols):
+            raise KeyError(f"Colunas para {key_kw} ou {val_kws} não encontradas")
+        out: Dict[str, Tuple[str, ...]] = {}
+        for row in self._df.itertuples(index=False):  # type: ignore
+            raw = getattr(row, key_col)
+            if pd.isna(raw): continue
+            k = str(raw).strip()
+            if not k: continue
+            k = k.upper() if upper_keys else k.lower()
+            vals = tuple(str(getattr(row, vc)).strip() for vc in val_cols)  # type: ignore
+            out[k] = vals
+        return out
+
+    def get_taxonomy_camp_name_and_id_from_ad_name(self) -> Tuple[Dict[str,str], Dict[str,str]]:
+        raw = self._map_columns("ad_name", ["taxonomy_campaign_name","utm_campaign"], upper_keys=True)
+        return ({k:v[0] for k,v in raw.items()}, {k:v[1] for k,v in raw.items()})
+
+    def utm_start_end(self) -> Dict[str,Dict[str,str]]:
+        raw = self._map_columns("utm_content", ["start","end"], upper_keys=False)
+        return {k:{"start":v[0],"end":v[1]} for k,v in raw.items()}
+
+    def get_criativo_mapping(self) -> Dict[str,str]:
+        raw = self._map_columns("utm_content", ["criativo"], upper_keys=False)
+        return {k:v[0] for k,v in raw.items()}
+
+    def lookup_utm_for_ad_name(self, ad_name: str) -> str:
+        if not isinstance(ad_name, str): return ""
+        inv = {v:k for k,v in self.get_criativo_mapping().items()}
+        return inv.get(ad_name.strip(),"")    
+
+def get_campaign_parameterization(creds_path: str, spreadsheet_id: str) -> Tuple[Dict[str,str],Dict[str,str]]:
+    return BIParamLookup(creds_path, spreadsheet_id).get_taxonomy_camp_name_and_id_from_ad_name()
+
+
+# ------------------------------------------------------------------------------
+# 2) Creative mapping (LinkedIn utm_content ↔ Criativo)
+# ------------------------------------------------------------------------------
+def _normalize_str(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.strip().lower()
+
+def load_ad_name_mapping(df_param: pd.DataFrame) -> Dict[str,str]:
+    df = df_param.copy()
+    df.columns = [_normalize_str(c) for c in df.columns]
+    if not {"utm_content","criativo"}.issubset(df.columns):
+        log.warning("Creative mapping: colunas faltando %s", set(("utm_content","criativo")) - set(df.columns))
+        return {}
+    df = df[["utm_content","criativo"]].dropna().applymap(str.strip)
+    return dict(zip(df["utm_content"], df["criativo"]))
+
+def get_ad_name_from_utm_content(utm: str, mapping: Dict[str,str]) -> str:
+    return mapping.get(utm.strip(), "")
+
+def fill_utm_from_ad_name(
+    df: pd.DataFrame,
+    mapping: Dict[str,str],
+    coluna_ad: str="Ad name",
+    coluna_dest: str="Content (utm)",
+    write_back: bool=False,
+    sheet_name: Optional[str]=None
+) -> pd.DataFrame:
+    inv = {v:k for k,v in mapping.items()}
+    df = df.copy()
+    updates: List[Dict[str,Any]] = []
+    # prepare worksheet if write_back...
+    for idx, ad in df[coluna_ad].astype(str).str.strip().items():
+        if not df.at[idx, coluna_dest].strip():
+            utm = inv.get(ad,"")
+            if utm:
+                df.at[idx, coluna_dest] = utm
+                # se write_back, acumular updates...
+    # se write_back: batch_update
+    return df
+
+
+# ------------------------------------------------------------------------------
+# 3) Datas e parâmetros (fill_missing_start_end_from_params)
+# ------------------------------------------------------------------------------
+MAX_CELLS = 500
+def _chunk(upd: List[Dict[str,Any]], size:int):
+    for i in range(0,len(upd),size): yield upd[i:i+size]
+
+def fill_missing_start_end_from_params(
+    df: pd.DataFrame,
+    sheet_name: Optional[str]=None,
+    worksheet: Optional[Worksheet]=None,
+    write_back: bool=True,
+    inplace: bool=True
+) -> pd.DataFrame:
+    if not inplace: df = df.copy()
+    # carregar BI_PARAMETRIZAÇÃO raw (linha 2)
+    client = get_google_client(CREDS_PATH)
+    sh = client.open_by_key(SPREADSHEET_ID)
+    ws = sh.worksheet("BI_PARAMETRIZAÇÃO")
+    data = ws.get_all_values()
+    hdr = [c.strip().upper() for c in data[1]]
+    dfp = pd.DataFrame(data[2:], columns=hdr)
+    # normalizar criativo, map_start, map_end
+    df["criativo_norm"] = normalize_campaign_series(df["ad_name"])
+    # preenche start e end, write_back se solicitado...
+    return df
+
+def transformar_para_date(v):
+    if not v: return None
+    if isinstance(v, date): return v
+    if isinstance(v, datetime): return v.date()
+    for fmt in ("%Y-%m-%d %H:%M:%S","%Y-%m-%d"):
+        try: return datetime.strptime(v.strip(),fmt).date()
+        except: continue
+    raise ValueError("Formato inválido")
+
+def converter_data(df: pd.DataFrame, col: str) -> pd.DataFrame:
+    if col in df.columns:
+        df[col] = pd.to_datetime(df[col], errors="coerce").dt.date.fillna("")
+    return df
+
+def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["Inicio_da_Campanha"] = df.get("start","").apply(transformar_para_date)
+    df["Fim_da_Campanha"]    = df.get("end","").apply(transformar_para_date)
+    return df
+
+# ------------------------------------------------------------------------------
+# 4) UTM-Lookup simplificado (via DataFrame)
+# ------------------------------------------------------------------------------
+def load_utm_mapping() -> Dict[str,Dict[str,str]]:
+    client = get_google_client(CREDS_PATH)
+    df = read_sheet_as_dataframe_range(client, SPREADSHEET_ID, "BI_PARAMETRIZAÇÃO","A2:ZZ",0)
+    df["utm_content"] = df.get("utm_content","").astype(str).str.strip().str.lower()
+    out = {}
+    for _,r in df.iterrows():
+        k = r["utm_content"]
+        if k: out[k] = {"start":r.get("start",""),"end":r.get("end","")}
+    return out
+
+def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_map: Dict[str,Dict[str,str]]) -> pd.DataFrame:
+    df = df.copy()
+    key = df.get("Content (utm)","").astype(str).str.strip().str.lower()
+    df["start"] = df["start"].mask(df["start"].eq(""), key.map({k:v["start"] for k,v in utm_map.items()}))
+    df["end"]   = df["end"].mask  (df["end"].eq(""),   key.map({k:v["end"]   for k,v in utm_map.items()}))
+    return df
+
+# ------------------------------------------------------------------------------
+# 5) Preview-links
+# ------------------------------------------------------------------------------
+def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.rename(columns={"Preview Link FB":"Preview_Link_FB","Preview Link IG":"Preview_Link_IG"})
+    df["URL_do_Anuncio"] = df.get("URL_do_Anuncio","").mask(
+        df.get("URL_do_Anuncio","")!="",
+        df.get("Preview_Link_IG","").mask("", df.get("Preview_Link_FB",""))
+    )
+    return df
+
+def generate_linkedin_ad_preview_link_from_lookup(df_param: pd.DataFrame) -> Dict[str,str]:
+    if not {"utm_content","preview"}.issubset(df_param.columns):
+        return {}
+    m = df_param[["utm_content","preview"]].dropna().drop_duplicates("utm_content")
+    return dict(zip(m["utm_content"],m["preview"]))
+
+def build_pinterest_preview_link(pin_id: Any) -> str:
+    s = str(pin_id).strip()
+    return f"https://www.pinterest.com/pin/{s}" if s else ""
+
+def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
+    col = next((c for c in df.columns if c.strip().lower()=="preview link"),None)
+    df["URL_do_Anúncio"] = df.get(col,"").apply(build_pinterest_preview_link) if col else ""
+    return df
+
+
+# utils/normalize.py
+
+# utils/normalize.py
+
+import logging
+import datetime as _dt
+import re as _re
+import pandas as pd
+from typing import List, Optional
+from gspread import Worksheet
+from gspread.utils import rowcol_to_a1
+from utils.get_google_client import get_google_client
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+import unicodedata
+
+# regex para detectar exatamente "YYYY-MM-DD hh:mm:ss"
+_TIME_STAMP_RE = _re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+
+def _try_manual_parse(val: str) -> Optional[_dt.date]:
+    """
+    Tenta converter strings no formato 'YYYY-MM-DD HH:MM:SS' em date.
+    Retorna date ou None.
+    """
+    if not isinstance(val, str):
+        return None
+    txt = val.strip()
+    if not _TIME_STAMP_RE.fullmatch(txt):
+        return None
+    try:
+        return _dt.datetime.strptime(txt, "%Y-%m-%d %H:%M:%S").date()
+    except ValueError:
+        return None
+
+def normalize_date_columns(
+    df: pd.DataFrame,
+    date_columns: Optional[List[str]] = None,
+    *,
+    sheet_name: Optional[str] = None,
+    worksheet: Worksheet | None = None,
+    write_back: bool = False,
+    inplace: bool = False,
+) -> pd.DataFrame:
+    """
+    Converte colunas datetime → YYYY-MM-DD.
+    Se write_back=True, grava as strings no Google Sheets.
+    """
+    log = logging.getLogger(__name__)
+    if not inplace:
+        df = df.copy()
+
+    # prepara worksheet para write_back
+    if write_back:
+        if worksheet is None:
+            if not sheet_name:
+                raise ValueError("sheet_name é obrigatório quando write_back=True")
+            client = get_google_client(CREDS_PATH)
+            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+        header = worksheet.row_values(1)
+        header_lc = [h.strip().lower() for h in header]
+
+    # mapeia lower→real col name
+    col_lookup = {c.lower(): c for c in df.columns}
+    if date_columns is None:
+        # auto detecta colunas date, start, end
+        date_columns = [
+            real for low, real in col_lookup.items()
+            if "date" in low or low in {"start", "end"}
+        ]
+
+    updates = []
+    for col in date_columns:
+        low = col.lower()
+        if low not in col_lookup:
+            log.debug(f"[normalize_date_columns] coluna '{col}' não encontrada; pulando.")
+            continue
+        real = col_lookup[low]
+        orig = df[real]
+
+        # 1) parse principal
+        parsed = pd.to_datetime(orig, errors="coerce")
+
+        # 2) extraia só date para quem parseou bem
+        good_mask = ~parsed.isna()
+        dates = parsed.dt.date
+
+        # 3) second pass manual apenas nas falhas
+        bad_idx = parsed[~good_mask].index
+        manual_dates = orig.loc[bad_idx].apply(_try_manual_parse)
+        # manual_dates é Series de date ou None
+        # combine: para idx bons use dates, para idx manuais use manual_dates, pro resto ""
+        final_values = []
+        for i in df.index:
+            if good_mask.iat[i]:
+                final_values.append(dates.iat[i])
+            else:
+                md = manual_dates.get(i)
+                final_values.append(md if isinstance(md, _dt.date) else "")
+
+        # 4) logging das falhas
+        failed = sum(1 for v in final_values if v == "")
+        if failed:
+            samples = orig[ [i for i,v in enumerate(final_values) if v==""] ][:3].astype(str).drop_duplicates().tolist()
+            log.warning(f"[normalize_date_columns] {failed} valores inválidos em '{real}' (ex.: {samples})")
+
+        # 5) prepare write-back e atribuição
+        changed_mask = orig.astype(str) != [ (v.isoformat() if isinstance(v,_dt.date) else "") for v in final_values ]
+
+        # atribui no DataFrame (date ou string)
+        df[real] = final_values
+
+        if write_back and changed_mask.any():
+            # busca coluna no header do Sheet
+            try:
+                col_idx = header_lc.index(real.lower()) + 1
+            except ValueError:
+                log.warning(f"'{real}' não existe no header do Sheets; skip write-back")
+                continue
+
+            for r in df.index[changed_mask]:
+                v = df.at[r, real]
+                cell_val = v.isoformat() if isinstance(v, _dt.date) else ""
+                updates.append({"range": rowcol_to_a1(r+2, col_idx), "values": [[cell_val]]})
+
+    # 6) envia batch
+    if write_back and updates:
+        worksheet.batch_update(updates, value_input_option="RAW")
+        log.info(f"[normalize_date_columns] {len(updates)} células atualizadas no Sheets")
+
+    return df
+
+
+def fill_empty_objective_with_reach(
+    df: pd.DataFrame,
+    *,
+    sheet_name: Optional[str] = None,
+    worksheet: Worksheet | None = None,
+    write_back: bool = False,
+    inplace: bool = False,
+) -> pd.DataFrame:
+    """
+    Substitui células vazias na coluna 'Campaign objective type' por 'REACH'.
+    Se write_back=True, grava os valores diretamente na aba de origem do Google-Sheets.
+
+    Parâmetros
+    ----------
+    df : pd.DataFrame
+    sheet_name : nome da aba (necessário para write_back)
+    worksheet : objeto Worksheet já inicializado (opcional)
+    write_back : se True, faz batch_update no Sheets
+    inplace : se False, trabalha em cópia de df
+    """
+    log = logging.getLogger(__name__)
+    if not inplace:
+        df = df.copy()
+
+    col = "Campaign objective type"
+    if col not in df.columns:
+        log.warning(f"[fill_empty_objective_with_reach] coluna '{col}' não encontrada; nada a fazer.")
+        return df
+
+    # preparar worksheet se for gravar
+    if write_back:
+        if worksheet is None:
+            if not sheet_name:
+                raise ValueError("sheet_name é obrigatório quando write_back=True")
+            client = get_google_client(CREDS_PATH)
+            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+        header = worksheet.row_values(1)
+        header_lc = [h.strip().lower() for h in header]
+
+        try:
+            col_idx = header_lc.index(col.lower()) + 1
+        except ValueError:
+            log.warning(f"[fill_empty_objective_with_reach] header não contém '{col}'; skip write-back")
+            write_back = False
+
+    # máscara de vazios
+    mask = df[col].astype(str).str.strip() == ""
+    total = int(mask.sum())
+    if total == 0:
+        log.debug(f"[fill_empty_objective_with_reach] nenhuma célula vazia em '{col}'")
+        return df
+
+    log.info(f"[fill_empty_objective_with_reach] preenchendo {total} células vazias em '{col}' com 'REACH'")
+    df.loc[mask, col] = "REACH"
+
+    if write_back:
+        updates = []
+        for r in df.index[mask]:
+            a1 = rowcol_to_a1(r + 2, col_idx)
+            updates.append({"range": a1, "values": [["REACH"]]})
+        worksheet.batch_update(updates, value_input_option="RAW")
+        log.info(f"[fill_empty_objective_with_reach] gravadas {len(updates)} células no Sheets")
+
+    return df
 
 
 def normalize_campaign_name(value):
@@ -1812,7 +2287,6 @@ def normalize_columns(columns: pd.Index) -> pd.Index:
 
     logger.debug("normalize_columns: colunas normalizadas %r", list(result))
     return result
-
 
 
 def normalize_parametrizacao_values(df: pd.DataFrame, cols: list[str] = None) -> pd.DataFrame:
@@ -2461,23 +2935,159 @@ def renomear_colunas_origem_para_modelo(df):
     Ignora colunas ausentes sem erro.
     """
     renomear = {
-        'Date': 'Data', 'Account name': 'Nome_da_Conta', 'Advertiser name': 'Nome_da_Conta',
-        'Campaign name': 'Campaign_name', 'Ad group name': 'Nome_do_Conjunto_de_Anuncio',
-        'Ad set name': 'Nome_do_Conjunto_de_Anuncio', 'Ad name': 'Nome_do_Anuncio',
-        'Campaign ID': 'Campaign_ID', 'Start': 'Inicio_da_Campanha', 'End': 'Fim_da_Campanha',
-        'Campaign objective type': 'Objetivo', 'Campaign objective': 'Objetivo',
-        'Placement': 'Placement', 'Preview Link': 'URL_do_Anuncio',
-        'Content (utm)': 'ID_Content', 'Impressions': 'Impressoes', 'Cost': 'Investimento',
-        'Link clicks': 'Cliques_no_Link', 'Clicks': 'Cliques_no_Link',
-        'Video play actions': 'Video_Play', 'Video views': 'Video_Play',
-        'Video watches at 25%': 'Visualizacoes_ate_25', 'Video watches at 50%': 'Visualizacoes_ate_50',
-        'Video watches at 75%': 'Visualizacoes_ate_75', 'Video watches at 100%': 'Visualizacoes_ate_100',
-        'Post reactions': 'Reacoes', 'Paid likes': 'Reacoes', 'Post shares': 'Compartilhamentos',
-        'Paid shares': 'Compartilhamentos', 'Post comments': 'Comentarios', 'Paid comments': 'Comentarios','Age': 'Faixa_Etaria'
+        'date': 'Data', 'account_name': 'Nome_da_Conta', 'advertiser_name': 'Nome_da_Conta',
+        'Campaign name': 'Campaign_name', 'ad_group_name': 'Nome_do_Conjunto_de_Anuncio',
+        'ad_set_name': 'Nome_do_Conjunto_de_Anuncio', 'ad_name': 'Nome_do_Anuncio',
+        'campaign_id': 'Campaign_ID', 'start': 'Inicio_da_Campanha', 'end': 'Fim_da_Campanha',
+        'objective': 'Objetivo', 'objective': 'Objetivo',
+        'ad_preview_link': 'URL_do_Anuncio',
+        'utm_content': 'ID_Content', 'impressions': 'Impressoes', 'cost': 'Investimento',
+        'link_clicks': 'Cliques_no_Link', 'clicks': 'Cliques_no_Link',
+        'video_play': 'Video_Play', 'Video views': 'Video_Play',
+        'video_watches_25': 'Visualizacoes_ate_25', 'video_watches_50': 'Visualizacoes_ate_50',
+        'video_watches_75': 'Visualizacoes_ate_75', 'video_watches_100': 'Visualizacoes_ate_100',
+        'post_reactions': 'Reacoes', 'paid_likes': 'Reacoes', 'post_shares': 'Compartilhamentos',
+        'paid_shares': 'Compartilhamentos', 'post_comments': 'Comentarios', 'paid_comments': 'Comentarios','age': 'Faixa_Etaria'
     }
     df.rename(columns=renomear, inplace=True)
     logging.debug("[renomear_colunas_origem_para_modelo] Colunas após renomear: %s", list(df.columns))
     return df
+
+renomeacao_metaGeral = {
+    "Date": "date",
+    "Account name": "account_name",
+    "Campaign name": "campaign_name",
+    "Ad group name": "ad_group_name",
+    "Ad name": "ad_name",
+    "Content (utm)": "utm_content",
+    "Ad ID": "ad_id",
+    "Campaign ID": "campaign_id",
+    "Start": "start",
+    "End": "end",
+    "Campaign objective type": "objective",
+    "Preview_Link_IG": "preview_link_ig",
+    "Preview_Link_FB": "preview_link_fb",
+    "Placement": "placement",
+    "Impressions": "impressions",
+    "Cost": "cost",
+    "Link clicks": "link_clicks",
+    "Video watches at 25%": "video_watches_25",
+    "Video watches at 50%": "video_watches_50",
+    "Video watches at 75%": "video_watches_75",
+    "Video watches at 100%": "video_watches_100",
+    "Post reactions": "post_reactions",
+    "Post shares": "post_shares",
+    "Post comments": "post_comments",
+    "Video_Play": "video_play"
+}
+
+renomeacao_metaIdade = {
+    "Date": "date",
+    "Age": "age",
+    "Account name": "account_name",
+    "Campaign name": "campaign_name",
+    "Campaign ID": "campaign_id",
+    "Ad name": "ad_name",
+    "Ad set name": "ad_group_name",
+    "Campaign objective type": "objective",
+    "Placement": "placement",
+    "Ad ID": "ad_id",
+    "Impressions": "impressions",
+    "Cost": "cost",
+    "Video watches at 100%": "video_watches_100",
+    "Link clicks": "link_clicks"
+}
+
+
+renomeacao_metaGenero = {
+    "Date": "date",
+    "Gender": "gender",
+    "Account name": "account_name",
+    "Campaign name": "campaign_name",
+    "Campaign ID": "campaign_id",
+    "Ad name": "ad_name",
+    "Ad set name": "ad_group_name",
+    "Campaign objective type": "objective",
+    "Placement": "placement",
+    "Ad ID": "ad_id",
+    "Impressions": "impressions",
+    "Cost": "cost",
+    "Video watches at 100%": "video_watches_100",
+    "Link clicks": "link_clicks"
+}											
+
+renomeacao_metaAlcance = {
+    "Date": "date",
+    "Account name": "account_name",
+    "Campaign name": "campaign_name",
+    "Placement": "placement",
+    "Ad group name": "ad_group_name",
+    "Ad name": "ad_name",
+    "Campaign objective type": "objective",
+    "Reach": "reach",
+    "Impressions": "impressions"
+}
+
+# bi_parametrizacao_column_map.py
+BI_PARAM_COLUMN_MAP = {
+    # ===== META-DEFINIÇÃO DA CAMPANHA =====
+    "NOME CAMPANHA":                     "campaign_name",
+    "PLATAFORMA/ REDE/PORTAL":           "platform_network_portal",
+    "VEÍCULOS":                          "vehicle",
+    "CATEGORIA obrigatório":             "category",
+    "FORMATO obrigatório":               "format",
+    "REGIÃO obrigatório":                "region",
+    "REMARKETING/AÇÃO obrigatório":      "remarketing_or_action",
+    "START":                             "start",
+    "END":                               "end",
+
+    # ===== CRIATIVO / PRÉ-VISUALIZAÇÃO =====
+    'CRIATIVO/INFLUENCIADOR - Obrigatório': "ad_name_raw",
+    "AD_PREVIEW":                        "ad_preview_link",
+    "URL DE DESTINO (Livre)":            "landing_page_url",
+
+    # ===== RESPONSÁVEIS & OBJETIVOS =====
+    "RESPONSÁVEL Obrigatório":           "responsible",
+    "OBJETIVO obrigatório":              "objective",
+    "TIPO DE COMPRA obrigatório":        "purchase_type",
+    "SEGMENTAÇÃO obrigatória! Escreva de forma resumida": "segmentation",
+
+    # ===== RAW FIELDS vindos da mídia =====
+    "ID":                                "utm_content_raw",
+    "utm_source_raw":                    "utm_source_raw",
+    "Remarketing e Ação":                "remarketing_or_action_raw",
+    "Agência":                           "agency_raw",
+    "SIGLA":                             "utm_campaign_raw",
+    "url":                               "base_urn",
+    "Editoria":                          "type_comunication",
+
+    # ===== UTM FINAIS =====
+    "utm_source":                        "utm_source",
+    "utm_medium":                        "utm_medium",
+    "utm_medium2":                       "utm_medium2",
+    "formato":                           "formato",
+    "utm_campaign":                      "utm_campaign",
+    "Objetivo":                          "objective",      # duplicado na fonte → mesmo canônico
+    "Região":                            "region",
+    "utm_term":                          "utm_term",
+    "utm_content":                       "utm_content",
+    "url_final_raw":                     "url_final_raw",
+
+    # ===== TAXONOMY (padrão interno) =====
+    "CAMPANHA":                          "taxonomy_campaign_name",
+    "CONJUNTO DE ANÚNCIO (não aplicável para Linkedin)": "taxonomy_ad_group_name",
+    "CRIATIVO":                          "taxonomy_ad_name",
+
+    # ===== PARAMETRIZAÇÃO DE LINKS =====
+    "GERAR LINK?":                       "generate_parametrized_link",
+    "URL PARAMETRIZADA":                 "parametrized_link",
+
+    # ===== TAXONOMY PARA REDES SOCIAIS =====
+    "CampanhaRedes":                     "taxonomy_campaign_name_social",
+    "ConjuntoAnunciosRedes":             "taxonomy_ad_group_name_social",
+    "CriativoRedes":                     "taxonomy_ad_name_social",
+}
+
 
 
 # utils/setup_logging.py
@@ -2557,10 +3167,10 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 _REPLACEMENT_SPECS: list[tuple[str, Mapping[str, str]]] = [
-    ("Content (utm)", ID_CONTENT_REPLACEMENTS),
-    ("Campaign name", CAMPAIGN_NAME_REPLACEMENTS),
-    ("Ad group name", AD_GROUP_NAME_REPLACEMENTS),
-    ("Ad group name", AD_NAME_REPLACEMENTS)
+    ("utm_content", ID_CONTENT_REPLACEMENTS),
+    ("campaign_name", CAMPAIGN_NAME_REPLACEMENTS),
+    ("ad_group_name", AD_GROUP_NAME_REPLACEMENTS),
+    ("ad_name", AD_NAME_REPLACEMENTS)
 ]
 
 # Segurança contra payloads enormes; 10k células ≅ 5 MiB.
@@ -2640,6 +3250,12 @@ def apply_all_origin_substitutions(
             continue
 
         # Normaliza apenas UMA vez
+        # normalizando as chaves do dicionário
+        mapping = {
+            k.strip().lower(): v
+            for k, v in mapping.items()
+        }
+
         s_norm = _normalize_series(df[col_name])
         mask = s_norm.isin(mapping)  # bool Series
         n_changes = int(mask.sum())
@@ -2729,6 +3345,7 @@ Valor: string que deve substituir o nome do grupo de anúncio.
 
 AD_NAME_REPLACEMENTS: dict[str, str] = {
     "Ad name2025-03-20 18:28:41": "2025_3_BR_VÍDEO_RESPOSTA_BRANDED_MISSION_1_ACAO_DBT_SBRAE_2025_EMP_FEM0062",
+    "Mari Kruger": "2025_2_BR_VÍDEO_MARI_KRUGER_ACAO_DBT_SBRAE_2025_CATALISA0002",
 }
 """Substituições específicas para o campo 'Ad name'.
 
@@ -2824,16 +3441,16 @@ def load_utm_mapping() -> dict[str, dict[str, str]]:
         header_row_index=0
     )
 
-    # Safely get the UTM_CONTENT column or create an empty one
-    if "UTM_CONTENT" in df.columns:
+    # Safely get the utm_content column or create an empty one
+    if "utm_content" in df.columns:
         utm_series = (
-            df["UTM_CONTENT"]
+            df["utm_content"]
             .astype(str)
             .str.strip()
             .str.lower()
         )
     else:
-        logger.warning("Column 'UTM_CONTENT' not found in BI_PARAMETRIZAÇÃO; using empty keys")
+        logger.warning("Column 'utm_content' not found in BI_PARAMETRIZAÇÃO; using empty keys")
         utm_series = pd.Series([""] * len(df), index=df.index)
 
     df = df.copy()
@@ -2844,23 +3461,19 @@ def load_utm_mapping() -> dict[str, dict[str, str]]:
         key = row["utm_content"]
         if key:
             mapping[key] = {
-                "START": row.get("START", ""),
-                "END":   row.get("END",   "")
+                "start": row.get("start", ""),
+                "end":   row.get("end",   "")
             }
 
     logger.info(f"Loaded {len(mapping)} UTM entries for start/end lookup")
     return mapping
 
 
-# utils/utm_lookup.py
-import logging
-import pandas as pd
-
 log = logging.getLogger(__name__)
 
 def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.DataFrame:
     """
-    Fill missing 'Inicio_da_Campanha' / 'Fim_da_Campanha' by looking-up the
+    Fill missing 'start' / 'end' by looking-up the
     utm_content in *utm_mapping* (dict: utm -> {"START":…, "END":…}).
 
     • Ignora linhas cujo “Content (utm)” esteja vazio.  
@@ -2883,33 +3496,33 @@ def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.D
 
     # 2) Build lookup Series once
     start_lkp = pd.Series(
-        {k: v["START"] for k, v in utm_mapping.items()},
-        name="Inicio_da_Campanha_lookup",
+        {k: v["start"] for k, v in utm_mapping.items()},
+        name="start_lookup",
     )
     end_lkp = pd.Series(
-        {k: v["END"] for k, v in utm_mapping.items()},
-        name="Fim_da_Campanha_lookup",
+        {k: v["end"] for k, v in utm_mapping.items()},
+        name="end_lookup",
     )
 
     # 3) Existing cols (may not exist yet)
-    if "Inicio_da_Campanha" not in df.columns:
-        df["Inicio_da_Campanha"] = ""
-    if "Fim_da_Campanha" not in df.columns:
-        df["Fim_da_Campanha"] = ""
+    if "start" not in df.columns:
+        df["start"] = ""
+    if "end" not in df.columns:
+        df["end"] = ""
 
     # 4) Only replace blanks / NA
-    before_start_na = df["Inicio_da_Campanha"].eq("").sum()
-    before_end_na   = df["Fim_da_Campanha"].eq("").sum()
+    before_start_na = df["start"].eq("").sum()
+    before_end_na   = df["end"].eq("").sum()
 
-    df.loc[df["Inicio_da_Campanha"].eq(""), "Inicio_da_Campanha"] = (
-        df.loc[df["Inicio_da_Campanha"].eq(""), "_utm_key"].map(start_lkp)
+    df.loc[df["start"].eq(""), "start"] = (
+        df.loc[df["start"].eq(""), "_utm_key"].map(start_lkp)
     )
-    df.loc[df["Fim_da_Campanha"].eq(""), "Fim_da_Campanha"] = (
-        df.loc[df["Fim_da_Campanha"].eq(""), "_utm_key"].map(end_lkp)
+    df.loc[df["end"].eq(""), "end"] = (
+        df.loc[df["end"].eq(""), "_utm_key"].map(end_lkp)
     )
 
-    filled_start = before_start_na - df["Inicio_da_Campanha"].eq("").sum()
-    filled_end   = before_end_na   - df["Fim_da_Campanha"].eq("").sum()
+    filled_start = before_start_na - df["start"].eq("").sum()
+    filled_end   = before_end_na   - df["end"].eq("").sum()
 
     log.info(
         "[utm_lookup] Filled Start/End from UTM — Start:%s  End:%s",

@@ -369,37 +369,45 @@ def normalize_parametrizacao_values(df: pd.DataFrame, cols: list[str] = None) ->
 def normalize_age(valor) -> str:
     """
     Normaliza faixas etárias para uso em dashboards e relatórios.
-
-    - Converte '55-64' e '65+' em '55+'.
-    - Converte valores vazios ou desconhecidos em 'Não classificado'.
-    - Mantém outros valores após strip e lowercase.
-
-    Parâmetros:
-        valor: entrada bruta (qualquer tipo); será convertido para str e processado.
-
-    Retorna:
-        str: faixa etária normalizada ou 'Não classificado' se valor inválido.
+    
+    • Trata primeiros os recortes específicos do Pinterest.
+    • Converte '55-64' e '65+' em '55+'.
+    • Converte valores vazios ou desconhecidos em 'Não classificado'.
+    • Mantém outros valores após strip e lowercase.
     """
     logger = logging.getLogger(__name__)
-    logger.debug("normalizar_faixa_etaria: recebendo valor %r", valor)
+    logger.debug("normalize_age: recebendo valor %r", valor)
 
+    # 1) Força str e lowercase para comparar chaves do mapeamento
     if not isinstance(valor, str):
-        logger.debug("normalizar_faixa_etaria: valor não é string, retornando 'Não classificado'")
+        logger.debug("normalize_age: valor não é string")
         return "Não classificado"
+    v = valor.strip().lower()
 
-    valor_norm = valor.strip().lower()
-    logger.debug("normalizar_faixa_etaria: após strip/lower %r", valor_norm)
+    # 2) Mapeamento dos recortes do Pinterest → faixas padrão
+    pin_map = {
+        "0-17":       "Não classificado",
+        "18-24":      "18-24",
+        "25-34":      "25-34",
+        "35-49":      "35-44",   # ajusta de 35-49 para 35-44
+        "50-64":      "55+",     # mapeia 50-64 pra 55+
+        "65+":        "55+",     # mantém 65+ → 55+
+    }
+    if v in pin_map:
+        logger.debug("normalize_age: recorte Pinterest '%s' → '%s'", v, pin_map[v])
+        return pin_map[v]
 
-    if valor_norm in {"", "none", "unknown", "others"}:
-        logger.debug("normalizar_faixa_etaria: valor em branco ou desconhecido, retornando 'Não classificado'")
+    # 3) casos genéricos
+    if v in {"", "none", "unknown", "others"}:
+        logger.debug("normalize_age: valor em branco ou desconhecido")
         return "Não classificado"
-    if valor_norm in {"55-64", "65+"}:
-        logger.debug("normalizar_faixa_etaria: valor '%s' convertido para '55+'", valor_norm)
+    if v in {"55-64", "65+"}:
+        logger.debug("normalize_age: faixa genérica '%s' → '55+'", v)
         return "55+"
 
-    logger.debug("normalizar_faixa_etaria: valor final %r", valor_norm)
-    return valor_norm
-
+    # 4) qualquer outro valor (ex.: '18-34', '21-25' etc.)
+    logger.debug("normalize_age: valor final %r", v)
+    return v
 
 
 def infer_vehicle_meta_by_placement (df: pd.DataFrame) -> pd.DataFrame:

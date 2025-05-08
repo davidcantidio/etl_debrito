@@ -43,19 +43,19 @@ def renomear_colunas_origem_para_modelo(df):
     Ignora colunas ausentes sem erro.
     """
     renomear = {
-        'Date': 'Data', 'Account name': 'Nome_da_Conta', 'Advertiser name': 'Nome_da_Conta',
-        'Campaign name': 'Campaign_name', 'Ad group name': 'Nome_do_Conjunto_de_Anuncio',
-        'Ad set name': 'Nome_do_Conjunto_de_Anuncio', 'Ad name': 'Nome_do_Anuncio',
-        'Campaign ID': 'Campaign_ID', 'Start': 'Inicio_da_Campanha', 'End': 'Fim_da_Campanha',
-        'Campaign objective type': 'Objetivo', 'Campaign objective': 'Objetivo',
-        'Placement': 'Placement', 'Preview Link': 'URL_do_Anuncio',
-        'Content (utm)': 'ID_Content', 'Impressions': 'Impressoes', 'Cost': 'Investimento',
-        'Link clicks': 'Cliques_no_Link', 'Clicks': 'Cliques_no_Link',
-        'Video play actions': 'Video_Play', 'Video views': 'Video_Play',
-        'Video watches at 25%': 'Visualizacoes_ate_25', 'Video watches at 50%': 'Visualizacoes_ate_50',
-        'Video watches at 75%': 'Visualizacoes_ate_75', 'Video watches at 100%': 'Visualizacoes_ate_100',
-        'Post reactions': 'Reacoes', 'Paid likes': 'Reacoes', 'Post shares': 'Compartilhamentos',
-        'Paid shares': 'Compartilhamentos', 'Post comments': 'Comentarios', 'Paid comments': 'Comentarios','Age': 'Faixa_Etaria'
+        'date': 'Data', 'account_name': 'Nome_da_Conta', 'advertiser_name': 'Nome_da_Conta',
+        'Campaign name': 'Campaign_name', 'ad_group_name': 'Nome_do_Conjunto_de_Anuncio',
+        'ad_set_name': 'Nome_do_Conjunto_de_Anuncio', 'ad_name': 'Nome_do_Anuncio',
+        'campaign_id': 'Campaign_ID', 'start': 'Inicio_da_Campanha', 'end': 'Fim_da_Campanha',
+        'objective': 'Objetivo', 'objective': 'Objetivo',
+        'ad_preview_link': 'URL_do_Anuncio',
+        'utm_content': 'ID_Content', 'impressions': 'Impressoes', 'cost': 'Investimento',
+        'link_clicks': 'Cliques_no_Link', 'clicks': 'Cliques_no_Link',
+        'video_play': 'Video_Play', 'Video views': 'Video_Play',
+        'video_watches_25': 'Visualizacoes_ate_25', 'video_watches_50': 'Visualizacoes_ate_50',
+        'video_watches_75': 'Visualizacoes_ate_75', 'video_watches_100': 'Visualizacoes_ate_100',
+        'post_reactions': 'Reacoes', 'paid_likes': 'Reacoes', 'post_shares': 'Compartilhamentos',
+        'paid_shares': 'Compartilhamentos', 'post_comments': 'Comentarios', 'paid_comments': 'Comentarios','age': 'Faixa_Etaria'
     }
     df.rename(columns=renomear, inplace=True)
     logging.debug("[renomear_colunas_origem_para_modelo] Colunas após renomear: %s", list(df.columns))

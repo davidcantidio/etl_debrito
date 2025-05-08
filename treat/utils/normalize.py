@@ -366,40 +366,42 @@ def normalize_parametrizacao_values(df: pd.DataFrame, cols: list[str] = None) ->
     return df_norm
 
 
-def normalize_age(valor) -> str:
+def normalize_name(nome):
     """
-    Normaliza faixas etárias para uso em dashboards e relatórios.
+    Normaliza nomes:
 
-    - Converte '55-64' e '65+' em '55+'.
-    - Converte valores vazios ou desconhecidos em 'Não classificado'.
-    - Mantém outros valores após strip e lowercase.
+    - Se não for string, retorna string vazia.
+    - Remove espaços externos, converte para lowercase.
+    - Remove acentos e caracteres unicode combinantes.
 
     Parâmetros:
-        valor: entrada bruta (qualquer tipo); será convertido para str e processado.
+        nome: qualquer objeto; se for string, será normalizado.
 
     Retorna:
-        str: faixa etária normalizada ou 'Não classificado' se valor inválido.
+        str: nome normalizado sem acentos, em lowercase, ou '' se não for string.
     """
     logger = logging.getLogger(__name__)
-    logger.debug("normalizar_faixa_etaria: recebendo valor %r", valor)
+    logger.debug("normalize_nome: recebendo %r", nome)
 
-    if not isinstance(valor, str):
-        logger.debug("normalizar_faixa_etaria: valor não é string, retornando 'Não classificado'")
-        return "Não classificado"
+    if not isinstance(nome, str):
+        logger.debug(
+            "normalize_nome: valor não é string, retornando vazio",
+        )
+        return ""
 
-    valor_norm = valor.strip().lower()
-    logger.debug("normalizar_faixa_etaria: após strip/lower %r", valor_norm)
+    cleaned = nome.strip().lower()
+    logger.debug(
+        "normalize_nome: após strip/lower %r",
+        cleaned,
+    )
 
-    if valor_norm in {"", "none", "unknown", "others"}:
-        logger.debug("normalizar_faixa_etaria: valor em branco ou desconhecido, retornando 'Não classificado'")
-        return "Não classificado"
-    if valor_norm in {"55-64", "65+"}:
-        logger.debug("normalizar_faixa_etaria: valor '%s' convertido para '55+'", valor_norm)
-        return "55+"
-
-    logger.debug("normalizar_faixa_etaria: valor final %r", valor_norm)
-    return valor_norm
-
+    normalized = unicodedata.normalize("NFKD", cleaned)
+    no_accents = ''.join([c for c in normalized if not unicodedata.combining(c)])
+    logger.debug(
+        "normalize_nome: sem acentos %r",
+        no_accents,
+    )
+    return no_accents
 
 
 def infer_vehicle_meta_by_placement (df: pd.DataFrame) -> pd.DataFrame:
@@ -522,33 +524,37 @@ def assign_vehicle_by_creative(df: pd.DataFrame) -> pd.DataFrame:
     )
     return df_out
 
+
 def normalize_gender(value) -> str:
     """
-    Normalize gender values:
-    - 'female', 'feminino' → 'Woman'
-    - 'male', 'masculino' → 'Man'
-    - empty, 'unknown', 'others', 'none', '-' → 'Not classified'
-    - other values → capitalized
+    Normaliza valores de gênero para português:
+    - 'female', 'feminino'  → 'Feminino'
+    - 'male',   'masculino' → 'Masculino'
+    - vazio, 'unknown', 'others', 'none', '-' → 'Não classificado'
+    - quaisquer outros valores → capitalizados
     """
     logging.debug(">>> In normalize_gender; raw input: %r", value)
+
     if not isinstance(value, str):
-        logging.debug("Value is not a string; returning 'Not classified'")
-        return "Not classified"
+        logging.debug("Value is not a string; returning 'Não classificado'")
+        return "Não classificado"
 
     val = value.strip().lower()
-    if val in {"female", "feminino"}:
-        logging.debug("Matched female variants; returning 'Woman'")
-        return "Woman"
-    elif val in {"male", "masculino"}:
-        logging.debug("Matched male variants; returning 'Man'")
-        return "Man"
-    elif val in {"", "unknown", "others", "none", "-"}:
-        logging.debug("Matched null/unknown variants; returning 'Not classified'")
-        return "Not classified"
 
-    result = val.capitalize()
+    if val in {"female", "feminino"}:
+        logging.debug("Matched female variants; returning 'Mulher'")
+        return "Feminino"
+    elif val in {"male", "masculino"}:
+        logging.debug("Matched male variants; returning 'Homem'")
+        return "Masculino"
+    elif val in {"", "unknown", "others", "none", "-"}:
+        logging.debug("Matched null/unknown variants; returning 'Não classificado'")
+        return "Não classificado"
+
+    result = val.capitalize()  # ex.: 'non-binary' → 'Non-binary'
     logging.debug("Capitalized '%s' to '%s'", val, result)
     return result
+
 
 def _clean_numeric_series(s: pd.Series) -> pd.Series:
     """
@@ -672,6 +678,48 @@ def extract_meta_platform_from_placement(placement: str) -> str:
     logging.debug("No keywords matched; defaulting to 'Facebook'")
     return "Facebook"
 
+def normalize_age(valor) -> str:
+    """
+    Normaliza faixas etárias para uso em dashboards e relatórios.
+    
+    • Trata primeiros os recortes específicos do Pinterest.
+    • Converte '55-64' e '65+' em '55+'.
+    • Converte valores vazios ou desconhecidos em 'Não classificado'.
+    • Mantém outros valores após strip e lowercase.
+    """
+    logger = logging.getLogger(__name__)
+    logger.debug("normalize_age: recebendo valor %r", valor)
+
+    # 1) Força str e lowercase para comparar chaves do mapeamento
+    if not isinstance(valor, str):
+        logger.debug("normalize_age: valor não é string")
+        return "Não classificado"
+    v = valor.strip().lower()
+
+    # 2) Mapeamento dos recortes do Pinterest → faixas padrão
+    pin_map = {
+        "0-17":       "Não classificado",
+        "18-24":      "18-24",
+        "25-34":      "25-34",
+        "35-49":      "35-44",   # ajusta de 35-49 para 35-44
+        "50-64":      "55+",     # mapeia 50-64 pra 55+
+        "65+":        "55+",     # mantém 65+ → 55+
+    }
+    if v in pin_map:
+        logger.debug("normalize_age: recorte Pinterest '%s' → '%s'", v, pin_map[v])
+        return pin_map[v]
+
+    # 3) casos genéricos
+    if v in {"", "none", "unknown", "others"}:
+        logger.debug("normalize_age: valor em branco ou desconhecido")
+        return "Não classificado"
+    if v in {"55-64", "65+"}:
+        logger.debug("normalize_age: faixa genérica '%s' → '55+'", v)
+        return "55+"
+
+    # 4) qualquer outro valor (ex.: '18-34', '21-25' etc.)
+    logger.debug("normalize_age: valor final %r", v)
+    return v
 
 # def apply_arbitrary_id_content_replacements(
 #     df: pd.DataFrame,

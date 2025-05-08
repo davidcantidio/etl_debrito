@@ -1,5 +1,5 @@
 
-# ==== ./main.py ====
+# ==== ./main BKP.py ====
 
 # main.py
 
@@ -55,6 +55,48 @@ if __name__ == "__main__":
         run_etl_genero()
         run_etl_regiao()
         run_etl_alcance()
+
+
+
+# ==== ./main.py ====
+
+# main.py
+
+import os
+import yaml
+from extract.sheets_fetcher import SheetsFetcher
+from treat.meta import treat_meta  # Exemplo de função de treat
+# from treat.tiktok import treat_tiktok
+# etc.
+
+# 1) Carrega configuração de abas
+with open("sheets_config.yaml", "r") as f:
+    SHEETS_TO_FETCH = yaml.safe_load(f)
+
+# 2) Instancia o fetcher (uma só vez)
+fetcher = SheetsFetcher(
+    creds_path=os.getenv("GOOGLE_CREDS_PATH", "creds.json"),
+    spreadsheet_id=os.getenv("SPREADSHEET_ID")
+)
+
+def main():
+    # 3) Extração
+    dfs_meta = fetcher.get(SHEETS_TO_FETCH["meta"])      # lista de abas meta
+    dfs_tiktok = fetcher.get(SHEETS_TO_FETCH["tiktok"])  # lista de abas tiktok
+    # ...
+
+    # 4) Tratamento
+    df_meta_geral = treat_meta(dfs_meta)                 # implementado em treat/meta.py
+    # df_tiktok_geral = treat_tiktok(dfs_tiktok)
+    # ...
+
+    # 5) Load (exemplo)
+    # from load.common import write_to_sheet
+    # write_to_sheet(df_meta_geral, "modeloGeral")
+    # ...
+
+if __name__ == "__main__":
+    main()
 
 
 
@@ -689,6 +731,7 @@ def preparar_kwargs_linkedin() -> dict:
 
 
 def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
+    
     """
     Preenche as colunas 'Nome_do_Anuncio' e 'Nome_do_Conjunto_de_Anuncio' no DataFrame de LinkedIn.
     - 'Nome_do_Anuncio' recebe o valor presente na coluna 'ID_Content'
@@ -697,6 +740,7 @@ def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
 
     Se algum valor em 'ID_Content' não tiver correspondência, é feito log de aviso.
     """
+    
     df = df.copy()
 
     if "ID_Content" not in df.columns:
@@ -1618,8 +1662,9 @@ import unicodedata
 
 
 def carregar_caches_padrao():
-    path_estados = "/home/debrito/Documentos/etl_debrito/utils/cache_estados.json"
-    path_municipios = "/home/debrito/Documentos/etl_debrito/utils/cache_municipios_estados.json"
+    MODULE_DIR = os.path.dirname(__file__)
+    path_estados   = os.path.join(MODULE_DIR, "cache_estados.json")
+    path_municipios = os.path.join(MODULE_DIR, "cache_municipios_estados.json")
 
     cache_estados = carregar_cache_estados(path_estados)
     cache_municipios = carregar_cache_municipios(path_municipios)
@@ -1955,31 +2000,35 @@ if __name__ == "__main__":
 
 # ==== ./utils/lookups_bi_parametrizacao.py ====
 
+# utils/bi_param_utils.py
+"""
+Módulo único para todas as funções que leem e manipulam
+conteúdo da aba BI_PARAMETRIZAÇÃO (lookup, preenchimento, preview etc.),
+antes de dividirmos em treat/common/.
+"""
+
 import logging
 import time
 import pandas as pd
-from typing import Optional, Tuple, Dict, List
+import unicodedata
+from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, date
+from gspread import Worksheet
+from gspread.utils import rowcol_to_a1
 from utils.get_google_client import get_google_client
-from utils.normalize import normalize_columns
+from utils.normalize import normalize_columns, normalize_campaign_series
+from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 
 log = logging.getLogger(__name__)
 
-
+# ------------------------------------------------------------------------------
+# 1) BIParamLookup: cache e geração de lookup dicts da planilha BI_PARAMETRIZAÇÃO
+# ------------------------------------------------------------------------------
 class BIParamLookup:
-    """
-    Classe para carregar e fornecer lookups a partir da aba BI_PARAMETRIZAÇÃO.
-    Utiliza cache e normalização de colunas para reduzir leituras e buscas repetidas.
-
-    Métodos principais:
-        - get_taxonomy_camp_name_and_id_from_ad_name(): mapeia nome de taxonomy_campaign_name e utm_campaign a partir do campo 'Ad name'.
-        - utm_start_end(): mapeia utm_content para datas start e end.
-        - get_criativo_mapping(): mapeia utm_content para nome do criativo.
-        - lookup_utm_for_ad_name(ad_name): encontra utm_content dado um nome de criativo.
-    """
-    SHEET_NAME: str = "BI_PARAMETRIZAÇÃO"
-    HEADER_ROW: int = 1      # linha com cabeçalho real (0-indexed)
-    _TTL: int = 60 * 10      # cache de 10 minutos
-
+    SHEET_NAME = "BI_PARAMETRIZAÇÃO"
+    HEADER_ROW = 1     # 0-indexed
+    _TTL = 60 * 10     # 10 minutos
 
     def __init__(self, creds_path: str, spreadsheet_id: str):
         self.creds_path = creds_path
@@ -1987,170 +2036,214 @@ class BIParamLookup:
         self._df: Optional[pd.DataFrame] = None
         self._last_load: float = 0.0
         self._col_cache: Dict[str, Optional[str]] = {}
-        log.debug("[BIParamLookup] Inicializado para spreadsheet_id=%s", spreadsheet_id)
-
-
+        log.debug("Inicializado BIParamLookup for %s", spreadsheet_id)
 
     def _load_df(self) -> pd.DataFrame:
-        """
-        Carrega do Google Sheets e retorna DataFrame com colunas normalizadas (lowercase).
-        """
-        log.debug("[BIParamLookup] Carregando BI_PARAMETRIZAÇÃO")
         client = get_google_client(self.creds_path)
         sheet = client.open_by_key(self.spreadsheet_id)
         rows = sheet.worksheet(self.SHEET_NAME).get_all_values()
         if len(rows) <= self.HEADER_ROW:
             raise ValueError("BI_PARAMETRIZAÇÃO sem dados suficientes.")
-
-        raw_headers = rows[self.HEADER_ROW]
-        headers = normalize_columns(pd.Index(raw_headers))
-        df = pd.DataFrame(rows[self.HEADER_ROW + 1 :], columns=headers)
-        log.info("[BIParamLookup] %d linhas carregadas de '%s'", len(df), self.SHEET_NAME)
+        raw_hdr = rows[self.HEADER_ROW]
+        hdr = normalize_columns(pd.Index(raw_hdr))
+        df = pd.DataFrame(rows[self.HEADER_ROW + 1 :], columns=hdr)
+        log.info("BI_PARAM loaded %d rows", len(df))
         return df
 
-
-    def _ensure_df(self) -> None:
-        """
-        Garante DataFrame carregado e recarrega se expirado pelo TTL.
-        """
-        now = time.time()
-        if self._df is None or (now - self._last_load) > self._TTL:
+    def _ensure_df(self):
+        if self._df is None or time.time() - self._last_load > self._TTL:
             self._df = self._load_df()
-            self._last_load = now
+            self._last_load = time.time()
             self._col_cache.clear()
-            log.debug("[BIParamLookup] Cache invalidado e DataFrame recarregado")
-
 
     def _find_col(self, keyword: str) -> Optional[str]:
-        """
-        Retorna o nome da coluna que contenha a keyword (lowercase), ou None.
-        Usa cache interno para acelerar buscas repetidas.
-        """
         key = keyword.lower()
         if key in self._col_cache:
             return self._col_cache[key]
         self._ensure_df()
-        for col in self._df.columns:  # type: ignore
-            if key in col:
-                self._col_cache[key] = col
-                log.debug("[BIParamLookup] Coluna '%s' encontrada para '%s'", col, keyword)
-                return col
+        for c in self._df.columns:  # type: ignore
+            if key in c:
+                self._col_cache[key] = c
+                return c
         self._col_cache[key] = None
-        log.warning("[BIParamLookup] Coluna para '%s' não encontrada", keyword)
+        log.warning("Coluna p/ %s não encontrada", keyword)
         return None
 
-
     def _map_columns(
-        self,
-        key_kw: str,
-        val_kws: List[str],
-        upper_keys: bool = True
+        self, key_kw: str, val_kws: List[str], upper_keys: bool = True
     ) -> Dict[str, Tuple[str, ...]]:
-        """
-        Cria dicionário de mapping: {key -> (val1, val2, ...)}
-
-        key_kw: keyword para coluna chave
-        val_kws: keywords para colunas de valor
-        upper_keys: se True, transforma chaves em uppercase
-        """
         self._ensure_df()
         key_col = self._find_col(key_kw)
-        val_cols = [self._find_col(k) for k in val_kws]
+        val_cols = [self._find_col(v) for v in val_kws]
         if key_col is None or any(vc is None for vc in val_cols):
-            raise KeyError(f"Colunas para '{key_kw}' ou {val_kws} não encontradas.")
-        mapping: Dict[str, Tuple[str, ...]] = {}
+            raise KeyError(f"Colunas para {key_kw} ou {val_kws} não encontradas")
+        out: Dict[str, Tuple[str, ...]] = {}
         for row in self._df.itertuples(index=False):  # type: ignore
-            raw_key = getattr(row, key_col)
-            if pd.isna(raw_key):
-                continue
-            key = str(raw_key).strip()
-            if not key:
-                continue
-            key = key.upper() if upper_keys else key.lower()
+            raw = getattr(row, key_col)
+            if pd.isna(raw): continue
+            k = str(raw).strip()
+            if not k: continue
+            k = k.upper() if upper_keys else k.lower()
             vals = tuple(str(getattr(row, vc)).strip() for vc in val_cols)  # type: ignore
-            mapping[key] = vals
-        log.debug("[BIParamLookup] Mapeamento '%s' gerado com %d chaves", key_kw, len(mapping))
-        return mapping
-
-
-    def get_taxonomy_camp_name_and_id_from_ad_name(self) -> Tuple[Dict[str, str], Dict[str, str]]:
-        """
-        Retorna dois dicionários baseados no campo 'Ad name':
-          - mapping_taxonomy_campaign_name: 
-          - mapping_utm_campaign:   
-        """
-        raw = self._map_columns(
-            key_kw="ad_name",
-            val_kws=["taxonomy_campaign_name", "utm_campaign"],
-            upper_keys=True
-        )
-        mapping_taxonomy_campaign_name = {k: v[0] for k, v in raw.items()}
-        mapping_utm_campaign = {k: v[1] for k, v in raw.items()}
-        log.info("[BIParamLookup] campaign mappings from ad_name carregados: %d chaves", len(raw))
-        return mapping_taxonomy_campaign_name, mapping_utm_campaign
-
-
-    def utm_start_end(self) -> Dict[str, Dict[str, str]]:
-        """
-        Retorna dicionário:
-          {utm_lower: {"start": start_val, "end": end_val}}
-        """
-        raw = self._map_columns(
-            key_kw="utm_content",
-            val_kws=["start", "end"],
-            upper_keys=False
-        )
-        out = {utm: {"start": v[0], "end": v[1]} for utm, v in raw.items()}
-        log.info("[BIParamLookup] utm_start_end carregados: %d utms", len(out))
+            out[k] = vals
         return out
 
+    def get_taxonomy_camp_name_and_id_from_ad_name(self) -> Tuple[Dict[str,str], Dict[str,str]]:
+        raw = self._map_columns("ad_name", ["taxonomy_campaign_name","utm_campaign"], upper_keys=True)
+        return ({k:v[0] for k,v in raw.items()}, {k:v[1] for k,v in raw.items()})
 
-    def get_criativo_mapping(self) -> Dict[str, str]:
-        """
-        Retorna mapping utm_content_lower -> nome do criativo.
-        """
-        raw = self._map_columns(
-            key_kw="utm_content",
-            val_kws=["criativo"],
-            upper_keys=False
-        )
-        mapping = {k: v[0] for k, v in raw.items()}
-        log.info("[BIParamLookup] criativo mapping carregado: %d entradas", len(mapping))
-        return mapping
+    def utm_start_end(self) -> Dict[str,Dict[str,str]]:
+        raw = self._map_columns("utm_content", ["start","end"], upper_keys=False)
+        return {k:{"start":v[0],"end":v[1]} for k,v in raw.items()}
 
+    def get_criativo_mapping(self) -> Dict[str,str]:
+        raw = self._map_columns("utm_content", ["criativo"], upper_keys=False)
+        return {k:v[0] for k,v in raw.items()}
 
     def lookup_utm_for_ad_name(self, ad_name: str) -> str:
-        """
-        Dado um nome de criativo (Ad name), retorna utm_content correspondente ou ''.
-        """
-        if not isinstance(ad_name, str):
-            return ""
-        criativo_map = self.get_criativo_mapping()
-        inv = {v: k for k, v in criativo_map.items()}
-        utm = inv.get(ad_name.strip(), "")
-        if not utm:
-            log.debug("[BIParamLookup] utm não encontrado para ad_name='%s'", ad_name)
-        return utm
+        if not isinstance(ad_name, str): return ""
+        inv = {v:k for k,v in self.get_criativo_mapping().items()}
+        return inv.get(ad_name.strip(),"")    
 
-def get_campaign_parameterization(
-    creds_path: str,
-    spreadsheet_id: str
-) -> Tuple[Dict[str, str], Dict[str, str]]:
-    """
-    Atalho para obter os mapeamentos de nome de campanha e sigla
-    a partir da aba BI_PARAMETRIZAÇÃO, usando a classe BIParamLookup.
+def get_campaign_parameterization(creds_path: str, spreadsheet_id: str) -> Tuple[Dict[str,str],Dict[str,str]]:
+    return BIParamLookup(creds_path, spreadsheet_id).get_taxonomy_camp_name_and_id_from_ad_name()
 
-    Args:
-        creds_path: caminho para o JSON de credenciais do Google Sheets.
-        spreadsheet_id: ID da planilha no Google Sheets.
 
-    Returns:
-        Tuple contendo:
-          - mapping_campanha: dict {NOME_CAMPANHA_UPPER: Campanha}
-          - mapping_sigla:    dict {NOME_CAMPANHA_UPPER: Sigla}
-    """
-    lookup = BIParamLookup(creds_path, spreadsheet_id)
-    return lookup.get_taxonomy_camp_name_and_id_from_ad_name()
+# ------------------------------------------------------------------------------
+# 2) Creative mapping (LinkedIn utm_content ↔ Criativo)
+# ------------------------------------------------------------------------------
+def _normalize_str(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.strip().lower()
+
+def load_ad_name_mapping(df_param: pd.DataFrame) -> Dict[str,str]:
+    df = df_param.copy()
+    df.columns = [_normalize_str(c) for c in df.columns]
+    if not {"utm_content","criativo"}.issubset(df.columns):
+        log.warning("Creative mapping: colunas faltando %s", set(("utm_content","criativo")) - set(df.columns))
+        return {}
+    df = df[["utm_content","criativo"]].dropna().applymap(str.strip)
+    return dict(zip(df["utm_content"], df["criativo"]))
+
+def get_ad_name_from_utm_content(utm: str, mapping: Dict[str,str]) -> str:
+    return mapping.get(utm.strip(), "")
+
+def fill_utm_from_ad_name(
+    df: pd.DataFrame,
+    mapping: Dict[str,str],
+    coluna_ad: str="Ad name",
+    coluna_dest: str="Content (utm)",
+    write_back: bool=False,
+    sheet_name: Optional[str]=None
+) -> pd.DataFrame:
+    inv = {v:k for k,v in mapping.items()}
+    df = df.copy()
+    updates: List[Dict[str,Any]] = []
+    # prepare worksheet if write_back...
+    for idx, ad in df[coluna_ad].astype(str).str.strip().items():
+        if not df.at[idx, coluna_dest].strip():
+            utm = inv.get(ad,"")
+            if utm:
+                df.at[idx, coluna_dest] = utm
+                # se write_back, acumular updates...
+    # se write_back: batch_update
+    return df
+
+
+# ------------------------------------------------------------------------------
+# 3) Datas e parâmetros (fill_missing_start_end_from_params)
+# ------------------------------------------------------------------------------
+MAX_CELLS = 500
+def _chunk(upd: List[Dict[str,Any]], size:int):
+    for i in range(0,len(upd),size): yield upd[i:i+size]
+
+def fill_missing_start_end_from_params(
+    df: pd.DataFrame,
+    sheet_name: Optional[str]=None,
+    worksheet: Optional[Worksheet]=None,
+    write_back: bool=True,
+    inplace: bool=True
+) -> pd.DataFrame:
+    if not inplace: df = df.copy()
+    # carregar BI_PARAMETRIZAÇÃO raw (linha 2)
+    client = get_google_client(CREDS_PATH)
+    sh = client.open_by_key(SPREADSHEET_ID)
+    ws = sh.worksheet("BI_PARAMETRIZAÇÃO")
+    data = ws.get_all_values()
+    hdr = [c.strip().upper() for c in data[1]]
+    dfp = pd.DataFrame(data[2:], columns=hdr)
+    # normalizar criativo, map_start, map_end
+    df["criativo_norm"] = normalize_campaign_series(df["ad_name"])
+    # preenche start e end, write_back se solicitado...
+    return df
+
+def transformar_para_date(v):
+    if not v: return None
+    if isinstance(v, date): return v
+    if isinstance(v, datetime): return v.date()
+    for fmt in ("%Y-%m-%d %H:%M:%S","%Y-%m-%d"):
+        try: return datetime.strptime(v.strip(),fmt).date()
+        except: continue
+    raise ValueError("Formato inválido")
+
+def converter_data(df: pd.DataFrame, col: str) -> pd.DataFrame:
+    if col in df.columns:
+        df[col] = pd.to_datetime(df[col], errors="coerce").dt.date.fillna("")
+    return df
+
+def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["Inicio_da_Campanha"] = df.get("start","").apply(transformar_para_date)
+    df["Fim_da_Campanha"]    = df.get("end","").apply(transformar_para_date)
+    return df
+
+# ------------------------------------------------------------------------------
+# 4) UTM-Lookup simplificado (via DataFrame)
+# ------------------------------------------------------------------------------
+def load_utm_mapping() -> Dict[str,Dict[str,str]]:
+    client = get_google_client(CREDS_PATH)
+    df = read_sheet_as_dataframe_range(client, SPREADSHEET_ID, "BI_PARAMETRIZAÇÃO","A2:ZZ",0)
+    df["utm_content"] = df.get("utm_content","").astype(str).str.strip().str.lower()
+    out = {}
+    for _,r in df.iterrows():
+        k = r["utm_content"]
+        if k: out[k] = {"start":r.get("start",""),"end":r.get("end","")}
+    return out
+
+def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_map: Dict[str,Dict[str,str]]) -> pd.DataFrame:
+    df = df.copy()
+    key = df.get("Content (utm)","").astype(str).str.strip().str.lower()
+    df["start"] = df["start"].mask(df["start"].eq(""), key.map({k:v["start"] for k,v in utm_map.items()}))
+    df["end"]   = df["end"].mask  (df["end"].eq(""),   key.map({k:v["end"]   for k,v in utm_map.items()}))
+    return df
+
+# ------------------------------------------------------------------------------
+# 5) Preview-links
+# ------------------------------------------------------------------------------
+def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.rename(columns={"Preview Link FB":"Preview_Link_FB","Preview Link IG":"Preview_Link_IG"})
+    df["URL_do_Anuncio"] = df.get("URL_do_Anuncio","").mask(
+        df.get("URL_do_Anuncio","")!="",
+        df.get("Preview_Link_IG","").mask("", df.get("Preview_Link_FB",""))
+    )
+    return df
+
+def generate_linkedin_ad_preview_link_from_lookup(df_param: pd.DataFrame) -> Dict[str,str]:
+    if not {"utm_content","preview"}.issubset(df_param.columns):
+        return {}
+    m = df_param[["utm_content","preview"]].dropna().drop_duplicates("utm_content")
+    return dict(zip(m["utm_content"],m["preview"]))
+
+def build_pinterest_preview_link(pin_id: Any) -> str:
+    s = str(pin_id).strip()
+    return f"https://www.pinterest.com/pin/{s}" if s else ""
+
+def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
+    col = next((c for c in df.columns if c.strip().lower()=="preview link"),None)
+    df["URL_do_Anúncio"] = df.get(col,"").apply(build_pinterest_preview_link) if col else ""
+    return df
+
 
 
 # ==== ./utils/normalize.py ====
@@ -3226,6 +3319,67 @@ renomeacao_metaAlcance = {
     "Impressions": "impressions"
 }
 
+# bi_parametrizacao_column_map.py
+BI_PARAM_COLUMN_MAP = {
+    # ===== META-DEFINIÇÃO DA CAMPANHA =====
+    "NOME CAMPANHA":                     "campaign_name",
+    "PLATAFORMA/ REDE/PORTAL":           "platform_network_portal",
+    "VEÍCULOS":                          "vehicle",
+    "CATEGORIA obrigatório":             "category",
+    "FORMATO obrigatório":               "format",
+    "REGIÃO obrigatório":                "region",
+    "REMARKETING/AÇÃO obrigatório":      "remarketing_or_action",
+    "START":                             "start",
+    "END":                               "end",
+
+    # ===== CRIATIVO / PRÉ-VISUALIZAÇÃO =====
+    'CRIATIVO/INFLUENCIADOR - Obrigatório': "ad_name_raw",
+    "AD_PREVIEW":                        "ad_preview_link",
+    "URL DE DESTINO (Livre)":            "landing_page_url",
+
+    # ===== RESPONSÁVEIS & OBJETIVOS =====
+    "RESPONSÁVEL Obrigatório":           "responsible",
+    "OBJETIVO obrigatório":              "objective",
+    "TIPO DE COMPRA obrigatório":        "purchase_type",
+    "SEGMENTAÇÃO obrigatória! Escreva de forma resumida": "segmentation",
+
+    # ===== RAW FIELDS vindos da mídia =====
+    "ID":                                "utm_content_raw",
+    "utm_source_raw":                    "utm_source_raw",
+    "Remarketing e Ação":                "remarketing_or_action_raw",
+    "Agência":                           "agency_raw",
+    "SIGLA":                             "utm_campaign_raw",
+    "url":                               "base_urn",
+    "Editoria":                          "type_comunication",
+
+    # ===== UTM FINAIS =====
+    "utm_source":                        "utm_source",
+    "utm_medium":                        "utm_medium",
+    "utm_medium2":                       "utm_medium2",
+    "formato":                           "formato",
+    "utm_campaign":                      "utm_campaign",
+    "Objetivo":                          "objective",      # duplicado na fonte → mesmo canônico
+    "Região":                            "region",
+    "utm_term":                          "utm_term",
+    "utm_content":                       "utm_content",
+    "url_final_raw":                     "url_final_raw",
+
+    # ===== TAXONOMY (padrão interno) =====
+    "CAMPANHA":                          "taxonomy_campaign_name",
+    "CONJUNTO DE ANÚNCIO (não aplicável para Linkedin)": "taxonomy_ad_group_name",
+    "CRIATIVO":                          "taxonomy_ad_name",
+
+    # ===== PARAMETRIZAÇÃO DE LINKS =====
+    "GERAR LINK?":                       "generate_parametrized_link",
+    "URL PARAMETRIZADA":                 "parametrized_link",
+
+    # ===== TAXONOMY PARA REDES SOCIAIS =====
+    "CampanhaRedes":                     "taxonomy_campaign_name_social",
+    "ConjuntoAnunciosRedes":             "taxonomy_ad_group_name_social",
+    "CriativoRedes":                     "taxonomy_ad_name_social",
+}
+
+
 
 
 # ==== ./utils/setup_logging.py ====
@@ -3306,10 +3460,10 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 _REPLACEMENT_SPECS: list[tuple[str, Mapping[str, str]]] = [
-    ("Content (utm)", ID_CONTENT_REPLACEMENTS),
-    ("Campaign name", CAMPAIGN_NAME_REPLACEMENTS),
-    ("Ad group name", AD_GROUP_NAME_REPLACEMENTS),
-    ("Ad name", AD_NAME_REPLACEMENTS)
+    ("utm_content", ID_CONTENT_REPLACEMENTS),
+    ("campaign_name", CAMPAIGN_NAME_REPLACEMENTS),
+    ("ad_group_name", AD_GROUP_NAME_REPLACEMENTS),
+    ("ad_name", AD_NAME_REPLACEMENTS)
 ]
 
 # Segurança contra payloads enormes; 10k células ≅ 5 MiB.
@@ -3615,7 +3769,7 @@ log = logging.getLogger(__name__)
 
 def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.DataFrame:
     """
-    Fill missing 'Inicio_da_Campanha' / 'Fim_da_Campanha' by looking-up the
+    Fill missing 'start' / 'end' by looking-up the
     utm_content in *utm_mapping* (dict: utm -> {"START":…, "END":…}).
 
     • Ignora linhas cujo “Content (utm)” esteja vazio.  
@@ -3639,32 +3793,32 @@ def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.D
     # 2) Build lookup Series once
     start_lkp = pd.Series(
         {k: v["start"] for k, v in utm_mapping.items()},
-        name="Inicio_da_Campanha_lookup",
+        name="start_lookup",
     )
     end_lkp = pd.Series(
         {k: v["end"] for k, v in utm_mapping.items()},
-        name="Fim_da_Campanha_lookup",
+        name="end_lookup",
     )
 
     # 3) Existing cols (may not exist yet)
-    if "Inicio_da_Campanha" not in df.columns:
-        df["Inicio_da_Campanha"] = ""
-    if "Fim_da_Campanha" not in df.columns:
-        df["Fim_da_Campanha"] = ""
+    if "start" not in df.columns:
+        df["start"] = ""
+    if "end" not in df.columns:
+        df["end"] = ""
 
     # 4) Only replace blanks / NA
-    before_start_na = df["Inicio_da_Campanha"].eq("").sum()
-    before_end_na   = df["Fim_da_Campanha"].eq("").sum()
+    before_start_na = df["start"].eq("").sum()
+    before_end_na   = df["end"].eq("").sum()
 
-    df.loc[df["Inicio_da_Campanha"].eq(""), "Inicio_da_Campanha"] = (
-        df.loc[df["Inicio_da_Campanha"].eq(""), "_utm_key"].map(start_lkp)
+    df.loc[df["start"].eq(""), "start"] = (
+        df.loc[df["start"].eq(""), "_utm_key"].map(start_lkp)
     )
-    df.loc[df["Fim_da_Campanha"].eq(""), "Fim_da_Campanha"] = (
-        df.loc[df["Fim_da_Campanha"].eq(""), "_utm_key"].map(end_lkp)
+    df.loc[df["end"].eq(""), "end"] = (
+        df.loc[df["end"].eq(""), "_utm_key"].map(end_lkp)
     )
 
-    filled_start = before_start_na - df["Inicio_da_Campanha"].eq("").sum()
-    filled_end   = before_end_na   - df["Fim_da_Campanha"].eq("").sum()
+    filled_start = before_start_na - df["start"].eq("").sum()
+    filled_end   = before_end_na   - df["end"].eq("").sum()
 
     log.info(
         "[utm_lookup] Filled Start/End from UTM — Start:%s  End:%s",
@@ -3923,7 +4077,7 @@ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 # cliente compartilhado
 _CLIENT = get_google_client(CREDS_PATH)
 
-class MetaPlacementMerge(ABC):
+class MetaplacementMerge(ABC):
     """
     Classe base para leitura/pivô/merge de abas 'metaX' + 'metaGeral'.
     """
@@ -3953,7 +4107,7 @@ class MetaPlacementMerge(ABC):
 
     @abstractmethod
     def dimension_keys(self) -> List[str]:
-        """Ex: ['Ad ID','Date','Age']"""
+        """Ex: ['ad_id','Date','Age']"""
 
     @abstractmethod
     def metric_columns(self) -> List[str]:
@@ -3970,10 +4124,10 @@ class MetaPlacementMerge(ABC):
 
     def pivot_general_data(self, df: pd.DataFrame) -> pd.DataFrame:
         id_vars   = self.general_keys()
-        value_vars = [c for c in df.columns if c not in id_vars + ["Placement"]]
+        value_vars = [c for c in df.columns if c not in id_vars + ["placement"]]
         df_piv = df.pivot_table(
             index=id_vars,
-            columns="Placement",
+            columns="placement",
             values=value_vars,
             aggfunc="sum",
             fill_value=0,
@@ -4015,7 +4169,7 @@ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-METRICAS: List[str] = ["Impressions", "Link clicks", "Cost", "video_watches_100"]
+METRICAS: List[str] = ["Impressions", "Link clicks", "cost", "video_watches_100"]
 
 # ------------------------------- CACHE -------------------------------- #
 _client = get_google_client(CREDS_PATH)
@@ -4041,7 +4195,7 @@ def load_and_prepare_meta_gender_data() -> pd.DataFrame:
     df.columns = df.columns.str.strip()
     # 1) Drop obrigatórios
     df = df.dropna(subset=["ad_id", "date", "gender"])
-    # 2) Converte Cost (pode vir como 'Cost' ou 'cost' etc)
+    # 2) Converte cost (pode vir como 'cost' ou 'cost' etc)
     #    vamos buscar case‑insensitive:
     cost_col = next((c for c in df.columns if c.lower() == "cost"), None)
     if cost_col:
@@ -4050,8 +4204,8 @@ def load_and_prepare_meta_gender_data() -> pd.DataFrame:
         s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)
         s = s.str.replace(",", ".", regex=False)
         df[cost_col] = pd.to_numeric(s, errors="coerce").fillna(0)
-        # já padroniza para 'Cost'
-        df.rename(columns={cost_col: "Cost"}, inplace=True)
+        # já padroniza para 'cost'
+        df.rename(columns={cost_col: "cost"}, inplace=True)
     # 3) Outras métricas
     for col in ["Impressions", "Link clicks", "video_watches_100"]:
         if col in df.columns:
@@ -4070,12 +4224,12 @@ def pivot_meta_gender_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
     id_vars = ["ad_id", "date"]
-    value_vars = [c for c in df_placement.columns if c not in id_vars + ["Placement"]]
+    value_vars = [c for c in df_placement.columns if c not in id_vars + ["placement"]]
 
     pivot_df = (
         df_placement.pivot_table(
             index=id_vars,
-            columns="Placement",
+            columns="placement",
             values=value_vars,
             aggfunc="sum",
             fill_value=0,
@@ -4157,7 +4311,7 @@ def distribute_gender_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
     """
     placements = get_placements(df_in)
 
-    # Garante colunas‑totais (Impressions, Cost, etc.)
+    # Garante colunas‑totais (Impressions, cost, etc.)
     for m in METRICAS:
         if m not in df_in.columns:
             cols = [f"{pl}_{m}" for pl in placements if f"{pl}_{m}" in df_in.columns]
@@ -4170,8 +4324,8 @@ def distribute_gender_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
 
         # distribuições por métrica
         dist: Dict[str, Dict[str, float | int]] = {}
-        # Cost separado: float 2 casas – demais inteiros
-        dist["Cost"] = _distribuir_cost(float(row["Cost"]), pesos)
+        # cost separado: float 2 casas – demais inteiros
+        dist["cost"] = _distribuir_cost(float(row["cost"]), pesos)
         for m in ("Impressions", "Link clicks", "video_watches_100"):
             dist[m] = _distribuir_contgenderm(int(row[m]), pesos)
 
@@ -4192,7 +4346,7 @@ def distribute_gender_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
     # ---------- checgenderm de integridade global ----------
     for m in METRICAS:
         soma_in, soma_out = df_in[m].sum(), df_out[m].sum()
-        tol = 0.01 if m == "Cost" else 0
+        tol = 0.01 if m == "cost" else 0
         if abs(soma_in - soma_out) > tol:
             raise AssertionError(
                 f"Soma global divergente em '{m}': {soma_in} → {soma_out}"
@@ -4232,7 +4386,7 @@ from math import floor
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-METRICAS: List[str] = ["Impressions", "Cost", "Video watches at 100%", "Link clicks"]
+METRICAS: List[str] = ["impressions", "cost", "Video watches at 100%", "Link clicks"]
 
 # ------------------------------- CACHE -------------------------------- #
 _client = get_google_client(CREDS_PATH)
@@ -4243,7 +4397,7 @@ def _read_sheet(sheet: str, dimension_col: str = None) -> pd.DataFrame:
     Lê a aba da planilha Google e retorna os dados, adaptando as colunas para diferentes dimensões.
     
     :param sheet: Nome da aba a ser lida (como "metaIdade", "metaGenero", etc.)
-    :param dimension_col: (Opcional) Nome da coluna de dimensão (como 'Age', 'Gender', 'Region') para ajustar o DataFrame
+    :param dimension_col: (Opcional) Nome da coluna de dimensão (como 'age', 'gender', 'region') para ajustar o DataFrame
     :return: DataFrame com os dados da aba
     """
     # Verifica se a aba já está em cache
@@ -4259,7 +4413,7 @@ def _read_sheet(sheet: str, dimension_col: str = None) -> pd.DataFrame:
     
     df = _cache[sheet].copy()
 
-    # Se houver uma coluna de dimensão especificada (como 'Age', 'Gender', etc.), ajusta o DataFrame
+    # Se houver uma coluna de dimensão especificada (como 'age', 'gender', etc.), ajusta o DataFrame
     if dimension_col:
         if dimension_col not in df.columns:
             log.warning(f"A coluna de dimensão '{dimension_col}' não foi encontrada na planilha '{sheet}'!")
@@ -4275,9 +4429,9 @@ DISTRIBUICAO_LOGS: Counter[str] = Counter()  # Contador de casos especiais duran
 # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
 def load_and_prepare_meta_dimension_data(dimension_col: str) -> pd.DataFrame:
     """
-    Carrega e prepara os dados de uma dimensão (Age, Gender, Region), e os dados de placement.
+    Carrega e prepara os dados de uma dimensão (age, gender, region), e os dados de placement.
     
-    :param dimension_col: Nome da coluna de dimensão (como 'Age', 'Gender', 'Region').
+    :param dimension_col: Nome da coluna de dimensão (como 'age', 'gender', 'region').
     :return: DataFrame com os dados de dimension e placement preparados.
     """
     df = _read_sheet("metaIdade")  # Ou "metaGeral" dependendo da dimensão
@@ -4286,9 +4440,9 @@ def load_and_prepare_meta_dimension_data(dimension_col: str) -> pd.DataFrame:
     df.columns = df.columns.str.strip()
     
     # 1) Drop obrigatórios
-    df = df.dropna(subset=["Ad ID", "Date", dimension_col])
+    df = df.dropna(subset=["ad_id", "date", dimension_col])
     
-    # 2) Processar Cost de forma dinâmica
+    # 2) Processar cost de forma dinâmica
     cost_col = next((c for c in df.columns if c.lower() == "cost"), None)
     if cost_col:
         s = df[cost_col].astype(str)
@@ -4296,10 +4450,10 @@ def load_and_prepare_meta_dimension_data(dimension_col: str) -> pd.DataFrame:
         s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)
         s = s.str.replace(",", ".", regex=False)
         df[cost_col] = pd.to_numeric(s, errors="coerce").fillna(0)
-        df.rename(columns={cost_col: "Cost"}, inplace=True)
+        df.rename(columns={cost_col: "cost"}, inplace=True)
 
     # 3) Outras métricas
-    for col in ["Impressions", "Link clicks", "Video watches at 100%"]:
+    for col in ["impressions", "Link clicks", "Video watches at 100%"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
     
@@ -4311,7 +4465,7 @@ def load_and_prepare_meta_placement_data() -> pd.DataFrame:
     Carrega e prepara os dados de placement (metaGeral).
     """
     df = _read_sheet("metaGeral")
-    df = df.dropna(subset=["Ad ID", "Date"])  # Garantir que as colunas 'Ad ID' e 'Date' não estejam vazias   
+    df = df.dropna(subset=["ad_id", "date"])  # Garantir que as colunas 'ad_id' e 'date' não estejam vazias   
     # Garantir que todas as métricas estejam presentes e sejam convertidas para numéricas
     for col in METRICAS:
         if col not in df.columns:
@@ -4336,7 +4490,7 @@ def compute_impression_weights(row: pd.Series, placements: list[str]) -> Tuple[d
     - total: soma dos pesos.
     """
     
-    pesos = {pl: max(int(row.get(f"{pl}_Impressions", 0)), 0) for pl in placements}
+    pesos = {pl: max(int(row.get(f"{pl}_impressions", 0)), 0) for pl in placements}
 
     # Se todos os pesos forem zero, atribui peso 1 ao placement com a maior métrica
     if not any(pesos.values()):
@@ -4350,7 +4504,7 @@ def compute_impression_weights(row: pd.Series, placements: list[str]) -> Tuple[d
 # ------------------------------ PIVOTS -------------------------------- #
 def pivot_meta_dimension_data(df: pd.DataFrame, dimension_col: str) -> pd.DataFrame:
     """
-    Agrupa os dados por Ad ID, Date e a coluna de dimensão fornecida (Age, Gender, Region) e soma as métricas.
+    Agrupa os dados por ad_id, date e a coluna de dimensão fornecida (age, gender, region) e soma as métricas.
     """
     # Verificando se a coluna de métricas está presente
     for col in METRICAS:
@@ -4358,18 +4512,18 @@ def pivot_meta_dimension_data(df: pd.DataFrame, dimension_col: str) -> pd.DataFr
             log.warning(f"Coluna '{col}' não encontrada para o agrupamento!")
             df[col] = 0  # Adiciona uma coluna com valores 0 caso não exista
 
-    # Agrupando pelos valores de 'Ad ID', 'Date' e a dimensão específica (Age, Gender, Region)
-    return df.groupby(["Ad ID", "Date", dimension_col], as_index=False)[METRICAS].sum()
+    # Agrupando pelos valores de 'ad_id', 'date' e a dimensão específica (age, gender, region)
+    return df.groupby(["ad_id", "date", dimension_col], as_index=False)[METRICAS].sum()
 
 
 def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
-    id_vars = ["Ad ID", "Date"]
-    value_vars = [c for c in df_placement.columns if c not in id_vars + ["Placement"]]
+    id_vars = ["ad_id", "date"]
+    value_vars = [c for c in df_placement.columns if c not in id_vars + ["placement"]]
 
     pivot_df = (
         df_placement.pivot_table(
             index=id_vars,
-            columns="Placement",
+            columns="placement",
             values=value_vars,
             aggfunc="sum",
             fill_value=0,
@@ -4383,9 +4537,9 @@ def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
 
 def get_placements(df: pd.DataFrame) -> List[str]:
     """
-    Extrai os placements a partir dos nomes das colunas com a sufixação '_Impressions'.
+    Extrai os placements a partir dos nomes das colunas com a sufixação '_impressions'.
     """
-    return sorted({c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_Impressions")})
+    return sorted({c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_impressions")})
 
 
 # ------------------------- MERGE E DISTRIBUIÇÃO ------------------------ #
@@ -4395,15 +4549,15 @@ def merge_placement_and_dimension_data(
     dimension_col: str
 ) -> pd.DataFrame:
     """
-    Realiza o merge entre os dados de uma dimensão (como Age, Gender, Region) e dados de placement.
+    Realiza o merge entre os dados de uma dimensão (como age, gender, region) e dados de placement.
     
-    :param df_dimension: DataFrame contendo os dados da dimensão (Age, Gender, Region).
-    :param df_place: DataFrame contendo os dados de placement (com métricas como Impressions, Cost, etc.).
-    :param dimension_col: Nome da coluna que representa a dimensão, como 'Age', 'Gender', ou 'Region'.
+    :param df_dimension: DataFrame contendo os dados da dimensão (age, gender, region).
+    :param df_place: DataFrame contendo os dados de placement (com métricas como impressions, cost, etc.).
+    :param dimension_col: Nome da coluna que representa a dimensão, como 'age', 'gender', ou 'region'.
     :return: DataFrame resultante do merge.
     """
-    required_columns_dimension = [dimension_col, "Ad ID", "Date"]
-    required_columns_place = ["Ad ID", "Date", "Impressions", "Cost", "Link clicks", "Video watches at 100%"]
+    required_columns_dimension = [dimension_col, "ad_id", "date"]
+    required_columns_place = ["ad_id", "date", "impressions", "cost", "Link clicks", "Video watches at 100%"]
     
     # Log de verificação para as colunas de dimensão
     log.debug(f"Verificando colunas em df_dimension: {df_dimension.columns}")
@@ -4421,7 +4575,7 @@ def merge_placement_and_dimension_data(
     log.debug(f"Linhas antes do merge - df_dimension: {df_dimension.shape[0]}")
     log.debug(f"Linhas antes do merge - df_place: {df_place.shape[0]}")
     
-    # Realizar o merge, agora considerando a coluna de dimensão dinâmica (Age
+    # Realizar o merge, agora considerando a coluna de dimensão dinâmica (age
 
 def _floor_cents(v: float) -> float:
     """
@@ -4454,12 +4608,12 @@ def _distribute_counts(valor: int, pesos: Dict[str, int]) -> Dict[str, int]:
 
 def distribute_dimension_metrics(df_in: pd.DataFrame, dimension_col: str) -> pd.DataFrame:
     """
-    Redistribui as métricas agregadas por uma dimensão (Age, Region, Gender) para cada placement,
+    Redistribui as métricas agregadas por uma dimensão (age, region, gender) para cada placement,
     preservando a soma global.
     """
     placements = get_placements(df_in)
 
-    # Garante colunas‑totais (Impressions, Cost, etc.)
+    # Garante colunas‑totais (impressions, cost, etc.)
     for m in METRICAS:
         if m not in df_in.columns:
             cols = [f"{pl}_{m}" for pl in placements if f"{pl}_{m}" in df_in.columns]
@@ -4472,18 +4626,18 @@ def distribute_dimension_metrics(df_in: pd.DataFrame, dimension_col: str) -> pd.
 
         # Distribuições por métrica
         dist: Dict[str, Dict[str, float | int]] = {}
-        dist["Cost"] = _distribute_cost(float(row["Cost"]), pesos)
+        dist["cost"] = _distribute_cost(float(row["cost"]), pesos)
         
-        for m in ("Impressions", "Link clicks", "Video watches at 100%"):
+        for m in ("impressions", "Link clicks", "Video watches at 100%"):
             dist[m] = _distribute_counts(int(row[m]), pesos)
 
         # Gera uma linha por placement
         for pl in placements:
             output_rows.append(
                 {
-                    "Ad ID": row["Ad ID"],
-                    "Date": row["Date"],
-                    dimension_col: row[dimension_col],  # Pode ser "Age", "Region", ou "Gender"
+                    "ad_id": row["ad_id"],
+                    "date": row["date"],
+                    dimension_col: row[dimension_col],  # Pode ser "age", "region", ou "gender"
                     "_Plataforma": pl,
                     **{m: dist[m][pl] for m in METRICAS},
                 }
@@ -4494,7 +4648,7 @@ def distribute_dimension_metrics(df_in: pd.DataFrame, dimension_col: str) -> pd.
     # ---------- Checagem de integridade global ----------
     for m in METRICAS:
         soma_in, soma_out = df_in[m].sum(), df_out[m].sum()
-        tol = 0.01 if m == "Cost" else 0
+        tol = 0.01 if m == "cost" else 0
         if abs(soma_in - soma_out) > tol:
             raise AssertionError(
                 f"Soma global divergente em '{m}': {soma_in} → {soma_out}"
@@ -4524,7 +4678,7 @@ from utils.geo_normalize import carregar_caches_padrao, limpeza_basica, obter_es
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-METRICAS: List[str] = ["Impressions", "Link clicks", "Cost", "Video watches at 100%"]
+METRICAS: List[str] = ["Impressions", "Link clicks", "cost", "Video watches at 100%"]
 
 # ------------------------------- CACHE -------------------------------- #
 _client = get_google_client(CREDS_PATH)
@@ -4595,7 +4749,7 @@ def load_and_prepare_meta_region_data() -> pd.DataFrame:
     # 8) Descarta coluna auxiliar
     df.drop(columns=["__prov_clean"], inplace=True)
 
-    # 9) Converte Cost (case‑insensitive) e padroniza nome
+    # 9) Converte cost (case‑insensitive) e padroniza nome
     cost_col = next((c for c in df.columns if c.lower() == "cost"), None)
     if cost_col:
         s = (
@@ -4606,8 +4760,8 @@ def load_and_prepare_meta_region_data() -> pd.DataFrame:
             .str.replace(",", ".", regex=False)
         )
         df[cost_col] = pd.to_numeric(s, errors="coerce").fillna(0)
-        df.rename(columns={cost_col: "Cost"}, inplace=True)
-        log.debug("Coluna de custo padronizada para 'Cost'")
+        df.rename(columns={cost_col: "cost"}, inplace=True)
+        log.debug("Coluna de custo padronizada para 'cost'")
 
     # 10) Converte demais métricas para numérico
     for m in METRICAS:
@@ -4736,8 +4890,8 @@ def distribute_region_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
         if idx < 3:
             log.debug("Linha %d - pesos: %s", idx, pesos)
         dist = {
-            "Cost": _distribuir_cost(float(row["Cost"]), pesos),
-            **{m: _distribuir_contagem(int(row[m]), pesos) for m in METRICAS if m != "Cost"}
+            "cost": _distribuir_cost(float(row["cost"]), pesos),
+            **{m: _distribuir_contagem(int(row[m]), pesos) for m in METRICAS if m != "cost"}
         }
         if idx < 3:
             log.debug("Linha %d - distribuição: %s", idx, {pl: {m: dist[m][pl] for m in METRICAS} for pl in placements})
@@ -4755,7 +4909,7 @@ def distribute_region_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
 
     # Valida soma global
     for m in METRICAS:
-        tol = 0.01 if m == "Cost" else 0
+        tol = 0.01 if m == "cost" else 0
         in_sum = df_in[m].sum()
         out_sum = df_out[m].sum()
         if abs(in_sum - out_sum) > tol:
@@ -4837,8 +4991,8 @@ def run_etl_alcance():
 
         logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
         df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
-        if "Date" in df_origin.columns:
-            df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
+        if "campanha" in df_origin.columns:
+            df_origin = df_origin[df_origin["campanha"].astype(str).str.strip() != ""]
         logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
 
         logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
@@ -5310,12 +5464,12 @@ def run_etl_geral():
         df_param.columns = normalize_columns(df_param.columns)
         ad_name_mapping = load_ad_name_mapping(df_param)
 
-        # 6) Preenche Content (utm) via lookup
+        # 6) Preenche utm_content via lookup
         df_origin = get_utm_content_from_ad_name(
             df_origin,
             ad_name_mapping,
-            coluna_ad_name="Ad name",
-            coluna_destino="Content (utm)"
+            coluna_ad_name="ad_name",
+            coluna_destino="utm_content"
         )
 
         extra_kwargs = {}
@@ -5451,8 +5605,8 @@ def run_etl_idade():
 
         logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
         df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
-        if "Date" in df_origin.columns:
-            df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
+        if "date" in df_origin.columns:
+            df_origin = df_origin[df_origin["date"].astype(str).str.strip() != ""]
         logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
 
         # --- substituições manuais de valores vindos da origem --------------
@@ -5573,8 +5727,8 @@ def run_etl_regiao():
 
         logging.info(f"Lendo dados da aba de origem '{source_sheet}'...")
         df_origin = carregar_aba_google_sheets(creds_path, spreadsheet_url, source_sheet)
-        if "Date" in df_origin.columns:
-            df_origin = df_origin[df_origin["Date"].astype(str).str.strip() != ""]
+        if "date" in df_origin.columns:
+            df_origin = df_origin[df_origin["date"].astype(str).str.strip() != ""]
         logging.debug(f"df_origin shape após limpeza: {df_origin.shape}")
 
         logging.info("Carregando mapeamentos de campanha (BI_PARAMETRIZAÇÃO)...")
@@ -5676,9 +5830,9 @@ class BaseAlcanceETL(BaseGeralETL):
         self.determine_ad_preview_link()
         self.criar_veiculo()
 
-        if "Reach" in self.df.columns:
-            logging.debug("Copiando 'Reach' para 'Alcance'")
-            self.df["Alcance"] = self.df["Reach"]
+        if "reach" in self.df.columns:
+            logging.debug("Copiando 'reach' para 'Alcance'")
+            self.df["Alcance"] = self.df["reach"]
 
         self.remover_colunas_indesejadas()
         self.reordenar_colunas_para_modelo()
@@ -6366,11 +6520,11 @@ class MetaRegiaoETL(BaseRegiaoETL):
 
         # 4) Campos descritivos via Ad ID
         info_map = {
-            "Account name":            "Nome_da_Conta",
-            "Campaign name":           "Campaign_name",
-            "Campaign objective type": "Objetivo",
-            "Ad group name":           "Nome_do_Conjunto_de_Anuncio",
-            "Ad name":                 "Nome_do_Anuncio",
+            "acount_name":            "Nome_da_Conta",
+            "campaign_name":           "Campaign_name",
+            "objective": "Objetivo",
+            "ad_group_name":           "Nome_do_Conjunto_de_Anuncio",
+            "ad_name":                 "Nome_do_Anuncio",
         }
         df_info = (
             df_placement[["Ad ID"] + list(info_map.keys())]
@@ -6386,7 +6540,7 @@ class MetaRegiaoETL(BaseRegiaoETL):
         )
 
         # 6) Veículo
-        df_dist["Placement"] = df_dist["_Plataforma"]
+        df_dist["placement"] = df_dist["_Plataforma"]
         df_dist = atribuir_veiculo_e_id_meta(df_dist)
         df_dist = renomear_colunas_origem_para_modelo(df_dist)
 
@@ -6612,6 +6766,276 @@ def test_apply_substitution_on_ad_name(caplog):
 
     # verifica se substituiu corretamente
     assert df_out.loc[0, "Ad name"] == new_ad_name
+
+
+
+# ==== ./tests/test_bi_param_utils.py ====
+
+import pytest
+import re
+
+import pandas as pd
+import time
+from treat.utils.bi_param_utils import (
+    BIParamLookup,
+    get_campaign_parameterization,
+    load_utm_mapping,
+    determine_meta_ad_preview_link,
+    generate_linkedin_ad_preview_link_from_lookup,
+    build_pinterest_preview_link,
+    generate_pinterest_ad_preview_link
+)
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+
+
+
+@pytest.fixture(scope="module")
+def lookup():
+    # instancia uma vez para todos os testes
+    return BIParamLookup(CREDS_PATH, SPREADSHEET_ID)
+
+@pytest.fixture(autouse=True)
+def clear_cache(lookup):
+    lookup._df = None
+    lookup._last_load = 0
+
+
+
+
+def test_campaign_and_utm_mapping_consistency(lookup):
+    """
+    Verifica que:
+      1) as chaves (ad_name_raw upper) são as mesmas para campanha e UTM;
+      2) nenhum valor está vazio;
+      3) todos os UTMs aparecem no resultado de utm_start_end().
+    """
+    camp_map, utm_map = lookup.get_taxonomy_camp_name_and_id_from_ad_name()
+
+    # 1) Mesmo conjunto de chaves
+    assert set(camp_map.keys()) == set(utm_map.keys()), "Chaves de campanha e UTM divergem"
+
+    # 2) Valores não vazios
+    assert all(v.strip() for v in camp_map.values()), "Há campanhas vazias"
+    assert all(v.strip() for v in utm_map.values()), "Há UTMs vazias"
+
+
+
+def test_utm_start_end_format(lookup):
+    """
+    Verifica que utm_start_end() devolve dicionário
+    com chaves 'start' e 'end' cujos valores estão no formato YYYY-MM-DD.
+    """
+    utm_dates = lookup.utm_start_end()
+    iso_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+    for utm_key, dates in utm_dates.items():
+        assert "start" in dates and "end" in dates
+        assert iso_pattern.match(dates["start"]), f"start inválido para {utm_key}: {dates['start']}"
+        assert iso_pattern.match(dates["end"]),   f"end inválido   para {utm_key}: {dates['end']}"
+
+
+
+
+
+def test_criativo_mapping_and_inverse_lookup(lookup):
+    """
+    get_criativo_mapping devolve {utm_content_lower: taxonomy_ad_name}
+    e lookup_utm_for_ad_name inverte corretamente.
+    """
+    mapping = lookup.get_criativo_mapping()
+    # Deve haver pelo menos um par válido
+    assert mapping, "mapa criativo está vazio"
+
+    # Testa alguns pares aleatórios (até 5)
+    for utm, ad in list(mapping.items())[:5]:
+        assert isinstance(utm, str) and utm.strip()
+        assert isinstance(ad,  str) and ad.strip()
+        assert lookup.lookup_utm_for_ad_name(ad) == utm
+
+
+def test_fill_utm_content_from_ad_name(lookup):
+    """
+    fill_utm_content_from_ad_name deve preencher corretamente
+    a coluna utm_content a partir de taxonomy_ad_name.
+    """
+    # prepara um pequeno DataFrame de teste
+    criativo_map = lookup.get_criativo_mapping()
+    # pega até 3 entradas válidas + 1 desconhecida
+    sample_ads = list(criativo_map.values())[:3] + ["NÃO_EXISTE"]
+    df = pd.DataFrame({
+        "taxonomy_ad_name": sample_ads,
+        "utm_content": [""] * len(sample_ads),
+    })
+
+    out = lookup.fill_utm_content_from_ad_name(
+        df,
+        coluna_ad_name="taxonomy_ad_name",
+        coluna_destino="utm_content",
+        write_back=False
+    )
+
+
+    for idx, ad in enumerate(sample_ads):
+        # deve corresponder ao lookup inverso
+        assert out.at[idx, "utm_content"] == lookup.lookup_utm_for_ad_name(ad)
+
+
+def test_get_campaign_parameterization_wrapper():
+    # Assegura que o wrapper devolve o mesmo que o método da classe
+    lookup = BIParamLookup(CREDS_PATH, SPREADSHEET_ID)
+    camp1, utm1 = lookup.get_taxonomy_camp_name_and_id_from_ad_name()
+    camp2, utm2 = get_campaign_parameterization(CREDS_PATH, SPREADSHEET_ID)
+    assert camp1 == camp2
+    assert utm1 == utm2 
+
+def test_load_utm_mapping_wrapper():
+    # Thin-wrapper para utm_start_end()
+    lookup = BIParamLookup(CREDS_PATH, SPREADSHEET_ID)
+    direct = lookup.utm_start_end()
+    wrapped = load_utm_mapping(CREDS_PATH, SPREADSHEET_ID)
+    assert direct == wrapped
+
+def test_missing_columns_raise_keyerror(monkeypatch):
+    # Simula planilha sem coluna utm_content → utm_start_end() deve KeyError
+    fake_rows = [
+        ["col1", "col2"],      # agora duas colunas de header
+        ["foo",   "bar"],      # dados na linha 1
+        ["A",     "B"],
+    ]
+
+    class WS: 
+        def get_all_values(self): return fake_rows
+    class SH:
+        def worksheet(self, _): return WS()
+    class CL:
+        def open_by_key(self, _): return SH()
+    monkeypatch.setattr("treat.utils.bi_param_utils.get_google_client", lambda p: CL())
+    lookup = BIParamLookup("x","y")
+    with pytest.raises(KeyError):
+        lookup.utm_start_end()
+
+def test_cache_ttl(monkeypatch):
+    # Garante que _load_df só é chamado uma vez antes de expirar
+    calls = {"count": 0}
+    def fake_load(self):
+        calls["count"] += 1
+        return pd.DataFrame(
+            [["A","B","C","d","2025-01-01","2025-01-02","X"]],
+            columns=["taxonomy_ad_name","taxonomy_campaign_name","utm_campaign","utm_content","start","end","criativo"]
+        )
+
+    monkeypatch.setattr(BIParamLookup, "_load_df", fake_load)
+    lookup = BIParamLookup("p","s")
+    lookup.HEADER_ROW = 1
+
+    # chama duas vezes sem avançar o tempo
+    _ = lookup.get_taxonomy_camp_name_and_id_from_ad_name()
+    _ = lookup.get_taxonomy_camp_name_and_id_from_ad_name()
+    assert calls["count"] == 1
+
+    # aqui a única mudança:
+    orig_time = time.time
+    monkeypatch.setattr(time, "time", lambda: orig_time() + lookup._TTL + 1)
+
+    _ = lookup.get_taxonomy_camp_name_and_id_from_ad_name()
+    assert calls["count"] == 2
+
+def test_determine_meta_preview_link():
+    df = pd.DataFrame({
+        "Preview Link FB": ["fb1","","fb3"],
+        "Preview Link IG": ["ig1","ig2",""],
+        "URL_do_Anuncio":  ["","preex",""]
+    })
+    out = determine_meta_ad_preview_link(df)
+    assert out.at[0, "URL_do_Anuncio"] == "ig1"
+    assert out.at[1,"URL_do_Anuncio"] == "preex"      
+    assert out.at[2,"URL_do_Anuncio"] == "fb3"        
+
+def test_generate_linkedin_and_pinterest_previews():
+    # LinkedIn
+    param_df = pd.DataFrame({
+        "utm_content": ["u1","u2","u1"], "preview": ["p1", None, "p2"]
+    })
+    lk = generate_linkedin_ad_preview_link_from_lookup(param_df)
+    assert lk == {"u1":"p2"}
+
+
+    # Pinterest URL builder
+    assert build_pinterest_preview_link("123") == "https://www.pinterest.com/pin/123"
+    assert build_pinterest_preview_link("") == ""
+
+    # Pinterest full function
+    dforig = pd.DataFrame({"Preview Link": ["999",""]})
+    outp = generate_pinterest_ad_preview_link(dforig)
+    assert outp.at[0,"URL_do_Anúncio"] == "https://www.pinterest.com/pin/999"
+    assert outp.at[1,"URL_do_Anúncio"] == ""
+
+def test_fill_missing_start_end_from_utm_with_write_back(monkeypatch, lookup):
+    # 1) Fake BI_PARAMETRIZAÇÃO cache: utm_content → start/end
+    fake_map = {
+        "u1": {"start": "2025-01-01", "end": "2025-01-31"},
+        "u2": {"start": "2025-02-01", "end": "2025-02-28"},
+    }
+    monkeypatch.setattr(lookup, "utm_start_end", lambda: fake_map)
+
+    # 2) Prepara DataFrame de origem:
+    #    - linha 0: ambos vazios → deve preencher
+    #    - linha 1: start já preenchido, end vazio → só end
+    #    - linha 2: ambos preenchidos → não toca
+    df = pd.DataFrame({
+        "utm_content": ["u1", "u2", "u1"],
+        "start":       ["",    "2025-02-XX", "2025-01-01"],
+        "end":         ["",    "",           "2025-01-31"],
+    })
+
+    # 3) Dummy worksheet para capturar atualizações
+    recorded: list = []
+    class DummyWS:
+        def row_values(self, _): 
+            return ["utm_content", "start", "end"]
+        def batch_update(self, updates, value_input_option):
+            recorded.extend(updates)
+
+    class DummySh:
+        def worksheet(self, _): return DummyWS()
+    class DummyCl:
+        def open_by_key(self, _): return DummySh()
+
+    # Monkeypatch do client
+    monkeypatch.setattr(
+        "treat.utils.bi_param_utils.get_google_client",
+        lambda creds: DummyCl()
+    )
+
+    # 4) Executa
+    out = lookup.fill_missing_start_end_from_utm(
+        df,
+        coluna_utm="utm_content",
+        coluna_start="start",
+        coluna_end="end",
+        sheet_name="ignored",
+        write_back=True
+    )
+
+    # 5) Verifica preenchimento in-memory
+    assert out.at[0, "start"] == "2025-01-01"
+    assert out.at[0, "end"]   == "2025-01-31"
+    assert out.at[1, "start"] == "2025-02-XX"  # manteve o que já tinha
+    assert out.at[1, "end"]   == "2025-02-28"
+    assert out.at[2, "start"] == "2025-01-01"
+    assert out.at[2, "end"]   == "2025-01-31"
+
+    # 6) Verifica batch_update: só 3 células devem ter sido escritas
+    #    linha 0 start (A2), linha 0 end (C2), linha 1 end (C3)
+    ranges = {u["range"] for u in recorded}
+    assert ranges == {"B2", "C2", "C3"}
+    # e os valores batidos
+    values_map = {u["range"]: u["values"][0][0] for u in recorded}
+    assert values_map == {
+        "B2": "2025-01-01",
+        "C2": "2025-01-31",
+        "C3": "2025-02-28",
+    }
 
 
 
@@ -6939,6 +7363,132 @@ def test_meta_idade_etl_pipeline(sample_meta_idade_df):
     # validação de somas por métrica
     for m in METRICAS:
         assert output[m].sum() == sample_meta_idade_df()[m].iloc[0]
+
+
+
+# ==== ./tests/test_extract_sheets_fetcher.py ====
+
+# tests/test_extract_sheets_fetcher.py
+
+import os
+import pytest
+import pandas as pd
+from extract.sheets_fetcher import SheetsFetcher
+import yaml
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), os.pardir, "sheets_config.yaml")
+
+@pytest.fixture(scope="module")
+def raw_config():
+    with open(CONFIG_PATH, "r") as f:
+        return yaml.safe_load(f)
+
+def test_yaml_structure(raw_config):
+    # valida seções mínimas
+    expected_sections = {"meta", "tiktok", "linkedin"}
+    assert expected_sections.issubset(raw_config.keys()), \
+        f"Seções faltando em YAML: esperava {expected_sections}, achei {set(raw_config.keys())}"
+    # cada seção deve listar strings não-vazias
+    for section, sheets in raw_config.items():
+        assert isinstance(sheets, list), f"Seção '{section}' deve ser lista"
+        assert all(isinstance(s, str) and s for s in sheets), \
+            f"Cada entrada em '{section}' deve ser string não-vazia"
+
+def test_fetcher_respects_yaml_sections(raw_config, fetcher):
+    # usando o mesmo fixture fetcher (SheetsFetcher) definido acima
+    for section, sheets in raw_config.items():
+        dfs = fetcher.get(sheets)
+        assert set(dfs.keys()) == set(sheets), \
+            f"Seção '{section}': esperei {sheets}, recebi {list(dfs.keys())}"
+    # cache interno só deve conter abas do YAML
+    all_requested = {s for sub in raw_config.values() for s in sub}
+    assert set(fetcher._cache.keys()) == all_requested
+
+@pytest.fixture(scope="module")
+def creds_path() -> str:
+    return os.getenv("GOOGLE_CREDS_PATH", "creds.json")
+
+@pytest.fixture(scope="module")
+def spreadsheet_id() -> str:
+    sid = os.getenv("SPREADSHEET_ID")
+    if not sid:
+        pytest.skip("Defina SPREADSHEET_ID para rodar testes de integração.")
+    return sid
+
+@pytest.fixture(scope="module")
+def fetcher(spreadsheet_id, creds_path):
+    """Instância única de SheetsFetcher para todos os testes."""
+    return SheetsFetcher(
+        spreadsheet_id=spreadsheet_id,
+        creds_path=creds_path,
+        header_row=1,
+        col_range="A:ZZ"
+    )
+
+def test_service_has_batch_get(fetcher):
+    svc = fetcher._service
+    # garante que o método batchGet existe
+    assert hasattr(svc.spreadsheets().values(), "batchGet"), "batchGet não encontrado no service"
+
+def test_get_returns_dataframes(fetcher):
+    sheets = ["metaGeral", "tiktokGeral", "linkedinGeral"]
+    dfs = fetcher.get(sheets, as_frame=True)
+    # chaves corretas e tipos
+    assert set(dfs.keys()) == set(sheets)
+    for name, df in dfs.items():
+        assert isinstance(df, pd.DataFrame)
+        assert df.columns.size > 0, f"Aba '{name}' retornou DataFrame sem colunas"
+
+def test_cache_prevents_second_call(monkeypatch, fetcher):
+    call_count = {"n": 0}
+    # wrap _fetch_batch para contar invocações
+    orig = fetcher._fetch_batch
+    def spy_fetch(names):
+        call_count["n"] += 1
+        return orig(names)
+    monkeypatch.setattr(fetcher, "_fetch_batch", spy_fetch, raising=True)
+
+    sheets = ["metaGeral", "tiktokGeral"]
+    fetcher._cache.clear()
+    _ = fetcher.get(sheets)
+    _ = fetcher.get(sheets)
+
+    assert call_count["n"] == 1, f"Esperava 1 invocação de _fetch_batch, mas foram {call_count['n']}"
+
+def test_as_frame_false(fetcher):
+    sheets = ["metaGeral"]
+    raw = fetcher.get(sheets, as_frame=False)
+    assert isinstance(raw, dict) and "metaGeral" in raw
+    assert isinstance(raw["metaGeral"], list)
+    # primeiro elemento deve ser lista de headers
+    headers = raw["metaGeral"][0]
+    assert isinstance(headers, list) and all(isinstance(h, str) for h in headers)
+
+def test_refresh(fetcher):
+    sheet = "tiktokGeral"
+    # garante que já está em cache
+    _ = fetcher.get([sheet])
+    # monkeypatcha o cache para valor diferente
+    fetcher._cache[sheet] = pd.DataFrame({"x":[1,2,3]})
+    # refresh faz refetch real e substitui cache
+    fetcher.refresh([sheet])
+    df = fetcher.get([sheet])[sheet]
+    assert not df.equals(pd.DataFrame({"x":[1,2,3]})), "refresh não atualizou o cache"
+
+def test_empty_sheet_returns_empty(fetcher):
+    # assegure que exista uma aba "googleIdade" na planilha
+    empty = fetcher.get(["googleIdade"])["googleIdade"]
+    print(f"\nℹ️ Aba 'googleIdade': {empty.shape}")
+    assert isinstance(empty, pd.DataFrame)
+    assert empty.empty
+
+def test_unique_columns(fetcher):
+    sheets = ["metaGeral", "tiktokGeral", "linkedinGeral"]
+    dfs = fetcher.get(sheets)
+    for name, df in dfs.items():
+        cols = list(df.columns)
+        dup = {c for c in cols if cols.count(c) > 1}
+        print(f"\nℹ️ Colunas duplicadas em '{name}': {dup}")
+        assert not dup, f"Aba '{name}' tem colunas duplicadas: {dup}"
 
 
 
@@ -8091,6 +8641,179 @@ class TestPreencherNomesAnuncioLinkedin(unittest.TestCase):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     unittest.main()
+
+
+
+# ==== ./tests/test_preprocess_utils.py ====
+
+import pytest
+import pandas as pd
+
+from treat.utils.preprocess_utils import (
+    normalize_region_column,
+    apply_origin_substitutions,
+    preprocess_origin,
+)
+from treat.utils.geo_normalize import normalize_region
+from treat.utils.substitute_origin_values import apply_all_origin_substitutions
+
+# Exemplos reais de região para inspeção manual
+VALORES_PARA_TESTE = [
+    "Acre (state)",
+    "Rio de Janeiro (state)",
+    "Unknown",
+    "São Paulo (state)",
+    "Federal District",
+    "Sao Paulo",
+    "Amapa",
+    "Para",
+    "-1",
+    "BR-OTHER",
+    "Greater Cuiaba",
+    "Brazil: Maranhao",
+    "Greater São Paulo Area",
+    "Brazil: Sao Paulo",
+    "Greater Richmond Region",
+    "London Area, United Kingdom",
+    "Los Angeles Metropolitan Area",
+    "Greater Ribeirão Preto",
+    "Greater São Luís Area",
+    "Charlotte Metro",
+    "Bogotá D.C. Metropolitan Area",
+    "Greater Belem",
+    "Vitoria, Brazil Metropolitan Area",
+    "State of Piaui"
+]
+
+def test_show_region_normalization(capsys):
+    """
+    Imprime cada par raw → normalizado.
+    Rode com `pytest -s` para verificar manualmente.
+    """
+    for raw in VALORES_PARA_TESTE:
+        norm = normalize_region(raw)
+        print(f"{raw!r} -> {norm!r}")
+    # sem asserts, apenas inspeção
+
+def test_normalize_region_column_uses_normalize_region(monkeypatch):
+    df = pd.DataFrame({"region": ["x", "y"], "foo": [1, 2]})
+    # forçar normalize_region
+    monkeypatch.setattr(
+        "treat.utils.preprocess_utils.normalize_region",
+        lambda s: f"ZZ[{s}]"
+    )
+    out = normalize_region_column(df, col_name="region")
+    assert out["region"].tolist() == ["ZZ[x]", "ZZ[y]"]
+    assert out["foo"].tolist() == [1, 2]
+
+    # se não existir a coluna, retorna o mesmo objeto
+    df2 = pd.DataFrame({"a": [1]})
+    assert normalize_region_column(df2, "region") is df2
+
+def test_apply_origin_substitutions_idempotent_and_shape():
+    df = pd.DataFrame({"a": ["aa", "bb"], "b": [1, 2]})
+    out1 = apply_origin_substitutions(df)
+    assert isinstance(out1, pd.DataFrame) and out1.shape == df.shape
+    # idempotência
+    out2 = apply_origin_substitutions(out1)
+    pd.testing.assert_frame_equal(out2, out1)
+
+def test_preprocess_origin_combines_steps(monkeypatch):
+    df = pd.DataFrame({"region": ["foo"], "x": ["bar"]})
+    monkeypatch.setattr(
+        "treat.utils.preprocess_utils.apply_origin_substitutions",
+        lambda df: df.assign(x="XX")
+    )
+    monkeypatch.setattr(
+        "treat.utils.preprocess_utils.normalize_region_column",
+        lambda df, col_name: df.assign(region="YY")
+    )
+    out = preprocess_origin(df)
+    assert out.at[0, "x"] == "XX"
+    assert out.at[0, "region"] == "YY"
+
+def test_apply_all_origin_substitutions_write_back_single_column(monkeypatch):
+    # força mapping em campaign_name
+    monkeypatch.setattr(
+        "treat.utils.substitute_origin_values.CAMPAIGN_NAME_REPLACEMENTS",
+        {"foo": "BAR"}
+    )
+    df = pd.DataFrame({
+        "campaign_name": ["foo", "baz"],
+        "other": [1, 2]
+    })
+    recorded = []
+    class DummyWS:
+        def row_values(self, _): 
+            return ["other", "campaign_name"]
+        def batch_update(self, updates, **kw):
+            recorded.extend(updates)
+    class DummySh:
+        def worksheet(self, _): return DummyWS()
+    class DummyCl:
+        def open_by_key(self, _): return DummySh()
+    monkeypatch.setattr(
+        "treat.utils.substitute_origin_values.get_google_client",
+        lambda creds: DummyCl()
+    )
+
+    out = apply_all_origin_substitutions(
+        df,
+        sheet_name="ignored",
+        write_back=True,
+        inplace=False
+    )
+    # memória
+    assert out.loc[0, "campaign_name"] == "BAR"
+    assert out.loc[1, "campaign_name"] == "baz"
+    # write-back: só B2
+    assert recorded == [{"range": "B2", "values": [["BAR"]]}]
+
+def test_apply_all_origin_substitutions_write_back_multiple_columns(monkeypatch):
+    # força mapping em utm_content e ad_group_name
+    monkeypatch.setattr(
+        "treat.utils.substitute_origin_values.ID_CONTENT_REPLACEMENTS",
+        {"u1": "U1NEW"}
+    )
+    monkeypatch.setattr(
+        "treat.utils.substitute_origin_values.AD_GROUP_NAME_REPLACEMENTS",
+        {"g1": "G1NEW"}
+    )
+    df = pd.DataFrame({
+        "utm_content": ["u1", "x"],
+        "ad_group_name": ["g1", "y"],
+        "other": [0, 0]
+    })
+    recorded = []
+    class DummyWS:
+        def row_values(self, _):
+            return ["utm_content", "ad_group_name", "other"]
+        def batch_update(self, updates, **kw):
+            recorded.extend(updates)
+    class DummySh:
+        def worksheet(self, _): return DummyWS()
+    class DummyCl:
+        def open_by_key(self, _): return DummySh()
+    monkeypatch.setattr(
+        "treat.utils.substitute_origin_values.get_google_client",
+        lambda creds: DummyCl()
+    )
+
+    out = apply_all_origin_substitutions(
+        df,
+        sheet_name="ignored",
+        write_back=True,
+        inplace=False
+    )
+    # memória
+    assert out.loc[0, "utm_content"]   == "U1NEW"
+    assert out.loc[0, "ad_group_name"] == "G1NEW"
+    assert out.loc[1, "utm_content"]   == "x"
+    assert out.loc[1, "ad_group_name"] == "y"
+    # write-back: A2 e B2
+    assert {"range": "A2", "values": [["U1NEW"]]} in recorded
+    assert {"range": "B2", "values": [["G1NEW"]]} in recorded
+    assert len(recorded) == 2
 
 
 

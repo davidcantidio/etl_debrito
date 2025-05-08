@@ -5,7 +5,7 @@ def remover_colunas_indesejadas(df):
     """
     Remove colunas que não fazem parte do modelo final.
     """
-    colunas_para_remover = ['Placement', 'Campaign_ID', 'Campaign_name', 'Content_utm']
+    colunas_para_remover = ['Placement', 'Campaign_ID', 'Campaign_name', ]
     for col in colunas_para_remover:
         if col in df.columns:
             df.drop(columns=col, inplace=True)

@@ -1,41 +1,82 @@
+# utils/append_records_to_sheet.py
+
 import logging
-import gspread
-from gspread_dataframe import set_with_dataframe
-from utils.get_google_client import get_google_client
+from typing import Optional
 
-def append_records_to_sheet(creds_path, spreadsheet_id, sheet_name, df):
+import pandas as pd
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from tenacity import retry, wait_exponential, stop_after_attempt
+
+log = logging.getLogger(__name__)
+
+
+def _build_service(
+    creds_path: str,
+    scopes: Optional[list[str]] = None,
+):
     """
-    Insere os registros do DataFrame na aba de destino, a partir da coluna B,
-    e redimensiona a planilha para acomodar os dados inseridos.
-
-    Parâmetros:
-        creds_path (str): Caminho para o arquivo de credenciais.
-        spreadsheet_id (str): ID da planilha.
-        sheet_name (str): Nome da aba de destino.
-        df (pandas.DataFrame): DataFrame contendo os registros a serem inseridos.
+    Cria a instância da Google Sheets API v4.
     """
-    # Obtém o cliente autenticado do Google Sheets
-    client = get_google_client(creds_path)
-    sh = client.open_by_key(spreadsheet_id)
-    worksheet = sh.worksheet(sheet_name)
-    
-    # Determina a próxima linha disponível e se deve incluir cabeçalho
-    data = worksheet.get_all_values()
-    if not data:
-        next_row = 1
-        include_header = True
-    else:
-        next_row = len(data) + 1
-        include_header = False
+    scopes = scopes or ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
+    return build("sheets", "v4", credentials=creds, cache_discovery=False)
 
-    # Insere o DataFrame na aba, iniciando na coluna B (col=1)
-    set_with_dataframe(worksheet, df, row=next_row, col=1, include_column_header=include_header)
-    
-    # Redimensiona a planilha de acordo com os dados atuais
-    data = worksheet.get_all_values()
-    total_rows = len(data)
-    total_cols = max(len(row) for row in data) if data else 0
-    worksheet.resize(rows=total_rows, cols=total_cols)
-    
-    logging.info(f"Inseridos {df.shape[0]} registros na aba '{sheet_name}' a partir da linha {next_row}.")
-    logging.info(f"Planilha redimensionada para {total_rows} linhas e {total_cols} colunas.")
+
+@retry(
+    wait=wait_exponential(multiplier=1, max=32),
+    stop=stop_after_attempt(5),
+    reraise=True,
+)
+def append_records_to_sheet(
+    creds_path: str,
+    spreadsheet_id: str,
+    sheet_name: str,
+    df: pd.DataFrame,
+    *,
+    start_row: int = 2,
+    start_column: str = "A",
+    value_input_option: str = "RAW",
+    service: Optional = None,
+) -> int:
+    """
+    Faz APPEND de `df` em `sheet_name`, começando em start_column+start_row,
+    num único batch, com insertDataOption='INSERT_ROWS'.
+
+    Retorna o número de linhas efetivamente inseridas.
+    """
+    if df.empty:
+        log.info("DataFrame vazio: nada a gravar em '%s'.", sheet_name)
+        return 0
+
+    service = service or _build_service(creds_path)
+
+    # Prepara valores (sem cabeçalho)
+    values = df.fillna("").astype(str).values.tolist()
+
+    # Range de início ex.: "ModeloGeral!A2"
+    range_start = f"{sheet_name}!{start_column}{start_row}"
+    body = {"values": values}
+
+    try:
+        result = (
+            service.spreadsheets()
+            .values()
+            .append(
+                spreadsheetId=spreadsheet_id,
+                range=range_start,
+                valueInputOption=value_input_option,
+                insertDataOption="INSERT_ROWS",
+                body=body,
+            )
+            .execute()
+        )
+    except HttpError as err:
+        log.error("Erro ao inserir em '%s': %s", sheet_name, err)
+        raise
+
+    updated = result.get("updates", {}).get("updatedRows", 0)
+    log.info("✅ %d linhas adicionadas em '%s' a partir de %s%d",
+             updated, sheet_name, start_column, start_row)
+    return updated

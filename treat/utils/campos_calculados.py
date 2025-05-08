@@ -44,13 +44,25 @@ def remover_colunas_indesejadas(self):
         if col in self.df.columns:
             self.df.drop(columns=col, inplace=True)
 
-def gerar_id(df: pd.DataFrame) -> pd.DataFrame:
+
+def gerar_id(row: pd.Series) -> str:
     """
-    Gera a coluna 'ID' a partir da concatenação de campos-chave.
+    ID = {data}-{Campanha}-{impressions}-{cost}-{link_clicks}
+    Aceita tanto colunas snake_case (inglês) quanto as
+    antigas em PT-BR com iniciais maiúsculas.
     """
-    df = df.copy()
-    df['ID'] = df.apply(
-        lambda row: f"{row['Data']}-{row['Campanha']}-{row['Impressoes']}-{row['Investimento']}-{row['Cliques_no_Link']}",
-        axis=1
-    )
-    return df
+    def pick(*candidatos: str) -> str:
+        for c in candidatos:
+            if c in row and str(row[c]).strip():
+                return str(row[c]).strip()
+        return ""
+
+    parts = [
+        pick("date",      "Data"),
+        pick("Campanha"),               # só existe em PT mesmo
+        pick("impressions", "Impressoes"),
+        pick("cost",        "Investimento"),
+        pick("link_clicks", "Cliques_no_Link"),
+    ]
+    return "-".join(parts)
+
