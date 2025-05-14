@@ -528,8 +528,8 @@ def assign_vehicle_by_creative(df: pd.DataFrame) -> pd.DataFrame:
 def normalize_gender(value) -> str:
     """
     Normaliza valores de gênero para português:
-    - 'female', 'feminino'  → 'Feminino'
-    - 'male',   'masculino' → 'Masculino'
+    - 'female', 'feminino'  → 'Mulher'
+    - 'male',   'masculino' → 'Homem'
     - vazio, 'unknown', 'others', 'none', '-' → 'Não classificado'
     - quaisquer outros valores → capitalizados
     """
@@ -543,17 +543,19 @@ def normalize_gender(value) -> str:
 
     if val in {"female", "feminino"}:
         logging.debug("Matched female variants; returning 'Mulher'")
-        return "Feminino"
+        return "Mulher"
     elif val in {"male", "masculino"}:
         logging.debug("Matched male variants; returning 'Homem'")
-        return "Masculino"
+        return "Homem"
     elif val in {"", "unknown", "others", "none", "-"}:
         logging.debug("Matched null/unknown variants; returning 'Não classificado'")
         return "Não classificado"
 
-    result = val.capitalize()  # ex.: 'non-binary' → 'Non-binary'
+    # para quaisquer outros valores, mantém o texto capitalizado
+    result = val.capitalize()
     logging.debug("Capitalized '%s' to '%s'", val, result)
     return result
+
 
 
 def _clean_numeric_series(s: pd.Series) -> pd.Series:
@@ -654,28 +656,39 @@ def extract_meta_platform_from_placement(placement: str) -> str:
     Determine the ad vehicle based on the placement string.
 
     Parameters:
-        placement (str): The placement value from Meta Ads (e.g. "Facebook Feed", "Instagram Stories").
+        placement (str): The placement value from Meta Ads
+                         (e.g. "Facebook Feed", "instagram|ig_stories", "fb").
 
     Returns:
-        str: 
-            - "Facebook" if the placement mentions Facebook or Audience Network.
-            - "Instagram" if the placement mentions Instagram.
+        str:
+            - "Facebook" if the placement mentions Facebook, Audience Network, or common FB codes (fb, facebook_*).
+            - "Instagram" if the placement mentions Instagram or common IG codes (ig, instagram_*).
             - Defaults to "Facebook" otherwise or if input isn’t a string.
     """
-    logging.debug(">>> In extrair_veiculo; placement=%r", placement)
+    logging.debug(">>> In extract_meta_platform_from_placement; placement=%r", placement)
     if not isinstance(placement, str):
         logging.debug("Placement is not a string; defaulting to 'Facebook'")
         return "Facebook"
 
     text = placement.lower()
-    if "facebook" in text or "audience" in text:
-        logging.debug("Matched 'facebook' or 'audience' in placement -> 'Facebook'")
-        return "Facebook"
-    elif "instagram" in text:
-        logging.debug("Matched 'instagram' in placement -> 'Instagram'")
+    # extrai tokens alfabéticos (separa por |, espaços, underscores etc.)
+    tokens = re.findall(r"[a-z]+", text)
+
+    # definições de tokens que mapeiam a cada plataforma
+    fb_keys = {"facebook", "fb", "audience", "audiencenetwork"}
+    ig_keys = {"instagram", "ig"}
+
+    # se qualquer token indicar Instagram
+    if any(tok in ig_keys for tok in tokens):
+        logging.debug("Matched IG token in placement %r -> 'Instagram'", tokens)
         return "Instagram"
 
-    logging.debug("No keywords matched; defaulting to 'Facebook'")
+    # se qualquer token indicar Facebook/Audience Network
+    if any(tok in fb_keys for tok in tokens):
+        logging.debug("Matched FB/Audience token in placement %r -> 'Facebook'", tokens)
+        return "Facebook"
+
+    logging.debug("No platform token matched in %r; defaulting to 'Facebook'", tokens)
     return "Facebook"
 
 def normalize_age(valor) -> str:
@@ -697,14 +710,17 @@ def normalize_age(valor) -> str:
     v = valor.strip().lower()
 
     # 2) Mapeamento dos recortes do Pinterest → faixas padrão
+    # 2) Mapeamento dos recortes do Pinterest → faixas padrão
     pin_map = {
-        "0-17":       "Não classificado",
-        "18-24":      "18-24",
-        "25-34":      "25-34",
-        "35-49":      "35-44",   # ajusta de 35-49 para 35-44
-        "50-64":      "55+",     # mapeia 50-64 pra 55+
-        "65+":        "55+",     # mantém 65+ → 55+
+        "0-17":  "Não classificado",
+        "18-24": "18-24",
+        "25-34": "25-34",
+        "35-49": "35-44",
+        "45-49": "45-54",      #  ← adicionado
+        "50-64": "55+",
+        "65+":   "55+",
     }
+
     if v in pin_map:
         logger.debug("normalize_age: recorte Pinterest '%s' → '%s'", v, pin_map[v])
         return pin_map[v]

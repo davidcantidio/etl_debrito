@@ -334,238 +334,6 @@ def append_records_to_sheet(creds_path, spreadsheet_id, sheet_name, df):
 
 
 
-# ==== ./utils/atribuicoes_via_lookup.py ====
-
-# utils/atribuicoes_via_lookup.py
-
-import logging
-from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_ID, SPREADSHEET_URL
-from utils.normalize import infer_vehicle_meta_by_placement
-from utils.campanha_mapper import buscar_mapping
-
-import pandas as pd
-
-def atribuir_id_veiculo_generico(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Atribui 'ID_Veiculo' com base no valor da coluna 'Veiculo',
-    buscando a correspondência na aba SOURCE.
-    """
-    logging.debug(">>> In atribuir_id_veiculo_generico")
-    try:
-        df_source = carregar_aba_google_sheets(
-            CREDS_PATH,
-            SPREADSHEET_URL,
-            "SOURCE"
-        )
-        df_source['Descrição da Mídia'] = df_source['Descrição da Mídia'].str.strip().str.lower()
-        mapping = dict(zip(df_source['Descrição da Mídia'], df_source['ID_Veiculo']))
-        df['ID_Veiculo'] = df['Veiculo'].str.strip().str.lower().map(mapping).fillna("")
-    except Exception as e:
-        logging.warning(f"Falha ao mapear ID_Veiculo via SOURCE: {e}")
-        df['ID_Veiculo'] = ""
-    return df
-
-# utils/atribuicoes_via_lookup.py
-
-import logging
-import pandas as pd
-from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_ID, SPREADSHEET_URL
-from utils.normalize import extract_meta_platform_from_placement
-from utils.campanha_mapper import buscar_mapping
-
-# -------------------------------------------------------------------------
-# ID_VEICULO GENÉRICO (usado em outros contextos além de Meta)
-# -------------------------------------------------------------------------
-
-def atribuir_id_veiculo_generico(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Atribui 'ID_Veiculo' com base no valor da coluna 'Veiculo',
-    buscando a correspondência na aba SOURCE.
-    """
-    logging.debug(">>> In atribuir_id_veiculo_generico")
-    try:
-        df_source = carregar_aba_google_sheets(
-            CREDS_PATH,
-            SPREADSHEET_URL,
-            "SOURCE"
-        )
-        df_source['Descrição da Mídia'] = df_source['Descrição da Mídia'].str.strip().str.lower()
-        mapping = dict(zip(df_source['Descrição da Mídia'], df_source['ID_Veiculo']))
-        df['ID_Veiculo'] = df['Veiculo'].str.strip().str.lower().map(mapping).fillna("")
-    except Exception as e:
-        logging.warning(f"Falha ao mapear ID_Veiculo via SOURCE: {e}")
-        df['ID_Veiculo'] = ""
-    return df
-
-# -------------------------------------------------------------------------
-# META: atribuição robusta de Veiculo e ID_Veiculo
-# -------------------------------------------------------------------------
-
-def atribuir_veiculo_e_id_meta(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Atribui as colunas 'Veiculo' e 'ID_Veiculo' com base na coluna 'Placement' do Meta.
-    A coluna 'Placement' deve estar presente no DataFrame (pode ser cópia de '_Plataforma').
-    """
-    logging.debug(">>> In atribuir_veiculo_e_id_meta")
-
-    if 'Placement' not in df.columns:
-        logging.warning("Coluna 'Placement' ausente. 'Veiculo' será atribuído como 'Não identificado'.")
-        df['Veiculo'] = "Não identificado"
-    else:
-        logging.debug("Inferindo 'Veiculo' a partir da coluna 'Placement'")
-        df['Veiculo'] = df['Placement'].apply(
-            lambda p: extract_meta_platform_from_placement(p) if isinstance(p, str) else "Não identificado"
-        )
-
-    logging.debug("Buscando 'ID_Veiculo' a partir da coluna 'Veiculo'")
-    df = atribuir_id_veiculo_generico(df)
-
-
-    return df
-
-# -------------------------------------------------------------------------
-# LINKEDIN / TWITTER: atribuição de Veiculo por criativo (Ad name)
-# -------------------------------------------------------------------------
-
-def atribuir_veiculo_por_criativo(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Faz lookup do campo 'Ad name' (que representa o CRIATIVO) na aba BI_PARAMETRIZAÇÃO
-    e preenche o campo 'Veiculo' com base na coluna 'VEÍCULOS'.
-    """
-    logging.debug(">>> In atribuir_veiculo_por_criativo (via Ad name → CRIATIVO)")
-
-    df_param = carregar_aba_google_sheets(CREDS_PATH, SPREADSHEET_URL, "BI_PARAMETRIZAÇÃO", header_row_index=1)
-    df_param.columns = [col.strip().upper() for col in df_param.columns]
-
-    if 'CRIATIVO' not in df_param.columns or 'VEÍCULOS' not in df_param.columns:
-        logging.warning("Colunas 'CRIATIVO' ou 'VEÍCULOS' não encontradas em BI_PARAMETRIZAÇÃO.")
-        df['Veiculo'] = ""
-        return df
-
-    mapping = dict(
-        zip(
-            df_param['CRIATIVO'].astype(str).str.strip(),
-            df_param['VEÍCULOS'].astype(str).str.strip()
-        )
-    )
-    df['Veiculo'] = df['Ad name'].astype(str).str.strip().map(mapping).fillna("")
-    return df
-
-# -------------------------------------------------------------------------
-# PINTEREST: preenchimento direto dos campos de campanha
-# -------------------------------------------------------------------------
-
-def preencher_campos_com_campanha(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Para plataformas como Pinterest onde não há Ad Name,
-    replica 'Campaign name' nos campos de destino:
-    - Campanha
-    - Nome_do_Anuncio
-    - Nome_do_Conjunto_de_Anuncio
-    """
-    logging.debug(">>> In preencher_campos_com_campanha (Pinterest)")
-
-    if 'Campaign name' not in df.columns:
-        logging.warning("Coluna 'Campaign name' não encontrada. Não será possível preencher campos derivados.")
-        df['Campanha'] = ""
-        df['Nome_do_Anuncio'] = ""
-        df['Nome_do_Conjunto_de_Anuncio'] = ""
-        return df
-
-    df['Campanha'] = df['Campaign name']
-    df['Nome_do_Anuncio'] = df['Campaign name']
-    df['Nome_do_Conjunto_de_Anuncio'] = df['Campaign name']
-    return df
-
-# -------------------------------------------------------------------------
-# CAMPANHA: preenchimento genérico com mapeamento externo
-# -------------------------------------------------------------------------
-
-def aplicar_parametrizacao_campanha(df: pd.DataFrame, mapping_campanha: dict, mapping_sigla: dict) -> pd.DataFrame:
-    """
-    Preenche as colunas 'Campanha' e 'ID_Campanha' com base na coluna 'Campaign_name',
-    utilizando dicionários de mapeamento externos.
-    """
-    logging.debug(">>> In aplicar_parametrizacao_campanha")
-
-    if 'Campaign_name' not in df.columns:
-        logging.warning("Coluna 'Campaign_name' ausente no DataFrame. 'Campanha' e 'ID_Campanha' não serão preenchidas.")
-        df['Campanha'] = ""
-        df['ID_Campanha'] = ""
-        return df
-
-    df['Campanha'] = df['Campaign_name'].apply(
-        lambda x: buscar_mapping(mapping_campanha, x) or x
-    )
-    df['ID_Campanha'] = df['Campaign_name'].apply(
-        lambda x: buscar_mapping(mapping_sigla, x)
-    )
-
-    return df
-
-
-def atribuir_veiculo_por_criativo(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Faz lookup do campo 'Ad name' (que representa o CRIATIVO) na aba BI_PARAMETRIZAÇÃO
-    e preenche o campo 'Veiculo' com base na coluna 'VEÍCULOS'.
-    """
-    logging.debug(">>> In atribuir_veiculo_por_criativo (via Ad name → CRIATIVO)")
-
-    df_param = carregar_aba_google_sheets(CREDS_PATH, SPREADSHEET_URL, "BI_PARAMETRIZAÇÃO", header_row_index=1)
-    df_param.columns = [col.strip().upper() for col in df_param.columns]
-
-    if 'CRIATIVO' not in df_param.columns or 'VEÍCULOS' not in df_param.columns:
-        logging.warning("Colunas 'CRIATIVO' ou 'VEÍCULOS' não encontradas em BI_PARAMETRIZAÇÃO.")
-        df['Veiculo'] = ""
-        return df
-
-    mapping = dict(zip(df_param['CRIATIVO'].astype(str).str.strip(), df_param['VEÍCULOS'].astype(str).str.strip()))
-    df['Veiculo'] = df['Ad name'].astype(str).str.strip().map(mapping).fillna("")
-    return df
-
-def preencher_campos_com_campanha(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Para plataformas como Pinterest onde não há Ad Name,
-    replica 'Campaign name' nos campos de destino:
-    - Campanha
-    - Nome_do_Anuncio
-    - Nome_do_Conjunto_de_Anuncio
-    """
-    logging.debug(">>> In preencher_campos_com_campanha (Pinterest)")
-
-    if 'Campaign name' not in df.columns:
-        logging.warning("Coluna 'Campaign name' não encontrada. Não será possível preencher campos derivados.")
-        df['Campanha'] = ""
-        df['Nome_do_Anuncio'] = ""
-        df['Nome_do_Conjunto_de_Anuncio'] = ""
-        return df
-
-    df['Campanha'] = df['Campaign name']
-    df['Nome_do_Anuncio'] = df['Campaign name']
-    df['Nome_do_Conjunto_de_Anuncio'] = df['Campaign name']
-    return df
-
-
-def aplicar_parametrizacao_campanha(df: pd.DataFrame, mapping_campanha: dict, mapping_sigla: dict) -> pd.DataFrame:
-    """
-    Preenche as colunas 'Campanha' e 'ID_Campanha' com base na coluna 'Campaign_name',
-    utilizando dicionários de mapeamento externos.
-    """
-    if 'Campaign_name' not in df.columns:
-        df['Campanha'] = ""
-        df['ID_Campanha'] = ""
-        return df
-
-    df['Campanha'] = df['Campaign_name'].apply(
-        lambda x: buscar_mapping(mapping_campanha, x) or x
-    )
-    df['ID_Campanha'] = df['Campaign_name'].apply(
-        lambda x: buscar_mapping(mapping_sigla, x)
-    )
-    return df
-
-
-
 # ==== ./utils/campanha_mapper.py ====
 
 # campanha_mapper.py
@@ -2108,7 +1876,6 @@ class BIParamLookup:
 def get_campaign_parameterization(creds_path: str, spreadsheet_id: str) -> Tuple[Dict[str,str],Dict[str,str]]:
     return BIParamLookup(creds_path, spreadsheet_id).get_taxonomy_camp_name_and_id_from_ad_name()
 
-
 # ------------------------------------------------------------------------------
 # 2) Creative mapping (LinkedIn utm_content ↔ Criativo)
 # ------------------------------------------------------------------------------
@@ -2242,6 +2009,45 @@ def build_pinterest_preview_link(pin_id: Any) -> str:
 def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     col = next((c for c in df.columns if c.strip().lower()=="preview link"),None)
     df["URL_do_Anúncio"] = df.get(col,"").apply(build_pinterest_preview_link) if col else ""
+    return df
+
+# -------------------------------------------------------------------------
+# LINKEDIN – atribuição de ad_name via utm_content
+# -------------------------------------------------------------------------
+def atribuir_ad_name_via_utm(df: pd.DataFrame, df_param: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preenche 'ad_name' com base em mapeamento utm_content → taxonomy_ad_name
+    presente na aba BI_PARAMETRIZAÇÃO.
+    """
+    # Não altere df_param.columns in-place: trabalhe sobre uma cópia
+    cols = {c.strip().lower(): c for c in df_param.columns}
+    utm_col = cols.get("utm_content_raw", cols.get("utm_content"))
+    name_col = cols.get("taxonomy_ad_name")
+
+    if utm_col is None or name_col is None:
+        logging.warning(
+            "Não achei colunas 'utm_content[_raw]' ou 'taxonomy_ad_name' em BI_PARAMETRIZAÇÃO."
+        )
+        df["ad_name"] = df.get("ad_name", "").fillna("")
+        return df
+
+    # Garante utm_content no DataFrame de saída
+    df["utm_content"] = df["utm_content"].astype(str).str.strip()
+
+    # Constrói mapping sem repetir colunas
+    mapping = (
+        df_param[[utm_col, name_col]]
+        .dropna(subset=[utm_col, name_col])
+        .assign(
+            _utm=lambda d: d[utm_col].astype(str).str.strip(),
+            _name=lambda d: d[name_col].astype(str).str.strip(),
+        )
+        .drop_duplicates(subset=["_utm"])
+        .set_index("_utm")["_name"]
+        .to_dict()
+    )
+
+    df["ad_name"] = df["utm_content"].map(mapping).fillna(df.get("ad_name", ""))
     return df
 
 
@@ -2619,37 +2425,46 @@ def normalize_parametrizacao_values(df: pd.DataFrame, cols: list[str] = None) ->
 def normalize_age(valor) -> str:
     """
     Normaliza faixas etárias para uso em dashboards e relatórios.
-
-    - Converte '55-64' e '65+' em '55+'.
-    - Converte valores vazios ou desconhecidos em 'Não classificado'.
-    - Mantém outros valores após strip e lowercase.
-
-    Parâmetros:
-        valor: entrada bruta (qualquer tipo); será convertido para str e processado.
-
-    Retorna:
-        str: faixa etária normalizada ou 'Não classificado' se valor inválido.
+    
+    • Trata primeiros os recortes específicos do Pinterest.
+    • Converte '55-64' e '65+' em '55+'.
+    • Converte valores vazios ou desconhecidos em 'Não classificado'.
+    • Mantém outros valores após strip e lowercase.
     """
     logger = logging.getLogger(__name__)
-    logger.debug("normalizar_faixa_etaria: recebendo valor %r", valor)
+    logger.debug("normalize_age: recebendo valor %r", valor)
 
+    # 1) Força str e lowercase para comparar chaves do mapeamento
     if not isinstance(valor, str):
-        logger.debug("normalizar_faixa_etaria: valor não é string, retornando 'Não classificado'")
+        logger.debug("normalize_age: valor não é string")
         return "Não classificado"
+    v = valor.strip().lower()
 
-    valor_norm = valor.strip().lower()
-    logger.debug("normalizar_faixa_etaria: após strip/lower %r", valor_norm)
+    # 2) Mapeamento dos recortes do Pinterest → faixas padrão
+    pin_map = {
+        "0-17":       "Não classificado",
+        "18-24":      "18-24",
+        "25-34":      "25-34",
+        "35-49":      "35-44",
+        "45-49":      "45-54",   
+        "50-64":      "55+",     # mapeia 50-64 pra 55+
+        "65+":        "55+",     # mantém 65+ → 55+
+    }
+    if v in pin_map:
+        logger.debug("normalize_age: recorte Pinterest '%s' → '%s'", v, pin_map[v])
+        return pin_map[v]
 
-    if valor_norm in {"", "none", "unknown", "others"}:
-        logger.debug("normalizar_faixa_etaria: valor em branco ou desconhecido, retornando 'Não classificado'")
+    # 3) casos genéricos
+    if v in {"", "none", "unknown", "others"}:
+        logger.debug("normalize_age: valor em branco ou desconhecido")
         return "Não classificado"
-    if valor_norm in {"55-64", "65+"}:
-        logger.debug("normalizar_faixa_etaria: valor '%s' convertido para '55+'", valor_norm)
+    if v in {"55-64", "65+"}:
+        logger.debug("normalize_age: faixa genérica '%s' → '55+'", v)
         return "55+"
 
-    logger.debug("normalizar_faixa_etaria: valor final %r", valor_norm)
-    return valor_norm
-
+    # 4) qualquer outro valor (ex.: '18-34', '21-25' etc.)
+    logger.debug("normalize_age: valor final %r", v)
+    return v
 
 
 def infer_vehicle_meta_by_placement (df: pd.DataFrame) -> pd.DataFrame:
@@ -3226,19 +3041,19 @@ def renomear_colunas_origem_para_modelo(df):
     Ignora colunas ausentes sem erro.
     """
     renomear = {
-        'Date': 'Data', 'Account name': 'Nome_da_Conta', 'Advertiser name': 'Nome_da_Conta',
-        'Campaign name': 'Campaign_name', 'Ad group name': 'Nome_do_Conjunto_de_Anuncio',
-        'Ad set name': 'Nome_do_Conjunto_de_Anuncio', 'Ad name': 'Nome_do_Anuncio',
-        'Campaign ID': 'Campaign_ID', 'Start': 'Inicio_da_Campanha', 'End': 'Fim_da_Campanha',
-        'Campaign objective type': 'Objetivo', 'Campaign objective': 'Objetivo',
-        'Placement': 'Placement', 'Preview Link': 'URL_do_Anuncio',
-        'Content (utm)': 'ID_Content', 'Impressions': 'Impressoes', 'Cost': 'Investimento',
-        'Link clicks': 'Cliques_no_Link', 'Clicks': 'Cliques_no_Link',
-        'Video play actions': 'Video_Play', 'Video views': 'Video_Play',
-        'Video watches at 25%': 'Visualizacoes_ate_25', 'Video watches at 50%': 'Visualizacoes_ate_50',
-        'Video watches at 75%': 'Visualizacoes_ate_75', 'Video watches at 100%': 'Visualizacoes_ate_100',
-        'Post reactions': 'Reacoes', 'Paid likes': 'Reacoes', 'Post shares': 'Compartilhamentos',
-        'Paid shares': 'Compartilhamentos', 'Post comments': 'Comentarios', 'Paid comments': 'Comentarios','Age': 'Faixa_Etaria'
+        'date': 'Data', 'account_name': 'Nome_da_Conta', 'advertiser_name': 'Nome_da_Conta',
+        'Campaign name': 'Campaign_name', 'ad_group_name': 'Nome_do_Conjunto_de_Anuncio',
+        'ad_set_name': 'Nome_do_Conjunto_de_Anuncio', 'ad_name': 'Nome_do_Anuncio',
+        'campaign_id': 'Campaign_ID', 'start': 'Inicio_da_Campanha', 'end': 'Fim_da_Campanha',
+        'objective': 'Objetivo', 'objective': 'Objetivo',
+        'ad_preview_link': 'URL_do_Anuncio',
+        'utm_content': 'ID_Content', 'impressions': 'Impressoes', 'cost': 'Investimento',
+        'link_clicks': 'Cliques_no_Link', 'clicks': 'Cliques_no_Link',
+        'video_play': 'Video_Play', 'Video views': 'Video_Play',
+        'video_watches_25': 'Visualizacoes_ate_25', 'video_watches_50': 'Visualizacoes_ate_50',
+        'video_watches_75': 'Visualizacoes_ate_75', 'video_watches_100': 'Visualizacoes_ate_100',
+        'post_reactions': 'Reacoes', 'paid_likes': 'Reacoes', 'post_shares': 'Compartilhamentos',
+        'paid_shares': 'Compartilhamentos', 'post_comments': 'Comentarios', 'paid_comments': 'Comentarios','age': 'Faixa_Etaria'
     }
     df.rename(columns=renomear, inplace=True)
     logging.debug("[renomear_colunas_origem_para_modelo] Colunas após renomear: %s", list(df.columns))
@@ -3611,6 +3426,13 @@ centralizando exceções que devem ser aplicadas em diferentes ETLs.
 
 ID_CONTENT_REPLACEMENTS: dict[str, str] = {
     "influenciador_gabi_bailas": "dbt_sbrae_2025_catalisa0001",
+    "dbt_sbrae_2025_cer_pan0006": "dbt_sbrae_2025_pan0006",
+    "dbt_sbrae_2025_pan0008":"dbt_sbrae_2025_cer_pan0008",
+    "dbt_sbrae_2025_cer_pan0012": "dbt_sbrae_2025_cer_pan0011",
+    "dbt_sbrae_2025_emp_fem0199":"dbt_sbrae_2025_emp_fem0198",
+    "dbt_sbrae_2025_cer_pan0202":"dbt_sbrae_2025_cer_pan0201",
+    "dbt_sbrae_2025_cer_pan0146": "dbt_sbrae_2025_pan0146",
+    "dbt_sbrae_2025_cer_pan0155" : "dbt_sbrae_2025_cer_pan0154",
 }
 """Substituições específicas para o campo 'ID_Content'.
 
@@ -3619,7 +3441,7 @@ Valor: string que deve substituir o original em 'ID_Content'.
 """
 
 CAMPAIGN_NAME_REPLACEMENTS: dict[str, str] = {
-    "topview-20250321-q-20250301460526-2025031002130": "2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM",
+    "TOPVIEW-20250321-Q-20250301460526-2025031002130": "2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM",
 }
 """Substituições específicas para o campo 'Campaign name'.
 
@@ -3628,7 +3450,7 @@ Valor: string que deve substituir o nome da campanha.
 """
 
 AD_GROUP_NAME_REPLACEMENTS: dict[str, str] = {
-    "topview-br-20250321-q-20250301460526-2025031076487": "2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM",
+    "TOPVIEW-BR-20250321-Q-20250301460526-2025031076487": "2025_3_BR_ALC_CPM_BRASIL",
 }
 """Substituições específicas para o campo 'Ad group name'.
 
@@ -3638,7 +3460,9 @@ Valor: string que deve substituir o nome do grupo de anúncio.
 
 
 AD_NAME_REPLACEMENTS: dict[str, str] = {
-    "Ad name2025-03-20 18:28:41": "2025_3_BR_VÍDEO_RESPOSTA_BRANDED_MISSION_1_ACAO_DBT_SBRAE_2025_EMP_FEM0062",
+    "Ad name2025-03-20 18:28:41": "2025_3_BR_VÍDEO_RAFA_ACAO_DBT_SBRAE_2025_EMP_FEM0075",
+    "Mari Kruger": "2025_2_BR_VÍDEO_MARI_KRUGER_ACAO_DBT_SBRAE_2025_CATALISA0002",
+    "2025_3_BR_VÍDEO_RESPOSTA_BRANDED_MISSION_1_ACAO_DBT_SBRAE_2025_EMP_FEM0062": "2025_3_BR_VÍDEO_RESPOSTA_BRANDED_MISSION_1_ACAO_DBT_SBRAE_2025_EMP_FEM0061"
 }
 """Substituições específicas para o campo 'Ad name'.
 
@@ -6776,7 +6600,7 @@ import re
 
 import pandas as pd
 import time
-from treat.utils.bi_param_utils import (
+from treat.bi_param_utils import (
     BIParamLookup,
     get_campaign_parameterization,
     load_utm_mapping,
@@ -6883,7 +6707,7 @@ def test_fill_utm_content_from_ad_name(lookup):
 def test_get_campaign_parameterization_wrapper():
     # Assegura que o wrapper devolve o mesmo que o método da classe
     lookup = BIParamLookup(CREDS_PATH, SPREADSHEET_ID)
-    camp1, utm1 = lookup.get_taxonomy_camp_name_and_id_from_ad_name()
+    camp1, utm1 = lookup.get_campaign_maps()
     camp2, utm2 = get_campaign_parameterization(CREDS_PATH, SPREADSHEET_ID)
     assert camp1 == camp2
     assert utm1 == utm2 
@@ -6929,15 +6753,15 @@ def test_cache_ttl(monkeypatch):
     lookup.HEADER_ROW = 1
 
     # chama duas vezes sem avançar o tempo
-    _ = lookup.get_taxonomy_camp_name_and_id_from_ad_name()
-    _ = lookup.get_taxonomy_camp_name_and_id_from_ad_name()
+    _ = lookup.get_campaign_maps()
+    _ = lookup.get_campaign_maps()
     assert calls["count"] == 1
 
     # aqui a única mudança:
     orig_time = time.time
     monkeypatch.setattr(time, "time", lambda: orig_time() + lookup._TTL + 1)
 
-    _ = lookup.get_taxonomy_camp_name_and_id_from_ad_name()
+    _ = lookup.get_campaign_maps()
     assert calls["count"] == 2
 
 def test_determine_meta_preview_link():
@@ -7944,6 +7768,218 @@ class TestLinkedinPreviewMappingReal(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+# ==== ./tests/test_load.py ====
+
+import pandas as pd
+import pytest
+import load as l
+
+# Funções do módulo load
+fetch_data = l.fetch_data
+prepare_new_records = l.prepare_new_records
+append_new_records = l.append_new_records
+load_missing_records = l.load_missing_records
+get_missing_records = l.get_missing_records
+from load.common.validate_impressions_consistency import validate_impressions_consistency
+
+class FakeFetcher:
+    """
+    Mock de SheetsFetcher: retorna DataFrames pré-definidos.
+    """
+    def __init__(self, data_map):
+        self.data_map = data_map
+
+    def get(self, sheet_names, as_frame=True):
+        return {name: self.data_map[name] for name in sheet_names}
+
+
+def test_fetch_data_returns_correct_data():
+    df1 = pd.DataFrame({'A': [1]})
+    df2 = pd.DataFrame({'B': [2]})
+    fetcher = FakeFetcher({'Origem': df1, 'Destino': df2})
+    src, dst = fetch_data(fetcher, 'Origem', 'Destino')
+    pd.testing.assert_frame_equal(src, df1)
+    pd.testing.assert_frame_equal(dst, df2)
+
+
+@pytest.mark.parametrize(
+    "df_src,df_dest,expected_ids",
+    [
+        (pd.DataFrame({'ID': ['a']}), pd.DataFrame(), ['a']),                # destino vazio
+        (pd.DataFrame({'ID': ['x', 'x']}), pd.DataFrame({'ID': ['x']}), ['x']), # duplicata
+    ]
+)
+def test_prepare_new_records_various(df_src, df_dest, expected_ids):
+    new = prepare_new_records(df_src, df_dest)
+    assert sorted(new['ID'].tolist()) == expected_ids
+
+
+def test_numero_sequencial_and_holes():
+    df_dest = pd.DataFrame({'ID': ['a', 'b'], 'Numero': [1, 5]})
+    df_src = pd.DataFrame({'ID': ['c']})
+    new = prepare_new_records(df_src, df_dest)
+    assert new['Numero'].iloc[0] == 6
+
+
+def test_append_new_records_calls_appender():
+    spy_calls = []
+
+    def spy_appender(sheet, df):
+        spy_calls.append((sheet, df.copy()))
+
+    df_new = pd.DataFrame({'ID': ['1', '2']})
+    append_new_records(spy_appender, 'SheetX', df_new)
+    assert spy_calls[0][0] == 'SheetX'
+    pd.testing.assert_frame_equal(spy_calls[0][1], df_new)
+
+    spy_calls.clear()
+    append_new_records(spy_appender, 'SheetX', pd.DataFrame())
+    assert spy_calls == []
+
+
+def test_load_missing_records_end_to_end(monkeypatch, caplog):
+    caplog.set_level('INFO', logger='load')
+    df_src = pd.DataFrame({'ID': ['a', 'b'], 'X': [10, 20]})
+    df_dest = pd.DataFrame({'ID': ['a'], 'X': [10]})
+    fetcher = FakeFetcher({'Origem': df_src, 'Destino': df_dest})
+
+    spy = []
+
+    def spy_appender(sheet, df):
+        spy.append((sheet, df.copy()))
+
+    # Usa lógica real
+    monkeypatch.setattr(l, 'get_missing_records', get_missing_records)
+
+    load_missing_records(
+        spreadsheet_id='id',
+        creds_path='creds',
+        origem_sheet='Origem',
+        destino_sheet='Destino',
+        fetcher=fetcher,
+        appender=spy_appender
+    )
+
+    assert len(spy) == 1
+    sheet, df_passed = spy[0]
+    assert sheet == 'Destino'
+    assert df_passed['ID'].tolist() == ['b']
+    assert df_passed['Numero'].tolist() == [1]
+    assert 'Inserindo' in caplog.text
+
+
+def test_validate_impressions_consistency_passes():
+    """Valida que a função de consistência não levanta erro quando as somas batem."""
+    
+    # DataFrames mockados
+    age = pd.DataFrame({'Veiculo': ['Facebook', 'Instagram'], 'Impressoes': [100, 200]})
+    gender = pd.DataFrame({'Veiculo': ['Facebook', 'Instagram'], 'Impressoes': [150, 250]})
+    region = pd.DataFrame({'Veiculo': ['Facebook', 'Instagram'], 'Impressoes': [120, 180]})
+    meta = pd.DataFrame({'Veiculo': ['Facebook', 'Instagram'], 'Impressoes': [370, 630]})
+
+    # FakeFetcher devolvendo as abas
+    ff = FakeFetcher({
+        'metaAge': age,
+        'metaGender': gender,
+        'metaRegion': region,
+        'metaGeral': meta,
+    })
+
+    # Não deve levantar exceção
+    validate_impressions_consistency(ff)
+
+
+def test_validate_impressions_consistency_fails():
+    # Divergência proposital (meta tem 100 a mais no Facebook)
+    age = pd.DataFrame({'Veiculo': ['Facebook'], 'Impressoes': [50]})
+    gender = pd.DataFrame({'Veiculo': ['Facebook'], 'Impressoes': [50]})
+    region = pd.DataFrame({'Veiculo': ['Facebook'], 'Impressoes': [50]})
+    meta = pd.DataFrame({'Veiculo': ['Facebook'], 'Impressoes': [200]})
+
+    ff = FakeFetcher({
+        'metaAge': age,
+        'metaGender': gender,
+        'metaRegion': region,
+        'metaGeral': meta,
+    })
+
+    with pytest.raises(ValueError):
+        validate_impressions_consistency(ff)
+
+
+def test_nome_do_anuncio_bi_parametrizacao(monkeypatch):
+    """Garante que todos os valores em Nome_do_Anuncio existem na coluna taxonomy_ad_name da aba BI_PARAMETRIZACAO."""
+    df_src = pd.DataFrame({
+        'ID': ['a', 'b'],
+        'Nome_do_Anuncio': ['Anuncio X', 'Anuncio Y'],
+        'X': [10, 20]
+    })
+    df_dest = pd.DataFrame({'ID': ['a'], 'Nome_do_Anuncio': ['Anuncio X'], 'X': [10]})
+    df_param = pd.DataFrame({'taxonomy_ad_name': ['Anuncio X', 'Anuncio Y', 'Outro']})
+
+    fetcher = FakeFetcher({
+        'Origem': df_src,
+        'Destino': df_dest,
+        'BI_PARAMETRIZACAO': df_param
+    })
+
+    captured = {}
+    def spy_appender(sheet, df):
+        captured['df'] = df.copy()
+
+    monkeypatch.setattr(l, 'get_missing_records', get_missing_records)
+
+    l.load_missing_records(
+        spreadsheet_id='dummy',
+        creds_path='dummy',
+        origem_sheet='Origem',
+        destino_sheet='Destino',
+        fetcher=fetcher,
+        appender=spy_appender
+    )
+
+    final_df = captured['df']
+    nomes = final_df['Nome_do_Anuncio'].dropna().unique()
+    taxonomy = fetcher.get(['BI_PARAMETRIZACAO'])['BI_PARAMETRIZACAO']['taxonomy_ad_name'].dropna().unique()
+    for nome in nomes:
+        assert nome in taxonomy, f"'{nome}' não encontrado em taxonomy_ad_name da aba BI_PARAMETRIZACAO"
+
+def test_id_content_present_in_final_df(monkeypatch):
+    """Verifica se todas as linhas do DataFrame final possuem ID_Content não nulo/vazio."""
+    # Dados de origem com ID_Content
+    df_src = pd.DataFrame({
+        'ID': ['a', 'b'],
+        'ID_Content': ['content_a', 'content_b'],
+        'X': [10, 20]
+    })
+    # Destino já contém um registro
+    df_dest = pd.DataFrame({'ID': ['a'], 'ID_Content': ['content_a'], 'X': [10]})
+
+    fetcher = FakeFetcher({'Origem': df_src, 'Destino': df_dest})
+
+    captured = {}
+    def spy_appender(sheet, df):
+        captured['df'] = df.copy()
+
+    # Usa lógica real para identificação de faltantes
+    monkeypatch.setattr(l, 'get_missing_records', get_missing_records)
+
+    load_missing_records(
+        spreadsheet_id='id',
+        creds_path='creds',
+        origem_sheet='Origem',
+        destino_sheet='Destino',
+        fetcher=fetcher,
+        appender=spy_appender
+    )
+
+    final_df = captured['df']
+    # Deve existir coluna ID_Content e nenhum valor vazio
+    assert 'ID_Content' in final_df.columns
+    assert final_df['ID_Content'].replace('', pd.NA).notna().all()  # nenhum vazio ou NA
 
 
 

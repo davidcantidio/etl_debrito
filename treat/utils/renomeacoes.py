@@ -75,7 +75,12 @@ renomeacao_geral = {
     "Post reactions": "post_reactions",
     "Post shares": "post_shares",
     "Post comments": "post_comments",
-    "Video_Play": "video_play"
+    "Video_Play": "video_play",
+    "Preview_Link_FB" : "URL_do_Anuncio",
+    "Preview_Link_IG" :"URL_do_Anuncio",
+    "URL_do_Anuncio": "URL_do_Anuncio",
+
+
 }
 
 renomeacao_metaIdade = {

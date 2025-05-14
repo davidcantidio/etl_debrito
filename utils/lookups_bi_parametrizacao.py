@@ -106,7 +106,6 @@ class BIParamLookup:
 def get_campaign_parameterization(creds_path: str, spreadsheet_id: str) -> Tuple[Dict[str,str],Dict[str,str]]:
     return BIParamLookup(creds_path, spreadsheet_id).get_taxonomy_camp_name_and_id_from_ad_name()
 
-
 # ------------------------------------------------------------------------------
 # 2) Creative mapping (LinkedIn utm_content ↔ Criativo)
 # ------------------------------------------------------------------------------
@@ -240,4 +239,43 @@ def build_pinterest_preview_link(pin_id: Any) -> str:
 def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     col = next((c for c in df.columns if c.strip().lower()=="preview link"),None)
     df["URL_do_Anúncio"] = df.get(col,"").apply(build_pinterest_preview_link) if col else ""
+    return df
+
+# -------------------------------------------------------------------------
+# LINKEDIN – atribuição de ad_name via utm_content
+# -------------------------------------------------------------------------
+def atribuir_ad_name_via_utm(df: pd.DataFrame, df_param: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preenche 'ad_name' com base em mapeamento utm_content → taxonomy_ad_name
+    presente na aba BI_PARAMETRIZAÇÃO.
+    """
+    # Não altere df_param.columns in-place: trabalhe sobre uma cópia
+    cols = {c.strip().lower(): c for c in df_param.columns}
+    utm_col = cols.get("utm_content_raw", cols.get("utm_content"))
+    name_col = cols.get("taxonomy_ad_name")
+
+    if utm_col is None or name_col is None:
+        logging.warning(
+            "Não achei colunas 'utm_content[_raw]' ou 'taxonomy_ad_name' em BI_PARAMETRIZAÇÃO."
+        )
+        df["ad_name"] = df.get("ad_name", "").fillna("")
+        return df
+
+    # Garante utm_content no DataFrame de saída
+    df["utm_content"] = df["utm_content"].astype(str).str.strip()
+
+    # Constrói mapping sem repetir colunas
+    mapping = (
+        df_param[[utm_col, name_col]]
+        .dropna(subset=[utm_col, name_col])
+        .assign(
+            _utm=lambda d: d[utm_col].astype(str).str.strip(),
+            _name=lambda d: d[name_col].astype(str).str.strip(),
+        )
+        .drop_duplicates(subset=["_utm"])
+        .set_index("_utm")["_name"]
+        .to_dict()
+    )
+
+    df["ad_name"] = df["utm_content"].map(mapping).fillna(df.get("ad_name", ""))
     return df

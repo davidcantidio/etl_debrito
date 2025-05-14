@@ -1,6 +1,6 @@
 import logging
 import time as _time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Sequence
 import pandas as pd
 from gspread.utils import rowcol_to_a1
 
@@ -48,45 +48,105 @@ class BIParamLookup:
         return None
 
     def _map_columns(
-        self, key_kw: str, val_kws: List[str], upper_keys: bool = True
-    ) -> Dict[str, Tuple[str, ...]]:
+        self,
+        key_kw: str,
+        val_kws: list[str],
+        *,
+        upper_keys: bool = True,
+    ) -> dict[str, tuple[str, ...]]:
+        """
+        Constrói um dicionário-lookup a partir da aba BI_PARAMETRIZAÇÃO.
+
+        Parameters
+        ----------
+        key_kw      : pedaço (substring, case-insensitive) do nome da coluna-chave
+                    (ex.: "utm_content" ou "taxonomy_campaign_name").
+        val_kws     : lista de substrings que identificam as colunas-valor
+                    (a ordem da lista define a ordem da tupla retornada).
+        upper_keys  : se True → chave normalizada em UPPER;
+                    se False → chave normalizada em lower().
+
+        Returns
+        -------
+        {chave_normalizada: (valor1, valor2, …)}
+
+        Notas de robustez
+        -----------------
+        • Faz cache das correspondências de nomes de colunas (self._col_cache).
+        • Ignora linhas vazias / NaN na coluna-chave.
+        • Strip + normalização *idênticas* em mapa e nas aplicações downstream.
+        (chave = str(...).strip().lower() ou upper()).
+        • Remove duplicatas mantendo a **última** ocorrência (uso de dict garante isso).
+        """
+        # Garante DataFrame carregado e cache de colunas pronto
         self._ensure_df()
+
+        # ── Resolve o nome real das colunas (case-insensitive) ────────────────
         key_col = self._find_col(key_kw)
         val_cols = [self._find_col(v) for v in val_kws]
+
         if key_col is None or any(vc is None for vc in val_cols):
-            raise KeyError(f"Columns for '{key_kw}' or {val_kws} not found")
-        mapping: Dict[str, Tuple[str, ...]] = {}
+            raise KeyError(
+                f"Colunas não encontradas — chave: '{key_kw}', valores: {val_kws}"
+            )
+
+        # ── Itera uma única vez no DataFrame já em cache ──────────────────────
+        mapping: dict[str, tuple[str, ...]] = {}
         for row in self._df.itertuples(index=False):
             raw_key = getattr(row, key_col)
+
+            # pula vazios / NaN / strings só com espaços
             if pd.isna(raw_key):
                 continue
             k = str(raw_key).strip()
             if not k:
                 continue
-            k = k.upper() if upper_keys else k.lower()
+
+            # normalização idêntica à usada em todo o pipeline
+            k_norm = k.upper() if upper_keys else k.lower()
+
+            # coleta valores (já em str + strip; mantém eventuais strings vazias)
             vals = tuple(str(getattr(row, vc)).strip() for vc in val_cols)
-            mapping[k] = vals
+
+            # dicionário sobrescreve duplicatas → última linha “ganha”
+            mapping[k_norm] = vals
+
         return mapping
 
-    def get_taxonomy_camp_name_and_id_from_utm_content(
-        self
-    ) -> Tuple[Dict[str, str], Dict[str, str]]:
-        """
-        Retorna dois dicionários baseados em utm_content na planilha BI_PARAMETRIZAÇÃO:
-        - {utm_content: campaign_name}
-        - {utm_content: utm_campaign}
-        Não faz nenhuma transformação de case ou strip.
-        """
-        raw = self._map_columns(
-            key_kw="utm_content",
-            val_kws=["campaign_name", "utm_campaign"],
-            upper_keys=False      # mantém utm_content como está
-        )
-        return (
-            {k: v[0] for k, v in raw.items()},
-            {k: v[1] for k, v in raw.items()}
-        )
 
+    def get_campaign_maps(
+    self,
+    prefer_cols: Sequence[str] = ("utm_content", "taxonomy_campaign_name"),
+) -> tuple[dict[str, str], dict[str, str]]:
+        """
+        Retorna (camp_map, utm_map) mesclando todas as colunas listadas
+        em `prefer_cols`.  Último valor *não* sobrescreve caso a chave já exista.
+        Todas as chaves saem normalizadas em lower/strip.
+        """
+        self._ensure_df()
+        cols_lc = {c.lower(): c for c in self._df.columns}
+
+        camp_map: dict[str, str] = {}
+        id_map:   dict[str, str] = {}
+
+        for key_kw in prefer_cols:
+            col_name = cols_lc.get(key_kw.lower())
+            if not col_name:
+                continue
+
+            raw = self._map_columns(
+                key_kw   = key_kw,
+                val_kws  = ["campaign_name", "utm_campaign"],
+                upper_keys = False        # mantém em lower
+            )
+            for k, (camp, utm) in raw.items():
+                k_norm = k.strip().lower()
+                # só adiciona se ainda não existe (preserva prioridade da 1ª coluna)
+                camp_map.setdefault(k_norm, camp)
+                id_map.setdefault(k_norm, utm)
+
+        return camp_map, id_map
+    
     def utm_start_end(self) -> Dict[str, Dict[str, str]]:
         """
         Retorna {utm_content_lower: {"start":..., "end":...}}
@@ -189,29 +249,28 @@ class BIParamLookup:
         write_back: bool = False,
     ) -> pd.DataFrame:
         """
-        Preenche 'utm_content' vazio fazendo ad_name → utm_content via BI.
-        Se a aba não possui ad_name, retorna o DataFrame inalterado.
+        Preenche 'utm_content' vazio a partir de 'ad_name' usando BI_PARAMETRIZAÇÃO.
+        Agora também loga quais ad_name não foram encontrados.
         """
         out = df.copy()
 
-        # ─── GUARDA contra abas sem ad_name ──────────────────────────────────────
         if coluna_ad_name not in out.columns:
             log.debug("[BIParamLookup] coluna '%s' ausente; skip fill_utm_content", coluna_ad_name)
             return out
-        # ------------------------------------------------------------------------
 
-        # lookup invertido: taxonomy_ad_name -> utm_content
+        # lookup invertido taxonomy_ad_name → utm_content
         raw = self._map_columns(
             key_kw="utm_content",
-            val_kws=["taxonomy_ad_name"],
+            val_kws=["taxonomy_ad_name", "taxonomy_ad_name_social"],
             upper_keys=False,
         )
-        # v é tupla (utm_content → (taxonomy_ad_name,)), pegamos v[0]
-        inv_map = {v[0].strip().upper(): k for k, v in raw.items()}
+        inv_map = {
+            v[0].strip().upper(): k
+            for k, v in raw.items()
+            if v[0]
+        }
 
-        # preparação write-back
-        header_lc: List[str] = []
-        updates: List[Dict[str, Any]] = []
+        header_lc, updates = [], []
         if write_back:
             if worksheet is None:
                 if sheet_name is None:
@@ -223,19 +282,21 @@ class BIParamLookup:
                 )
             header_lc = [h.strip().lower() for h in worksheet.row_values(1)]
 
-        # loop: preenche apenas vazios
+        not_found: list[tuple[int, str]] = []
+
         for idx, ad in out[coluna_ad_name].astype(str).str.strip().items():
+            if not ad:
+                continue  # ignora vazios
             if str(out.at[idx, coluna_destino]).strip():
                 continue
             utm = inv_map.get(ad.upper(), "")
             if not utm:
+                not_found.append((idx, ad))
                 continue
             out.at[idx, coluna_destino] = utm
-
             if write_back and coluna_destino.lower() in header_lc:
                 c = header_lc.index(coluna_destino.lower()) + 1
-                cell = rowcol_to_a1(idx + 2, c)
-                updates.append({"range": cell, "values": [[utm]]})
+                updates.append({"range": rowcol_to_a1(idx + 2, c), "values": [[utm]]})
 
         if write_back and updates:
             worksheet.batch_update(updates, value_input_option="RAW")
@@ -244,53 +305,135 @@ class BIParamLookup:
                 len(updates), coluna_ad_name, coluna_destino
             )
 
+        if not_found:
+            preview = ", ".join(f"{i}:{v}" for i, v in not_found[:10])
+            if len(not_found) > 10:
+                preview += ", …"
+            log.info(
+                "[BIParamLookup] %d ad_name(s) sem correspondência em BI_PARAMETRIZAÇÃO: %s",
+                len(not_found), preview
+            )
+
         return out
 
+    def get_linkedin_ad_name_map(self) -> dict[str,str]:
+        if not hasattr(self, "_li_ad_name_map"):
+            df_param = self._load_df()
+            cols = {c.strip().lower(): c for c in df_param.columns}
+            utm_col = cols.get("utm_content_raw", cols.get("utm_content"))
+            name_col = cols.get("taxonomy_ad_name_social")
+            if utm_col is None or name_col is None:
+                logging.warning("Não achei colunas 'utm_content[_raw]' ou 'taxonomy_ad_name_social' em BI_PARAMETRIZAÇÃO.")
+                self._li_ad_name_map = {}
+            else:
+                self._li_ad_name_map = (
+                    df_param[[utm_col, name_col]]
+                    .dropna(subset=[utm_col, name_col])
+                    .assign(
+                        _utm=lambda d: d[utm_col].astype(str).str.strip(),
+                        _name=lambda d: d[name_col].astype(str).str.strip(),
+                    )
+                    .drop_duplicates(subset=["_utm"])
+                    .set_index("_utm")["_name"]
+                    .to_dict()
+                )
+        return self._li_ad_name_map
+    
+    def get_objective_map(self) -> Dict[str, str]:
+            """
+            Retorna um dicionário {utm_content: objective} a partir da aba BI_PARAMETRIZAÇÃO.
+            """
+            # garante df carregado
+            self._ensure_df()
+            # encontra colunas
+            cols = {c.strip().lower(): c for c in self._df.columns}
+            utm_col = cols.get("utm_content_raw") or cols.get("utm_content")
+            obj_col = cols.get("objective")
+            if utm_col is None or obj_col is None:
+                log.warning("Não achei colunas 'utm_content[_raw]' ou 'objective' em BI_PARAMETRIZAÇÃO.")
+                return {}
+            # build map
+            df = self._df[[utm_col, obj_col]].dropna(subset=[utm_col, obj_col])
+            return {
+                str(row[utm_col]).strip(): str(row[obj_col]).strip()
+                for _, row in df.iterrows()
+            }
+
+
+def fill_objective_from_bi(
+    df: pd.DataFrame,
+    lookup: BIParamLookup,
+    *,
+    key_col: str = "utm_content",
+    objective_col: str = "objective",
+) -> pd.DataFrame:
+        """
+        Preenche objective vazio via mapping utm_content → objective usando BIParamLookup.
+        """
+        if key_col not in df.columns:
+            return df
+        obj_map = lookup.get_objective_map()
+        # só preenche onde objective está vazio e utm_content não vazio
+        mask = (
+            df.get(objective_col, "").astype(str).str.strip().eq("") &
+            df[key_col].astype(str).str.strip().ne("")
+        )
+        df.loc[mask, objective_col] = (
+            df.loc[mask, key_col]
+            .astype(str).str.strip()
+            .map(obj_map)
+            .fillna("")
+        )
+        return df
 
 
 def enrich_with_bi_parametrizacao(
     df: pd.DataFrame,
     creds_path: str,
     spreadsheet_id: str,
-    sheet_name: Optional[str] = None,
+    *,
+    sheet_name: str | None = None,
 ) -> pd.DataFrame:
-    """
-    1) Mapeia Campanha e ID_Campanha a partir de utm_content → BI  
-    2) Preenche start/end (via utm_content)  
-    3) Preenche utm_content vazio a partir de ad_name  
-    """
     lookup = BIParamLookup(creds_path, spreadsheet_id)
 
-    # 1) campaign_name & utm_campaign via utm_content
-    camp_map, utm_map = lookup.get_taxonomy_camp_name_and_id_from_utm_content()
-
-    # escolhe a coluna existente
-    key_col = "utm_content" if "utm_content" in df.columns else "ID_Content"
-
-    # backup de qualquer valor já em Campanha
-    original_camp = df.get(
-        "Campanha",
-        pd.Series([""] * len(df), index=df.index)
+    # 1) utm_content ← ad_name (caso necessário)
+    df = lookup.fill_utm_content_from_ad_name(
+        df, coluna_ad_name="ad_name", coluna_destino="utm_content", write_back=False
     )
 
-    # aplica o lookup direto, sem strip/upper/lower
-    df["Campanha"]    = df[key_col].map(camp_map).combine_first(original_camp)
-    df["ID_Campanha"] = df[key_col].map(utm_map)
+    # 2) dicionários de BI (já normalizados em lowercase)
+    camp_map, id_map = lookup.get_campaign_maps()
+    camp_map = {k.lower(): v for k, v in camp_map.items()}
+    id_map   = {k.lower(): v for k, v in id_map.items()}
 
-    # 2) start/end faltantes
+    # 3) chave: utm_content  ➜  se vazio usa campaign_name
+    key_series = (
+        df.get("utm_content", pd.Series("", index=df.index))
+        .astype(str).str.strip()
+        .where(lambda s: s != "",
+               df.get("campaign_name", pd.Series("", index=df.index))
+                 .astype(str).str.strip())
+        .str.lower()
+    )
+
+    # 4) aplica mapeamento apenas em células realmente vazias
+    if "Campanha" not in df.columns:
+        df["Campanha"] = ""
+    if "ID_Campanha" not in df.columns:
+        df["ID_Campanha"] = ""
+
+    mask_camp = df["Campanha"].astype(str).str.strip() == ""
+    mask_id   = df["ID_Campanha"].astype(str).str.strip() == ""
+
+    df.loc[mask_camp, "Campanha"]    = key_series.map(camp_map)
+    df.loc[mask_id,   "ID_Campanha"] = key_series.map(id_map)
+
+    # 5) start/end via utm_content
     df = lookup.fill_missing_start_end_from_utm(
         df, write_back=False, sheet_name=sheet_name
     )
-
-    # 3) utm_content vazio ← ad_name
-    df = lookup.fill_utm_content_from_ad_name(
-        df,
-        coluna_ad_name="ad_name",
-        coluna_destino="utm_content",
-        write_back=False
-    )
-
     return df
+
 
 def fill_missing_start_end_from_params(
     df: pd.DataFrame,
@@ -323,7 +466,7 @@ def get_campaign_parameterization(
     """
     Atalho para o lookup de campaign_name e utm_campaign.
     """
-    return BIParamLookup(creds_path, spreadsheet_id).get_taxonomy_camp_name_and_id_from_utm_content()
+    return BIParamLookup(creds_path, spreadsheet_id).get_campaign_maps()
 
 def load_utm_mapping(
     creds_path: str, spreadsheet_id: str
@@ -383,3 +526,4 @@ def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     col = next((c for c in df.columns if c.strip().lower() == "preview link"), None)
     df["URL_do_Anúncio"] = df[col].apply(build_pinterest_preview_link) if col else ""
     return df
+

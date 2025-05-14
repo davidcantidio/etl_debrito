@@ -110,7 +110,7 @@ def test_fill_utm_content_from_ad_name(lookup):
 def test_get_campaign_parameterization_wrapper():
     # Assegura que o wrapper devolve o mesmo que o método da classe
     lookup = BIParamLookup(CREDS_PATH, SPREADSHEET_ID)
-    camp1, utm1 = lookup.get_taxonomy_camp_name_and_id_from_utm_content()
+    camp1, utm1 = lookup.get_campaign_maps()
     camp2, utm2 = get_campaign_parameterization(CREDS_PATH, SPREADSHEET_ID)
     assert camp1 == camp2
     assert utm1 == utm2 
@@ -156,15 +156,15 @@ def test_cache_ttl(monkeypatch):
     lookup.HEADER_ROW = 1
 
     # chama duas vezes sem avançar o tempo
-    _ = lookup.get_taxonomy_camp_name_and_id_from_utm_content()
-    _ = lookup.get_taxonomy_camp_name_and_id_from_utm_content()
+    _ = lookup.get_campaign_maps()
+    _ = lookup.get_campaign_maps()
     assert calls["count"] == 1
 
     # aqui a única mudança:
     orig_time = time.time
     monkeypatch.setattr(time, "time", lambda: orig_time() + lookup._TTL + 1)
 
-    _ = lookup.get_taxonomy_camp_name_and_id_from_utm_content()
+    _ = lookup.get_campaign_maps()
     assert calls["count"] == 2
 
 def test_determine_meta_preview_link():
