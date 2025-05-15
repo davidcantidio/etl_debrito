@@ -1,63 +1,43 @@
 from __future__ import annotations
-import re
-import pandas as pd
-from typing import Dict, Callable
-import logging
 
-from treat.utils.geo_normalize import (
-    obter_estado_de_regiao,
-    carregar_caches_padrao,
+import re
+import logging
+from typing import Dict, Callable
+
+import pandas as pd
+
+from load.origin_writer import write_back_origin
+
+from treat.utils.geo_normalize import obter_estado_de_regiao, carregar_caches_padrao
+from treat.utils.atribuicoes_via_lookup import (
+    atribuir_veiculo_e_id_meta,
+    atribuir_veiculo_por_prefixo,
+    PLATFORM_TO_VEICULO
 )
+from treat.utils.substitute_origin_values import apply_all_origin_substitutions
+from treat.preprocess_utils import preprocess_origin
 from .bi_param_utils import (
     BIParamLookup,
     enrich_with_bi_parametrizacao,
     fill_objective_from_bi
 )
-from .preprocess_utils import preprocess_origin
-from treat.utils.write_back import write_back_df
-from treat.utils.renomeacoes import (
-    renomear_colunas_origem_para_modelo,
-    aplicar_substituicoes_objetivo,
-)
-from treat.utils.campos_calculados import gerar_id, calcular_engajamento_total          
+from treat.utils.renomeacoes import renomear_colunas_origem_para_modelo, aplicar_substituicoes_objetivo
+from treat.utils.campos_calculados import gerar_id, calcular_engajamento_total
 from treat.utils.normalize import normalize_age, normalize_gender
-from treat.utils.validations import (check_required_columns,
-                                     validate_utm_content_in_bi,
-                                     validate_aggregates
-)
-from treat.utils.substitute_origin_values import apply_all_origin_substitutions
-
-from treat.utils.atribuicoes_via_lookup import (
-    atribuir_veiculo_e_id_meta,
-    atribuir_veiculo_por_prefixo,
-    PLATFORM_TO_VEICULO
-    
-)
+from treat.utils.validations import check_required_columns, validate_utm_content_in_bi, validate_aggregates
 from treat.utils.preview_links import (
     determine_meta_ad_preview_link,
     generate_tiktok_ad_preview_link,
     build_pinterest_preview_link,
-    generate_linkedin_ad_preview_link_from_lookup,
+    generate_linkedin_ad_preview_link_from_lookup
 )
 
 log = logging.getLogger(__name__)
-
 CACHE_ESTADOS, CACHE_MUNICIPIOS = carregar_caches_padrao()
 
-class TreatPipeline:
-    """Pipeline genérico que aplica **todas** as etapas de tratamento a uma aba
-    de origem (Meta, TikTok, Pinterest, etc.).
 
-    Parâmetros
-    ----------
-    creds_path      : caminho do JSON de credenciais do serviço
-    spreadsheet_id  : ID da planilha (Google Sheets)
-    sheet_name      : nome da aba de origem a ser tratada
-    mapping_renomeacao : dict col_origem → col_modelo (específico da aba)
-    write_back      : se True, grava as correções de volta na aba
-    subs_objetivo_fn: função que aplica substituições de "objective"
-                      (permite customizar por plataforma se necessário)
-    """
+class TreatPipeline:
+    """Pipeline genérico para tratar e carregar dados de uma aba de origem."""
 
     def __init__(
         self,
@@ -75,88 +55,46 @@ class TreatPipeline:
         self.write_back = write_back
         self.mapping = mapping_renomeacao
         self.subs_obj_fn = subs_objetivo_fn
-
-        # lookup BI compartilhado durante toda a execução
         self._bi_lookup = BIParamLookup(creds_path, spreadsheet_id)
 
-    # ───────────────────────────── helpers internos ────────────────────────── #
     def _preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        1) executa o pipeline padrão de origem;
-        2) elimina linhas onde TODAS as colunas chave estão vazias
-        (NaN, "", "nan", ou apenas espaços).
-        """
         df = preprocess_origin(df)
-
-        # --- remove linhas totalmente vazias --- #
         mandatory = ["date", "account_name", "campaign_name"]
         cols = [c for c in mandatory if c in df.columns]
         if cols:
-            # Cria máscara TRUE se a célula é vazia/nula/"nan" (case-insensitive)
-            empty = df[cols].apply(
-                lambda s: s.astype(str).str.strip().str.lower().isin(["", "nan"])
-            )
-            # Mantém a linha se pelo menos UMA coluna mandatória não for vazia
-            keep = ~empty.all(axis=1)
-            df = df.loc[keep].reset_index(drop=True)
-
+            empty = df[cols].apply(lambda s: s.astype(str).str.strip().str.lower().isin(["", "nan"]))
+            df = df.loc[~empty.all(axis=1)].reset_index(drop=True)
         return df
 
-
     def _assign_vehicle_and_id(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Atribui 'Veiculo' e 'ID_Veiculo' conforme a plataforma indicada por sheet_name:
-        - Qualquer aba começando com 'meta': 
-            • se existir 'placement' → inferência Meta (Facebook/Instagram etc.)
-            • caso contrário → Veiculo = 'Meta'
-        - Demais: prefixo da aba → atribuir_veiculo_por_prefixo (TikTok, LinkedIn...)
-        """
         lower = self.sheet_name.lower()
-
-        # 1) todas as abas meta*
         if lower.startswith("meta"):
-            # tenta usar placement para detalhar Facebook/Instagram…
             if "placement" in df.columns:
                 return atribuir_veiculo_e_id_meta(df)
-            # sem placement, atribui plataforma genérica 'Meta' + ID_Veiculo
             return atribuir_veiculo_por_prefixo(df, "meta")
-
-        # 2) outras plataformas: procura prefixo em PLATFORM_TO_VEICULO
-        prefix = next(
-            (k for k in PLATFORM_TO_VEICULO if lower.startswith(k)),
-            None
-        )
-        if prefix is None:
-            # fallback genérico
-            prefix = re.match(r"[a-z]+", lower).group(0)
+        prefix = next((k for k in PLATFORM_TO_VEICULO if lower.startswith(k)), None)
+        prefix = prefix or re.match(r"[a-z]+", lower).group(0)
         return atribuir_veiculo_por_prefixo(df, prefix)
 
-
     def _fill_start_end(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Preenche start/end vazios via utm_content usando BI_PARAMETRIZAÇÃO."""
         return self._bi_lookup.fill_missing_start_end_from_utm(
             df, sheet_name=self.sheet_name, write_back=self.write_back
         )
 
-    def _enrich_bi(self, df):
+    def _enrich_bi(self, df: pd.DataFrame) -> pd.DataFrame:
         return enrich_with_bi_parametrizacao(
-            df, self.creds_path, self.spreadsheet_id,
-            sheet_name=self.sheet_name
+            df, self.creds_path, self.spreadsheet_id, sheet_name=self.sheet_name
         )
 
-
-    # ──────────────────────────── método principal ─────────────────────────── #
-
     def run(self, df_raw: pd.DataFrame) -> pd.DataFrame:
-        """Executa o pipeline completo e devolve DataFrame padronizado."""
-        # 1) pré-processamento + descartar linhas totalmente vazias
+        # 1) Pré-process
         df = self._preprocess(df_raw)
         mandatory = ["date", "account_name", "campaign_name"]
-        subset   = [c for c in mandatory if c in df.columns]
+        subset = [c for c in mandatory if c in df.columns]
         if subset:
             df = df.dropna(how="all", subset=subset).reset_index(drop=True)
 
-        # 1.1) substituir valores de origem (aplica mappings, sem write-back)
+        # 2) Substituições de origem
         df = apply_all_origin_substitutions(
             df,
             sheet_name=self.sheet_name,
@@ -164,27 +102,63 @@ class TreatPipeline:
             inplace=True
         )
 
-        # 1.2) validar utm_content contra BI_PARAMETRIZAÇÃO (pára se houver missings)
+        # 3) Validação UTM_CONTENT
         df_param = self._bi_lookup._load_df()
         validate_utm_content_in_bi(df, df_param)
 
-        # 2) completar start/end
+        # 4) Preencher start/end via utm_content
         df = self._fill_start_end(df)
 
-        # 3) enriquecimento BI (preenche utm_content, Campanha, ID_Campanha, start/end)
-        df = enrich_with_bi_parametrizacao(
-                                df, self.creds_path,
-                                self.spreadsheet_id,
-                                sheet_name=self.sheet_name
-)
+        # 5) Enriquecer com BI_PARAMETRIZAÇÃO
+        df = self._enrich_bi(df)
 
+        # 5.1) Fallback quando utm_content está vazio (ex.: LinkedIn)
+        camp_map, id_map = self._bi_lookup.get_campaign_maps(
+            prefer_cols=("utm_content", "taxonomy_campaign_name")
+        )
+        # chave normalizeda de campaign_name
+        camp_key = df["campaign_name"].astype(str).str.strip().str.lower()
 
+        # preencher Campanha / ID_Campanha onde ainda vazio
+        mask_missing = df["Campanha"].astype(str).str.strip() == ""
+        if mask_missing.any():
+            df.loc[mask_missing, "Campanha"] = (
+                camp_key[mask_missing]
+                .map(camp_map)
+                .fillna("")
+            )
+            df.loc[mask_missing, "ID_Campanha"] = (
+                camp_key[mask_missing]
+                .map(id_map)
+                .fillna("")
+            )
 
-        # 3.1) preencher objective vazio a partir de BI_PARAMETRIZAÇÃO
-        df = fill_objective_from_bi(df, self._bi_lookup, key_col="utm_content", objective_col="objective")
+        # 5.2) Fallback de start/end via campaign_name
+        df_param = self._bi_lookup._load_df()
+        df_param["key"] = (
+            df_param["taxonomy_campaign_name"]
+            .astype(str).str.strip().str.lower()
+        )
+        start_map = df_param.set_index("key")["start"].to_dict()
+        end_map   = df_param.set_index("key")["end"].to_dict()
 
+        if "start" in df.columns:
+            miss = df["start"].astype(str).str.strip() == ""
+            df.loc[miss, "start"] = camp_key[miss].map(start_map)
 
-        # 4) normalizações opcionais
+        if "end" in df.columns:
+            miss = df["end"].astype(str).str.strip() == ""
+            df.loc[miss, "end"] = camp_key[miss].map(end_map)
+
+        # 6) preencher objective vazio a partir da BI
+        df = fill_objective_from_bi(
+            df,
+            self._bi_lookup,
+            key_col="utm_content",
+            objective_col="objective"
+        )
+
+        # 7) Normalizações extras
         if "age" in df.columns:
             df["age"] = df["age"].apply(normalize_age)
         if "region" in df.columns:
@@ -194,72 +168,52 @@ class TreatPipeline:
         if "gender" in df.columns:
             df["gender"] = df["gender"].apply(normalize_gender)
 
-        # 5) inferir Veiculo / ID_Veiculo
+        # 8) Atribuir Veiculo e ID_Veiculo
         df = self._assign_vehicle_and_id(df)
 
-        # 6) gerar URL_do_Anuncio e, no LinkedIn, preencher ad_name
+        # 9) Gerar preview links e ad_name
         lower = self.sheet_name.lower()
-        if lower.startswith("meta"):
-            if any(c.strip().lower() in ("preview_link_ig", "preview_link_fb") for c in df.columns):
-                df = determine_meta_ad_preview_link(df)
-
+        if lower.startswith("meta") and any(
+            c.strip().lower() in ("preview_link_ig", "preview_link_fb")
+            for c in df.columns
+        ):
+            df = determine_meta_ad_preview_link(df)
         elif lower.startswith("tiktok"):
             df = generate_tiktok_ad_preview_link(df)
-
         elif lower.startswith("pinterest") and "pin_id" in df.columns:
-            if "URL_do_Anuncio" not in df.columns:
-                df["URL_do_Anuncio"] = ""
+            df["URL_do_Anuncio"] = df.get("URL_do_Anuncio", "")
             df["URL_do_Anuncio"] = df["URL_do_Anuncio"].where(
                 df["URL_do_Anuncio"].str.strip() != "",
                 df["pin_id"].apply(build_pinterest_preview_link),
             )
-
-
         elif lower.startswith("linkedin"):
-            # 1) Preview Link
-            if "URL_do_Anuncio" not in df.columns:
-                df["URL_do_Anuncio"] = ""
-            preview_map = generate_linkedin_ad_preview_link_from_lookup(self._bi_lookup._load_df())
+            df["URL_do_Anuncio"] = df.get("URL_do_Anuncio", "")
+            preview_map = generate_linkedin_ad_preview_link_from_lookup(
+                self._bi_lookup._load_df()
+            )
             if preview_map and "utm_content" in df.columns:
                 df["URL_do_Anuncio"] = df["URL_do_Anuncio"].where(
                     df["URL_do_Anuncio"].str.strip() != "",
                     df["utm_content"].astype(str).map(preview_map).fillna(""),
                 )
-
-            # 2) Ad Name (LinkedIn não traz; preenche via utm_content)
             ad_name_map = self._bi_lookup.get_linkedin_ad_name_map()
             if ad_name_map and "utm_content" in df.columns:
-                # garante que ad_name exista como Series
-                if "ad_name" not in df.columns:
-                    df["ad_name"] = ""
-                # faz o where sobre a Series, não sobre uma string
+                df["ad_name"] = df.get("ad_name", "")
                 mask = df["ad_name"].astype(str).str.strip() != ""
                 df["ad_name"] = df["ad_name"].where(
                     mask,
                     df["utm_content"].astype(str).map(ad_name_map).fillna(""),
                 )
 
-        # 6.3) validação de somatórios de impressões e custo
-        validate_aggregates(df_raw, df)
-
-
-        # 7) write-back (opcional)
-        if self.write_back:
-            write_back_df(df, self.creds_path, self.spreadsheet_id, self.sheet_name)
-
-        # 8) renomear colunas
-        df = renomear_colunas_origem_para_modelo(df, self.mapping)
-
-        # 9) substituir valores de objective
+        # 10) substituir valores de objective
         df = self.subs_obj_fn(df)
 
-        # 10) gerar Engajamento_Total e ID final
-        df = calcular_engajamento_total(df)
-        df["ID"] = df.apply(gerar_id, axis=1)
+        # 11) validação de somatórios de impressões e custo
+        validate_aggregates(df_raw, df)
 
-        # 11) validação final de colunas obrigatórias
+        # 12) validação final de colunas obrigatórias
         ZERO_OK_METRICS = [
-            "imrpessions", "cost", "link_clicks", "video_play",
+            "impressions", "cost", "link_clicks", "video_play",
             "video_watches_25", "video_watches_50", "video_watches_75",
             "video_watches_100", "post_reactions", "post_shares",
             "post_comments"
@@ -269,5 +223,23 @@ class TreatPipeline:
             optional_cols=["URL_do_Anuncio"],
             zero_valid_cols=ZERO_OK_METRICS
         )
+
+        # 13) Write-back na aba de origem
+        write_back_origin(
+            df_raw=df_raw,
+            df_ok=df,
+            creds_path=self.creds_path,
+            spreadsheet_id=self.spreadsheet_id,
+            sheet_name=self.sheet_name,
+            write_back=self.write_back,
+            dry_run=False
+        )
+
+        # 14) Renomear colunas para modelo
+        df = renomear_colunas_origem_para_modelo(df, self.mapping)
+
+        # 15) Calcular Engajamento_Total e ID final
+        df = calcular_engajamento_total(df)
+        df["ID"] = df.apply(gerar_id, axis=1)
 
         return df

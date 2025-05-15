@@ -16,6 +16,7 @@ Valor: string que deve substituir o original em 'ID_Content'.
 
 CAMPAIGN_NAME_REPLACEMENTS: dict[str, str] = {
     "topview-20250321-q-20250301460526-2025031002130": "2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM",
+    "2025_3_INOVA CERRADO E PANTANAL_ALC__CPM": "2025_3_INOVA CERRADO E PANTANAL_ALC_COMERCIALIZAÇÃO_CPM",
 }
 """Substituições específicas para o campo 'Campaign name'.
 

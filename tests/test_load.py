@@ -8,7 +8,7 @@ prepare_new_records = l.prepare_new_records
 append_new_records = l.append_new_records
 load_missing_records = l.load_missing_records
 get_missing_records = l.get_missing_records
-from load.common.validate_impressions_consistency import validate_impressions_consistency
+from load.utils.validate_impressions_consistency import validate_impressions_consistency
 
 class FakeFetcher:
     """
