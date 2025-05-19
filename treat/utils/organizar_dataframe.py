@@ -1,5 +1,5 @@
 import logging
-from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER
+from treat.utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER
 
 def remover_colunas_indesejadas(df):
     """

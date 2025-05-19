@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+
 import re
 import logging
 from typing import Dict, Callable
 
 import pandas as pd
 
+from utils import converter_data
 from load.origin_writer import write_back_origin
 
 from treat.utils.geo_normalize import obter_estado_de_regiao, carregar_caches_padrao
@@ -15,7 +17,7 @@ from treat.utils.atribuicoes_via_lookup import (
     PLATFORM_TO_VEICULO
 )
 from treat.utils.substitute_origin_values import apply_all_origin_substitutions
-from treat.preprocess_utils import preprocess_origin
+from treat.utils.preprocess_utils import preprocess_origin
 from .bi_param_utils import (
     BIParamLookup,
     enrich_with_bi_parametrizacao,
@@ -80,6 +82,9 @@ class TreatPipeline:
         return self._bi_lookup.fill_missing_start_end_from_utm(
             df, sheet_name=self.sheet_name, write_back=self.write_back
         )
+    
+
+
 
     def _enrich_bi(self, df: pd.DataFrame) -> pd.DataFrame:
         return enrich_with_bi_parametrizacao(
@@ -108,6 +113,11 @@ class TreatPipeline:
 
         # 4) Preencher start/end via utm_content
         df = self._fill_start_end(df)
+
+        # ── Converte colunas datetime → date puro ─────────────────────────── 
+        for coluna in ("date", "start", "end"):
+            if coluna in df.columns:
+                df = converter_data(df, coluna)
 
         # 5) Enriquecer com BI_PARAMETRIZAÇÃO
         df = self._enrich_bi(df)

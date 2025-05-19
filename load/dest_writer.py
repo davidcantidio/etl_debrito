@@ -1,6 +1,8 @@
 from __future__ import annotations
 import logging
 import re
+import datetime
+
 from typing import Optional, Tuple, List, Dict
 
 import pandas as pd
@@ -87,6 +89,14 @@ def write_back_destination(
 
     # 2.2) Scalariza valores
     df_dest = df_dest.transform(lambda col: col.map(_to_scalar))
+    # ── Remove NaN/resultados vazios para evitar erro JSON
+    df_dest = df_dest.fillna("")
+
+    # ── Converte objetos date em string ISO para JSON
+    def _date_to_iso_dest(v):
+        return v.isoformat() if isinstance(v, datetime.date) else v
+    df_dest = df_dest.applymap(_date_to_iso_dest)
+    df_dest = df_dest.fillna("")
 
     # 3) Deduplicação por ID
     existing_ids: set[str] = set()

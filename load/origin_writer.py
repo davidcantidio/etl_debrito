@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 import pandas as pd
+import datetime
 
 from treat.utils.write_back import write_back_df
 
@@ -65,6 +66,20 @@ def write_back_origin(
         return v
 
     df_wb = df_wb.applymap(_to_scalar)
+
+    # 1) Primeiro: números vazios viram 0
+    num_cols = df_wb.select_dtypes(include="number").columns
+    df_wb[num_cols] = df_wb[num_cols].fillna(0)
+
+    # 2) Depois: para qualquer campo não numérico, “limpa” para string vazia
+    df_wb = df_wb.fillna("")
+
+    def _date_to_iso(v):
+        return v.isoformat() if isinstance(v, datetime.date) else v
+    
+
+    df_wb = df_wb.applymap(_date_to_iso)
+
 
     log.info(
         "Preparando write-back: %d linhas, colunas: %s",
