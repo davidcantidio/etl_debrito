@@ -22,3 +22,9 @@ typing-extensions>=4.5
 
 # Testes (caso esteja usando)
 pytest>=7.4
+
+vulture
+flake8
+isort
+unimport
+pydeps

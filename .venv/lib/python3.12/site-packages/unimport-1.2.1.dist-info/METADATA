@@ -1,0 +1,78 @@
+Metadata-Version: 2.1
+Name: unimport
+Version: 1.2.1
+Summary: The ultimate linter and formatter for removing unused import statements in your code.
+Home-page: https://unimport.hakancelik.dev/
+Author: Hakan Çelik
+Author-email: hakancelikdev@gmail.com
+License: MIT
+Project-URL: Documentation, https://unimport.hakancelik.dev/
+Project-URL: Issues, https://github.com/hakancelikdev/unimport/issues/
+Project-URL: Changelog, https://unimport.hakancelik.dev/1.2.1/CHANGELOG/
+Keywords: unused,import
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Environment :: Console
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: <3.13,>=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pathspec <1,>=0.10.1
+Requires-Dist: toml <1,>=0.9.0
+Requires-Dist: libcst <=1.1.0,>=0.3.7 ; python_version == "3.10"
+Requires-Dist: libcst <=1.1.0,>=0.3.0 ; python_version == "3.8"
+Requires-Dist: libcst <=1.1.0,>=0.3.7 ; python_version == "3.9"
+Requires-Dist: libcst <=1.1.0,>=0.4.10 ; python_version >= "3.11"
+Provides-Extra: docs
+Requires-Dist: mkdocs ==1.5.3 ; extra == 'docs'
+Requires-Dist: mkdocs-material ==9.4.9 ; extra == 'docs'
+Requires-Dist: mkdocs-markdownextradata-plugin ==0.2.5 ; extra == 'docs'
+Requires-Dist: mkdocs-minify-plugin ==0.7.1 ; extra == 'docs'
+Requires-Dist: mkdocs-git-revision-date-localized-plugin ==1.2.1 ; extra == 'docs'
+Requires-Dist: mike ==2.0.0 ; extra == 'docs'
+Provides-Extra: test
+Requires-Dist: pytest ==7.4.3 ; extra == 'test'
+Requires-Dist: pytest-cov ==4.1.0 ; extra == 'test'
+Requires-Dist: semantic-version ==2.10.0 ; extra == 'test'
+
+![unimport](https://raw.githubusercontent.com/hakancelikdev/unimport/main/docs/assets/logo/unimport.png)
+
+**🚀 The ultimate linter and formatter for removing unused import statements in your
+code.**
+
+Looking for a way to eliminate those pesky unused import statements in your code? Look
+no further than Unimport! This powerful tool serves as both a linter and formatter,
+making it easy to detect and remove any imports that are no longer needed. Say goodbye
+to cluttered, inefficient code and hello to a cleaner, more streamlined development
+process with Unimport.
+
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/hakancelikdev/unimport/main.svg)](https://results.pre-commit.ci/latest/github/hakancelikdev/unimport/main)
+![test](https://github.com/hakancelikdev/unimport/workflows/test/badge.svg)
+
+[![Pypi](https://img.shields.io/pypi/v/unimport)](https://pypi.org/project/unimport/)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/unimport)
+[![Downloads](https://static.pepy.tech/personalized-badge/unimport?period=total&units=international_system&left_color=grey&right_color=red&left_text=downloads)](https://pepy.tech/project/unimport)
+[![License](https://img.shields.io/github/license/hakancelikdev/unimport.svg)](https://github.com/hakancelikdev/unimport/blob/main/LICENSE)
+
+[![Forks](https://img.shields.io/github/forks/hakancelikdev/unimport)](https://github.com/hakancelikdev/unimport/fork)
+[![Issues](https://img.shields.io/github/issues/hakancelikdev/unimport)](https://github.com/hakancelikdev/unimport/issues)
+[![Stars](https://img.shields.io/github/stars/hakancelikdev/unimport)](https://github.com/hakancelikdev/unimport/stargazers)
+
+[![Codecov](https://codecov.io/gh/hakancelikdev/unimport/branch/main/graph/badge.svg)](https://codecov.io/gh/hakancelikdev/unimport)
+[![Contributors](https://img.shields.io/github/contributors/hakancelikdev/unimport)](https://github.com/hakancelikdev/unimport/graphs/contributors)
+[![Last Commit](https://img.shields.io/github/last-commit/hakancelikdev/unimport.svg)](https://github.com/hakancelikdev/unimport/commits/main)
+
+For more information see: https://unimport.hakancelik.dev/
+
+Try it out now using the Unimport Playground,
+https://playground-unimport.hakancelik.dev/
