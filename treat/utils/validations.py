@@ -1,11 +1,34 @@
 import logging
 import pandas as pd
-from typing import List, Sequence
+from typing import List, Sequence, Any, Dict
 from treat.bi_param_utils import BIParamLookup  # ajuste conforme seu projeto
 import math
+import numpy as np
 
 
 log = logging.getLogger(__name__)
+
+
+
+def _json_ready(obj):
+    if obj is None:
+        return None
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, (int, str)):
+        return obj
+    if isinstance(obj, float):
+        return None if math.isnan(obj) or math.isinf(obj) else obj
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return None if math.isnan(obj) else float(obj)
+    if isinstance(obj, dict):
+        return {k: _json_ready(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return type(obj)(_json_ready(v) for v in obj)
+    return str(obj)
+
 
 def check_required_columns(
     df: pd.DataFrame,
@@ -181,3 +204,97 @@ def validate_aggregates(
     else:
         log.info("[Validação] Totais de impressions e cost conferem: %d imp, %.2f cost",
                  raw_imp, raw_cost)
+
+
+def validate_taxonomy_consistency(
+    df_ok: pd.DataFrame,
+    df_bi: pd.DataFrame,
+    cols_to_check: List[str] | None = None,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Verifica se valores de campaign_name, ad_group_name, ad_name e utm_content
+    em df_ok existem nas colunas correspondentes da BI_PARAMETRIZAÇÃO.
+    """
+
+    # 1) Mapear nome do campo de origem → nome da coluna na BI
+    bi_col_map = {
+        "campaign_name":       "taxonomy_campaign_name",
+        "ad_group_name":       "taxonomy_ad_group_name",  # ajuste conforme existir
+        "ad_name":             "taxonomy_ad_name",
+        "utm_content":         "utm_content",
+    }
+
+    report: Dict[str, Dict[str, Any]] = {}
+
+    # 2) Preparar os sets da BI, normalizando só para lookup
+    bi_sets: Dict[str, set] = {}
+    for orig_col, bi_col in bi_col_map.items():
+        if bi_col in df_bi.columns:
+            bi_sets[orig_col] = set(
+                df_bi[bi_col].astype(str).str.strip().str.lower()
+            )
+
+    # 3) Para cada coluna de origem, faça a checagem
+    for orig_col, bi_col in bi_col_map.items():
+        col_report = {"missing_column": False, "empty_count": 0, "unknown_values": []}
+
+        # 3.1) Checa existência
+        if orig_col not in df_ok.columns:
+            col_report["missing_column"] = True
+            log.warning("[Validação] Coluna '%s' inexistente em df_ok", orig_col)
+
+        else:
+            # 3.2) Série bruta e lookup key
+            series_raw = df_ok[orig_col].astype(str)
+            lookup = series_raw.str.strip().str.lower()
+
+            # 3.3) Contagem de vazios
+            empty = (series_raw.str.strip() == "").sum()
+            col_report["empty_count"] = empty
+            if empty:
+                log.warning("[Validação] Coluna '%s' vazia em %d linha(s)", orig_col, empty)
+
+            # 3.4) Comparação com o set correto da BI
+            bi_set = bi_sets.get(orig_col, set())
+            mask_unknown = (lookup != "") & (~lookup.isin(bi_set))
+            unknown = series_raw[mask_unknown].unique().tolist()
+            if unknown:
+                preview = unknown[:20]
+                log.warning(
+                    "[Validação] %d valor(es) de '%s' fora da BI_PARAMETRIZAÇÃO (%s): %s%s",
+                    len(unknown), orig_col, bi_col, preview, " …" if len(unknown) > 20 else ""
+                )
+            col_report["unknown_values"] = unknown
+
+        report[orig_col] = col_report
+
+    return _json_ready(report)
+
+
+def validate_no_blank_cells(
+    df: pd.DataFrame,
+    *,
+    allow_blank_cols: Sequence[str] = ("URL_do_Anuncio",),
+    context: str | None = None,
+) -> None:
+    """
+    Verifica se há células vazias em *todas* as colunas, exceto as listadas em
+    ``allow_blank_cols``.  
+    - Logs `WARNING` por coluna com células vazias.  
+    - Se quiser tornar “fatal”, troque `log.warning`→`log.error` ou levante
+      `ValueError`.
+    """
+    allow_blank_cols = {c.lower() for c in allow_blank_cols}
+    # normaliza nomes → lower para comparação
+    cols_to_check = [c for c in df.columns if c.lower() not in allow_blank_cols]
+
+    for col in cols_to_check:
+        # string vazia, NaN, None contam como “blank”
+        blank_mask = df[col].astype(str).str.strip().isin(("", "nan", "None"))
+        n_blank = int(blank_mask.sum())
+        if n_blank:
+            where = f" ({context})" if context else ""
+            log.warning(
+                "[Validação]%s Coluna '%s' vazia em %d linha(s)",
+                where, col, n_blank
+            )

@@ -1,165 +1,125 @@
-from __future__ import annotations
-import os, itertools, logging
+# File: extract/sheets_fetcher.py
+import os
+import time
+import logging
+from typing import Any, Dict, Iterable, List, Tuple
+
 import pandas as pd
-from typing import Iterable, Dict, List, Any
-
-from google.oauth2.service_account import Credentials
+from google.api_core.exceptions import TooManyRequests
 from googleapiclient.discovery import build
-
-def build_sheets_service(creds_path: str):
-    scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-    creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
-    return build("sheets", "v4", credentials=creds, cache_discovery=False)
 from googleapiclient.errors import HttpError
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 log = logging.getLogger(__name__)
 
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+
+
+def _build_sheets_service(creds_path: str):
+    """Constroi Google Sheets API service via google‑api‑python‑client."""
+    import google.oauth2.service_account as sa
+
+    creds = sa.Credentials.from_service_account_file(creds_path, scopes=SCOPES)
+    return build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+
 class SheetsFetcher:
-    """
-    Extrai múltiplas abas via batchGet e mantém cache de RAW LISTS.
-    get(..., as_frame) converte ao retornar, sem mudar o cache.
+    """Lê múltiplas abas de um Google Sheets num único *batchGet*, com cache TTL.
+
+    * **Leitura em lote** → economiza quota.
+    * **Retry/back‑off** → aguenta erros 429.
+    * **Cache em memória** → evita leituras repetidas em até `cache_ttl` segundos.
     """
 
     def __init__(
         self,
-        spreadsheet_id: str | None = None,
-        creds_path: str | None = None,
+        spreadsheet_id: str,
+        creds_path: str,
         header_row: int = 0,
         col_range: str = "A:ZZ",
-        service=None,
+        cache_ttl: int = 300,
     ):
-        self.spreadsheet_id = spreadsheet_id or os.getenv("SPREADSHEET_ID")
-        self.creds_path     = creds_path or os.getenv("GOOGLE_CREDS_PATH", "creds.json")
-        self.header_row     = header_row
-        self.col_range      = col_range
-        # Se já foi passado um serviço, reutiliza; se não, constrói via helper
-        self._service       = service or build_sheets_service(self.creds_path)
-        # cache armazena RAW: List[List[str]]
-        self._cache: Dict[str, List[List[str]]] = {}
+        self.spreadsheet_id = spreadsheet_id
+        self.creds_path = creds_path
+        self.header_row = header_row
+        self.col_range = col_range
+        self._service = _build_sheets_service(creds_path)
+        self._cache: Dict[Tuple[str, ...], Tuple[float, Dict[str, List[List[str]]]]] = {}
+        self._cache_ttl = cache_ttl
 
-    def get(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
-        names = list(dict.fromkeys(sheet_names))
-        missing = [n for n in names if n not in self._cache]
-        if missing:
-            self._fetch_batch(missing)
-
-        out_raw = {n: self._cache[n] for n in names}
-        if not as_frame:
-            return out_raw
-
-        return {n: self._as_dataframe(raw) for n, raw in out_raw.items()}
-
-    def refresh(self, sheet_names: Iterable[str]):
-        for n in sheet_names:
-            self._cache.pop(n, None)
-        self._fetch_batch(list(sheet_names))
-
-    def _fetch_batch(self, names: List[str]):
-        for batch in self._chunk(names, 100):
-            log.info("📡 batchGet %d ranges", len(batch))
-            ranges = [f"{n}!{self.col_range}" for n in batch]
-            try:
-                resp = (
-                    self._service.spreadsheets()
-                                 .values()
-                                 .batchGet(
-                                     spreadsheetId=self.spreadsheet_id,
-                                     ranges=ranges,
-                                     majorDimension="ROWS",
-                                 )
-                                 .execute()
-                )
-            except HttpError as e:
-                log.error("Sheets API error: %s", e)
-                for n in batch:
-                    self._cache[n] = []
-                continue
-
-            seen = set()
-            for vr in resp.get("valueRanges", []):
-                name   = vr["range"].split("!")[0]
-                values = vr.get("values", []) or []
-                seen.add(name)
-
-                if not values:
-                    self._cache[name] = []
-                else:
-                    hdr_idx = self._detect_header_row(values)
-                    header  = values[hdr_idx]
-                    body    = list(self._normalize_rows(header, values[hdr_idx + 1:]))
-                    self._cache[name] = [header] + body
-
-            for n in batch:
-                if n not in seen:
-                    self._cache[n] = []
-
-    @staticmethod
-    def _chunk(items: List[str], size: int):
-        for i in range(0, len(items), size):
-            yield items[i : i + size]
-
-    @staticmethod
-    def _normalize_rows(header: List[str], rows: List[List[str]]):
-        max_cols = len(header)
-        for r in rows:
-            if len(r) < max_cols:
-                yield r + [""] * (max_cols - len(r))
-            else:
-                yield r[:max_cols]
-
-    def _detect_header_row(self, values: List[List[str]]) -> int:
-        P = 0.5
-        for idx, row in enumerate(values):
-            non_empty = sum(1 for cell in row if cell not in (None, "", "0"))
-            if non_empty >= len(row) * P:
-                return idx
-        return self.header_row
-
-    def get_column(
-        self,
-        sheet_name: str,
-        column: str = "A",
-        *,
-        header_present: bool = True,
-        as_series: bool = True,
-    ):
-        col_range = f"{sheet_name}!{column}:{column}"
+    # ───────────────────────────────── retry / backoff ─────────────────────────
+    @retry(
+        retry=retry_if_exception_type(TooManyRequests),
+        stop=stop_after_attempt(6),                  # 1 + 2 + 4 + 8 + 16 + 32 ≈ 63 s
+        wait=wait_exponential(multiplier=1, min=1, max=32),
+        reraise=True,
+    )
+    def _batch_get(self, ranges: List[str]) -> Dict[str, Any]:
+        """Faz uma chamada batchGet com back‑off para 429."""
+        # log da tentativa de batchGet
+        log.info("🔄 batchGet tentativa para ranges: %s", ranges)
         try:
-            resp = (
+            return (
                 self._service.spreadsheets()
-                             .values()
-                             .get(
-                                 spreadsheetId=self.spreadsheet_id,
-                                 range=col_range,
-                                 majorDimension="COLUMNS",
-                             )
-                             .execute()
+                .values()
+                .batchGet(spreadsheetId=self.spreadsheet_id, ranges=ranges)
+                .execute()
             )
         except HttpError as e:
-            log.error("Sheets API error (get_column %s): %s", sheet_name, e)
-            return pd.Series(dtype="object") if as_series else []
+            log.error("Sheets API HttpError: %s", e)
+            raise
 
-        values = resp.get("values", [[]])
-        col = values[0] if values else []
+    # ───────────────────────────────── cache helper ────────────────────────────
+    def _fetch_and_cache(self, sheet_names: List[str]) -> Dict[str, List[List[str]]]:
+        # Prepara ranges a partir dos nomes solicitados (usa col_range)
+        ranges = [f"{name}!{self.col_range}" for name in sheet_names]
+        resp = self._batch_get(ranges)
+        if not resp.get("valueRanges"):
+            raise RuntimeError("Sheets API retornou valueRanges vazio – quota ou planilha vazia?")
 
-        if header_present and col:
-            header = col[0]
-            col = col[1:]
+        payload: Dict[str, List[List[str]]] = {}
+        for name, vr in zip(sheet_names, resp["valueRanges"]):
+            # log do range completo retornado para debug de título
+            log.info("🔍 range completo retornado pela API: %s", vr.get("range"))
+            original_key = name.strip()
+            returned_key = vr["range"].split("!", 1)[0].strip()
+            if returned_key != original_key:
+                log.warning("Nome retornado pela API difere do solicitado: '%s' → '%s'", original_key, returned_key)
+            payload[original_key] = vr.get("values", [])
+        return payload
+
+    # ───────────────────────────────── API pública ─────────────────────────────
+    def get(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
+        names = [n.strip() for n in dict.fromkeys(sheet_names)]
+        key = tuple(sorted(names))
+        now = time.time()
+
+        # — cache —
+        if key in self._cache and now - self._cache[key][0] < self._cache_ttl:
+            raw = self._cache[key][1]
+            log.info("📥 Cache hit para %s", key)
         else:
-            header = column
+            raw = self._fetch_and_cache(names)
+            self._cache[key] = (now, raw)
+            log.info("📡 batchGet %d ranges", len(names))
 
-        while col and col[-1] == "":
-            col.pop()
+        # Retorna raw lists ou DataFrames com as chaves originais (sem lowercasing)
+        if not as_frame:
+            return {n: raw.get(n, []) for n in names}
 
-        if as_series:
-            return pd.Series(col, name=header)
-        return col
+        return {n: self._as_dataframe(raw.get(n, [])) for n in names}
 
+    def refresh(self, sheet_names: Iterable[str]):
+        key = tuple(sorted(sheet_names))
+        self._cache.pop(key, None)
+        _ = self.get(sheet_names, as_frame=False)  # força reload
+
+    # ───────────────────────────────── utilidades ──────────────────────────────
     @staticmethod
     def _as_dataframe(raw: List[List[str]]) -> pd.DataFrame:
         if not raw:
             return pd.DataFrame()
         header, *body = raw
         max_cols = len(header)
-        body = [r + [""] * (max_cols - len(r)) for r in body]
-        return pd.DataFrame(body, columns=header)
+        normalized = [row + [""] * (max_cols - len(row)) if len(row) < max_cols else row[:max_cols] for row in body]
+        return pd.DataFrame(normalized, columns=[c.strip() for c in header])

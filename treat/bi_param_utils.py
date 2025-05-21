@@ -10,18 +10,30 @@ from utils.normalize import normalize_columns
 log = logging.getLogger(__name__)
 
 class BIParamLookup:
+    """
+    Acesso parametrizado à aba BI_PARAMETRIZAÇÃO com cache global.
+
+    • A primeira instância carrega o DataFrame; as demais reutilizam.
+    • TTL de 10 min (_TTL) continua valendo para todo o processo.
+    """
+
     SHEET_NAME = "BI_PARAMETRIZAÇÃO"
-    HEADER_ROW = 0     # cabeçalho real na primeira linha (índice 0)
-    _TTL = 60 * 10     # 10 minutos de cache
+    HEADER_ROW = 0
+    _TTL = 60 * 10  # 10 min
+
+    # ─── cache compartilhado entre TODAS as instâncias ──────────────────────
+    _df: Optional[pd.DataFrame] = None
+    _last_load: float = 0.0
 
     def __init__(self, creds_path: str, spreadsheet_id: str):
         self.creds_path = creds_path
         self.spreadsheet_id = spreadsheet_id
-        self._df: Optional[pd.DataFrame] = None
-        self._last_load: float = 0.0
+        # cache de correspondência de colunas continua por instância
         self._col_cache: Dict[str, Optional[str]] = {}
-        log.debug("BIParamLookup initialized for %s", spreadsheet_id)
 
+    # ────────────────────────────────────────────────────────────────────────
+    # helpers internos
+    # ────────────────────────────────────────────────────────────────────────
     def _load_df(self) -> pd.DataFrame:
         client = get_google_client(self.creds_path)
         sh = client.open_by_key(self.spreadsheet_id)
@@ -30,23 +42,31 @@ class BIParamLookup:
         return pd.DataFrame(rows[self.HEADER_ROW + 1 :], columns=cols)
 
     def _ensure_df(self) -> None:
-        if self._df is None or (_time.time() - self._last_load) > self._TTL:
-            self._df = self._load_df()
-            self._last_load = _time.time()
+        if (
+            BIParamLookup._df is None
+            or (_time.time() - BIParamLookup._last_load) > self._TTL
+        ):
+            BIParamLookup._df = self._load_df()
+            BIParamLookup._last_load = _time.time()
+            # limpa apenas o cache de coluna da instância corrente
             self._col_cache.clear()
 
     def _find_col(self, keyword: str) -> Optional[str]:
         key = keyword.lower()
         if key in self._col_cache:
             return self._col_cache[key]
+
         self._ensure_df()
-        for c in self._df.columns:
+        for c in BIParamLookup._df.columns:
             if key in c.lower():
                 self._col_cache[key] = c
                 return c
         self._col_cache[key] = None
         return None
 
+    # ────────────────────────────────────────────────────────────────────────
+    # métodos públicos (demais código permanece inalterado)
+    # ────────────────────────────────────────────────────────────────────────
     def _map_columns(
         self,
         key_kw: str,
@@ -54,66 +74,27 @@ class BIParamLookup:
         *,
         upper_keys: bool = True,
     ) -> dict[str, tuple[str, ...]]:
-        """
-        Constrói um dicionário-lookup a partir da aba BI_PARAMETRIZAÇÃO.
-
-        Parameters
-        ----------
-        key_kw      : pedaço (substring, case-insensitive) do nome da coluna-chave
-                    (ex.: "utm_content" ou "taxonomy_campaign_name").
-        val_kws     : lista de substrings que identificam as colunas-valor
-                    (a ordem da lista define a ordem da tupla retornada).
-        upper_keys  : se True → chave normalizada em UPPER;
-                    se False → chave normalizada em lower().
-
-        Returns
-        -------
-        {chave_normalizada: (valor1, valor2, …)}
-
-        Notas de robustez
-        -----------------
-        • Faz cache das correspondências de nomes de colunas (self._col_cache).
-        • Ignora linhas vazias / NaN na coluna-chave.
-        • Strip + normalização *idênticas* em mapa e nas aplicações downstream.
-        (chave = str(...).strip().lower() ou upper()).
-        • Remove duplicatas mantendo a **última** ocorrência (uso de dict garante isso).
-        """
-        # Garante DataFrame carregado e cache de colunas pronto
         self._ensure_df()
 
-        # ── Resolve o nome real das colunas (case-insensitive) ────────────────
         key_col = self._find_col(key_kw)
         val_cols = [self._find_col(v) for v in val_kws]
-
         if key_col is None or any(vc is None for vc in val_cols):
             raise KeyError(
                 f"Colunas não encontradas — chave: '{key_kw}', valores: {val_kws}"
             )
 
-        # ── Itera uma única vez no DataFrame já em cache ──────────────────────
         mapping: dict[str, tuple[str, ...]] = {}
-        for row in self._df.itertuples(index=False):
+        for row in BIParamLookup._df.itertuples(index=False):
             raw_key = getattr(row, key_col)
-
-            # pula vazios / NaN / strings só com espaços
-            if pd.isna(raw_key):
-                continue
-            k = str(raw_key).strip()
-            if not k:
+            if pd.isna(raw_key) or str(raw_key).strip() == "":
                 continue
 
-            # normalização idêntica à usada em todo o pipeline
-            k_norm = k.upper() if upper_keys else k.lower()
-
-            # coleta valores (já em str + strip; mantém eventuais strings vazias)
+            k_norm = (str(raw_key).strip().upper() if upper_keys
+                      else str(raw_key).strip().lower())
             vals = tuple(str(getattr(row, vc)).strip() for vc in val_cols)
-
-            # dicionário sobrescreve duplicatas → última linha “ganha”
             mapping[k_norm] = vals
 
         return mapping
-
-
     def get_campaign_maps(
     self,
     prefer_cols: Sequence[str] = ("utm_content", "taxonomy_campaign_name"),
@@ -358,6 +339,11 @@ class BIParamLookup:
                 str(row[utm_col]).strip(): str(row[obj_col]).strip()
                 for _, row in df.iterrows()
             }
+    
+    def df(self) -> pd.DataFrame:
+        """DataFrame da BI_PARAMETRIZAÇÃO em cache (atualiza se TTL vencer)."""
+        self._ensure_df()
+        return BIParamLookup._df
 
 
 def fill_objective_from_bi(

@@ -13,31 +13,45 @@ def get_sheet_id(service, spreadsheet_id: str, aba_nome: str) -> int:
 
 def limpar_aba_mantendo_cabecalho(service, spreadsheet_id: str, aba_nome: str):
     """
-    Remove todas as linhas da aba, exceto a primeira (cabeçalho).
+    Remove todas as linhas da aba, exceto a primeira (cabeçalho),
+    e insere uma linha em branco logo abaixo do cabeçalho.
     """
     sheet_id = get_sheet_id(service, spreadsheet_id, aba_nome)
 
-    request_body = {
-        "requests": [
-            {
-                "deleteDimension": {
-                    "range": {
-                        "sheetId": sheet_id,
-                        "dimension": "ROWS",
-                        "startIndex": 1  # começa na linha 2 (0-indexed)
-                    }
-                }
+    # 1) Deleta todas as linhas abaixo do cabeçalho
+    delete_req = {
+        "deleteDimension": {
+            "range": {
+                "sheetId": sheet_id,
+                "dimension": "ROWS",
+                "startIndex": 1  # começa na linha 2 (0-indexed)
+                # endIndex está implícito: até o fim
             }
-        ]
+        }
     }
+
+    # 2) Insere UMA linha vazia imediatamente após o cabeçalho
+    insert_req = {
+        "insertDimension": {
+            "range": {
+                "sheetId": sheet_id,
+                "dimension": "ROWS",
+                "startIndex": 1,
+                "endIndex":   2
+            },
+            "inheritFromBefore": False
+        }
+    }
+
+    # agrupa ambas as requests num único batchUpdate
+    body = {"requests": [delete_req, insert_req]}
 
     service.spreadsheets().batchUpdate(
         spreadsheetId=spreadsheet_id,
-        body=request_body
+        body=body
     ).execute()
 
-    print(f"Aba '{aba_nome}' limpa com sucesso (mantido apenas o cabeçalho).")
-
+    print(f"Aba '{aba_nome}' limpa com sucesso (mantido cabeçalho + 1 linha em branco).")
 
 if __name__ == "__main__":
     # Configuração inicial

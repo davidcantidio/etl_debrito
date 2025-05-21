@@ -26,7 +26,13 @@ from .bi_param_utils import (
 from treat.utils.renomeacoes import renomear_colunas_origem_para_modelo, aplicar_substituicoes_objetivo
 from treat.utils.campos_calculados import gerar_id, calcular_engajamento_total
 from treat.utils.normalize import normalize_age, normalize_gender
-from treat.utils.validations import check_required_columns, validate_utm_content_in_bi, validate_aggregates
+from treat.utils.validations import (
+    check_required_columns,
+    validate_utm_content_in_bi,
+    validate_aggregates,
+    validate_taxonomy_consistency
+)
+
 from treat.utils.preview_links import (
     determine_meta_ad_preview_link,
     generate_tiktok_ad_preview_link,
@@ -108,8 +114,16 @@ class TreatPipeline:
         )
 
         # 3) Validação UTM_CONTENT
-        df_param = self._bi_lookup._load_df()
+        df_param = self._bi_lookup.df()
         validate_utm_content_in_bi(df, df_param)
+
+        # Validação de consistência de taxonomia (camp/ad/adgroup/utm)
+        self._last_taxo_report = validate_taxonomy_consistency(
+        df_ok=df,
+        df_bi=self._bi_lookup.df()
+    )
+
+
 
         # 4) Preencher start/end via utm_content
         df = self._fill_start_end(df)
@@ -144,7 +158,7 @@ class TreatPipeline:
             )
 
         # 5.2) Fallback de start/end via campaign_name
-        df_param = self._bi_lookup._load_df()
+        df_param = self._bi_lookup.df()
         df_param["key"] = (
             df_param["taxonomy_campaign_name"]
             .astype(str).str.strip().str.lower()
@@ -199,21 +213,25 @@ class TreatPipeline:
         elif lower.startswith("linkedin"):
             df["URL_do_Anuncio"] = df.get("URL_do_Anuncio", "")
             preview_map = generate_linkedin_ad_preview_link_from_lookup(
-                self._bi_lookup._load_df()
+                self._bi_lookup.df()
             )
             if preview_map and "utm_content" in df.columns:
                 df["URL_do_Anuncio"] = df["URL_do_Anuncio"].where(
                     df["URL_do_Anuncio"].str.strip() != "",
                     df["utm_content"].astype(str).map(preview_map).fillna(""),
                 )
+                # ---- ad_name via lookup (sempre sobrescreve) ------------------------
             ad_name_map = self._bi_lookup.get_linkedin_ad_name_map()
+            # se existir o mapa e utm_content, então sobrescreve ad_name
             if ad_name_map and "utm_content" in df.columns:
-                df["ad_name"] = df.get("ad_name", "")
-                mask = df["ad_name"].astype(str).str.strip() != ""
-                df["ad_name"] = df["ad_name"].where(
-                    mask,
-                    df["utm_content"].astype(str).map(ad_name_map).fillna(""),
+                df["ad_name"] = (
+                    df["utm_content"]
+                    .astype(str)
+                    .str.strip()
+                    .map(ad_name_map)
+                    .fillna(df.get("ad_name", ""))
                 )
+
 
         # 10) substituir valores de objective
         df = self.subs_obj_fn(df)
