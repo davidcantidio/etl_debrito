@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import datetime
 import logging
 from typing import Optional
 
 import pandas as pd
-import datetime
 
 from treat.utils.write_back import write_back_df
 
+
 log = logging.getLogger(__name__)
+
+def _normalize_scalar(df: pd.DataFrame) -> pd.DataFrame:
+    df_num   = df.select_dtypes("number").fillna(0)
+    df_other = df.select_dtypes(exclude="number").fillna("")
+    df = pd.concat([df_num, df_other], axis=1)[df.columns]  # preserva ordem
+    return df.applymap(lambda v: v.isoformat() if isinstance(v, datetime.date) else v)
 
 
 def write_back_origin(
@@ -17,15 +24,14 @@ def write_back_origin(
     creds_path: str,
     spreadsheet_id: str,
     sheet_name: str,
+    *,
     write_back: bool = True,
     dry_run: bool = False,
     a1_range: str = "A1",
     value_input_option: str = "USER_ENTERED",
 ) -> Optional[pd.DataFrame]:
     """
-    Filtra df_ok para manter apenas colunas que existem em df_raw e
-    grava de volta na aba de origem se write_back=True.
-    Retorna o DataFrame enviado para o Sheets.
+    Filtra `df_ok` para manter apenas as colunas de `df_raw` e grava de volta na aba de origem.
 
     :param df_raw: DataFrame original lido da aba de origem
     :param df_ok: DataFrame normalizado completo
@@ -33,64 +39,41 @@ def write_back_origin(
     :param spreadsheet_id: ID da planilha Google Sheets
     :param sheet_name: nome da aba de origem
     :param write_back: habilita/desabilita a gravação
-    :param dry_run: se True, apenas loga as ações sem chamar o Sheets API
-    :param a1_range: range A1 para início da gravação
+    :param dry_run: se True, apenas loga as ações sem chamar a API
+    :param a1_range: célula inicial para gravação (ex.: "A1")
     :param value_input_option: modo de input para batch_update
+
+    :return: DataFrame gravado ou None se write_back=False
     """
     if not write_back:
         log.info("Write-back desabilitado para '%s'", sheet_name)
         return None
 
-    # 1) Intersecção de colunas, mantendo ordem do raw
+    # 1) Intersecção de colunas na ordem original de df_raw
     cols_raw = list(df_raw.columns)
     cols_to_write = [c for c in cols_raw if c in df_ok.columns]
     df_wb = df_ok[cols_to_write].copy()
 
-    # 1.1) Remove colunas duplicadas (mantém a primeira ocorrência)
+    # 2) Remove colunas duplicadas, mantendo a primeira
     if df_wb.columns.duplicated().any():
-        dup_cols = df_wb.columns[df_wb.columns.duplicated()].unique().tolist()
-        log.warning("Colunas duplicadas detectadas – mantendo primeira ocorrência: %s", dup_cols)
+        dup = df_wb.columns[df_wb.columns.duplicated()].unique().tolist()
+        log.warning(
+            "Colunas duplicadas encontradas; mantendo 1ª ocorrência: %s", dup
+        )
         df_wb = df_wb.loc[:, ~df_wb.columns.duplicated(keep="first")]
 
-    # 1.2) Garantir que cada célula seja um escalar simples
-    def _to_scalar(v):
-        """Converte Series/list para escalar, e limpa repr de Series."""
-        if isinstance(v, pd.Series):
-            return v.iat[0] if not v.empty else ""
-        if isinstance(v, (list, tuple)):
-            return v[0] if v else ""
-        if isinstance(v, str) and "dtype:" in v and "\n" in v:
-            first_line = v.split("\n")[0]
-            tokens = first_line.split()
-            return tokens[-1] if tokens else first_line.strip()
-        return v
-
-    df_wb = df_wb.applymap(_to_scalar)
-
-    # 1) Primeiro: números vazios viram 0
-    num_cols = df_wb.select_dtypes(include="number").columns
-    df_wb[num_cols] = df_wb[num_cols].fillna(0)
-
-    # 2) Depois: para qualquer campo não numérico, “limpa” para string vazia
-    df_wb = df_wb.fillna("")
-
-    def _date_to_iso(v):
-        return v.isoformat() if isinstance(v, datetime.date) else v
-    
-
-    df_wb = df_wb.applymap(_date_to_iso)
-
+    # 3) Normalização básica de valores
+    df_wb = _normalize_scalar(df_wb)
 
     log.info(
-        "Preparando write-back: %d linhas, colunas: %s",
-        len(df_wb), cols_to_write,
+        "Write-back '%s': %d linhas, %d colunas", sheet_name, len(df_wb), df_wb.shape[1]
     )
 
     if dry_run:
-        log.info("[Dry run] Não foi efetuado batch_update em '%s'", sheet_name)
+        log.info("[dry-run] Nenhum batch_update enviado para '%s'", sheet_name)
         return df_wb
 
-    # 2) Executar o write-back
+    # 4) Executa o write-back via cache de worksheet
     write_back_df(
         df=df_wb,
         creds_path=creds_path,
@@ -99,6 +82,5 @@ def write_back_origin(
         a1_range=a1_range,
         value_input_option=value_input_option,
     )
-
-    log.info("✅ Write-back concluído (%d linhas) em '%s'", len(df_wb), sheet_name)
+    log.info("✅ Write-back concluído para '%s'", sheet_name)
     return df_wb

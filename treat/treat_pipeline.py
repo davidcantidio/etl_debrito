@@ -232,8 +232,8 @@ class TreatPipeline:
                     .fillna(df.get("ad_name", ""))
                 )
         # ── 9.2) Para LinkedIn, garantir que ad_group_name seja sempre igual a ad_name
-        # (insira logo após o bloco de ad_name_map)
-        df["ad_group_name"] = df["ad_name"]
+            # (insira logo após o bloco de ad_name_map)
+            df["ad_group_name"] = df["ad_name"]
 
             
 

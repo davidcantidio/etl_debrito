@@ -4,7 +4,7 @@ from typing import List, Sequence, Any, Dict
 from treat.bi_param_utils import BIParamLookup  # ajuste conforme seu projeto
 import math
 import numpy as np
-
+from collections import defaultdict
 
 log = logging.getLogger(__name__)
 
@@ -298,3 +298,90 @@ def validate_no_blank_cells(
                 "[Validação]%s Coluna '%s' vazia em %d linha(s)",
                 where, col, n_blank
             )
+
+def _norm_date(val: str | pd.Timestamp) -> str | None:
+    """YYYY-MM-DD normalizado ou None se vazio/indefinido."""
+    if pd.isna(val):                       # NaN / NaT
+        return None
+    s = str(val).strip()
+    if not s or s.lower() in ("", "nan", "nat"):
+        return None
+    try:
+        return pd.to_datetime(s).date().isoformat()
+    except Exception:
+        return s           # assume string já está ok (conta como valor)
+
+def validate_consistent_dates_across_models(
+    dest_dfs: Dict[str, pd.DataFrame]
+) -> pd.DataFrame:
+    """
+    Para cada par (Campanha, Veiculo), verifica se há mais de um valor distinto
+    de start ou end em cada aba e também entre abas.
+
+    Retorna um DataFrame com as inconsistências encontradas, com colunas:
+      nível      ('aba' ou 'entre-abas')
+      aba        nome da(s) aba(s) onde foi detectado o problema
+      Campanha   nome da campanha
+      Veiculo    nome do veículo
+      start      valores distintos de início (set)
+      end        valores distintos de fim (set)
+    """
+    # Acumula tuplas de inconsistência: (nível, aba, Campanha, Veiculo, start_set, end_set)
+    prob: list[tuple[str, str, str, str, set, set]] = []
+
+    # estruturas temporárias para coletar todos os valores
+    starts = defaultdict(lambda: defaultdict(set))
+    ends   = defaultdict(lambda: defaultdict(set))
+
+    # 1) coleta todos os valores de every row
+    for aba, df in dest_dfs.items():
+        if not {"Campanha", "Veiculo", "start", "end"}.issubset(df.columns):
+            continue
+        for _, row in df.iterrows():
+            key = (row["Campanha"], row["Veiculo"])
+            starts[key][aba].add(row["start"])
+            ends[key][aba].add(row["end"])
+
+    # 2) valida dentro de cada aba (intra-aba)
+    for (camp, veic), per_aba in starts.items():
+        for aba, vals in per_aba.items():
+            # desconsidera valores vazios/NaN
+            valid = {v for v in vals if pd.notna(v) and str(v).strip()}
+            if len(valid) > 1:
+                log.warning(
+                    "[Consistência Datas] Aba %s: campanha=%r, veículo=%r tem múltiplos start: %s",
+                    aba, camp, veic, valid
+                )
+                prob.append(("aba", aba, camp, veic, valid, {""}))
+    for (camp, veic), per_aba in ends.items():
+        for aba, vals in per_aba.items():
+            valid = {v for v in vals if pd.notna(v) and str(v).strip()}
+            if len(valid) > 1:
+                log.warning(
+                    "[Consistência Datas] Aba %s: campanha=%r, veículo=%r tem múltiplos end: %s",
+                    aba, camp, veic, valid
+                )
+                prob.append(("aba", aba, camp, veic, set(), valid))
+
+    # 3) valida entre abas
+    for key in set(starts) | set(ends):
+        camp, veic = key
+        all_starts = {v for per in starts[key].values() for v in per if pd.notna(v) and str(v).strip()}
+        all_ends   = {v for per in ends[key].values()   for v in per if pd.notna(v) and str(v).strip()}
+        if len(all_starts) > 1 or len(all_ends) > 1:
+            aba_str = ",".join(sorted(starts[key].keys() | ends[key].keys()))
+            log.warning(
+                "[Consistência Datas] Entre abas: campanha=%r, veículo=%r tem inconsistência start/end em %s",
+                camp, veic, aba_str
+            )
+            prob.append(("entre-abas", aba_str, camp, veic, all_starts, all_ends))
+
+    # monta DataFrame de problemas
+    check = pd.DataFrame(
+        prob,
+        columns=["nível", "aba", "Campanha", "Veiculo", "start", "end"]
+    )
+
+    if check.empty:
+        log.info("✅ Nenhuma divergência de start/end entre modelos.")
+    return check
