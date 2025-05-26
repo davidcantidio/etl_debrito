@@ -182,15 +182,7 @@ class TreatPipeline:
             objective_col="objective"
         )
 
-        # 7) Normalizações extras
-        if "age" in df.columns:
-            df["age"] = df["age"].apply(normalize_age)
-        if "region" in df.columns:
-            df["region"] = df["region"].apply(
-                lambda v: obter_estado_de_regiao(v, CACHE_MUNICIPIOS, CACHE_ESTADOS)
-            )
-        if "gender" in df.columns:
-            df["gender"] = df["gender"].apply(normalize_gender)
+        
 
         # 8) Atribuir Veiculo e ID_Veiculo
         df = self._assign_vehicle_and_id(df)
@@ -235,6 +227,19 @@ class TreatPipeline:
             # (insira logo após o bloco de ad_name_map)
             df["ad_group_name"] = df["ad_name"]
 
+        elif lower.startswith("gageral") and "region" in df.columns:
+            df = df.rename(columns={"region": "regiao", "sessionCampaignName":"campaign_name"})
+
+
+        # 7) Normalizações extras
+        if "age" in df.columns:
+            df["age"] = df["age"].apply(normalize_age)
+        if "region" in df.columns:
+            df["region"] = df["region"].apply(
+                lambda v: obter_estado_de_regiao(v, CACHE_MUNICIPIOS, CACHE_ESTADOS)
+            )
+        if "gender" in df.columns:
+            df["gender"] = df["gender"].apply(normalize_gender)
             
 
 
