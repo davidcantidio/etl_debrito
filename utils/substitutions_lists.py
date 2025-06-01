@@ -14,6 +14,7 @@ ID_CONTENT_REPLACEMENTS: dict[str, str] = {
     "dbt_sbrae_2025_cer_pan0202":"dbt_sbrae_2025_cer_pan0201",
     "dbt_sbrae_2025_cer_pan0146": "dbt_sbrae_2025_pan0146",
     "dbt_sbrae_2025_cer_pan0155" : "dbt_sbrae_2025_cer_pan0154",
+    "dbt_sbrae_2025_emp_fem0204" : "dbt_sbrae_2025_emp_fem0203",
 }
 """Substituições específicas para o campo 'ID_Content'.
 

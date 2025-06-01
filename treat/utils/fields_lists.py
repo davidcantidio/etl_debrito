@@ -46,7 +46,7 @@ GENERAL_MODEL_COLUMN_ORDER = [
     'video_watches_25',
     'video_watches_50',
     'video_watches_75',
-    'video_watches_100',
+    'video_watched_100',
     'post_reactions',
     'post_shares',
     'post_comments',

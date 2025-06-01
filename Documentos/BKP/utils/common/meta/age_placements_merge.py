@@ -14,7 +14,7 @@ from utils.normalize import normalize_age
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-METRICAS: List[str] = ["impressions", "link_clicks", "cost", "video_watches_100"]
+METRICAS: List[str] = ["impressions", "link_clicks", "cost", "video_watched_100"]
 
 # ------------------------------- CACHE -------------------------------- #
 _client = get_google_client(CREDS_PATH)
@@ -57,7 +57,7 @@ def load_and_prepare_meta_age_data() -> pd.DataFrame:
         df.rename(columns={cost_col: "cost"}, inplace=True)
     
     # 3) Outras métricas
-    for col in ["impressions", "link_clicks", "video_watches_100"]:
+    for col in ["impressions", "link_clicks", "video_watched_100"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
     
@@ -190,7 +190,7 @@ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
         # Distribuição proporcional por métrica
         dist: Dict[str, Dict[str, float | int]] = {}
         dist["cost"] = _distribuir_cost(float(row["cost"]), pesos)
-        for m in ("impressions", "link_clicks", "video_watches_100"):
+        for m in ("impressions", "link_clicks", "video_watched_100"):
             dist[m] = _distribuir_contagem(int(row[m]), pesos)
 
         # Gera uma linha por placement

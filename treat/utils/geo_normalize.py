@@ -1,3 +1,5 @@
+#trat.utils.geo_normalize
+
 import json
 import os
 import unicodedata
@@ -95,8 +97,7 @@ def obter_estado_de_regiao(regiao: Any, cache_municipios: dict, cache_estados: d
 
 # -----------------------------------------------------------------------------
 # Carrega caches apenas uma vez
-_CACHE_ESTADOS, _CACHE_MUNICIPIOS = carregar_caches_padrao()
-
+CACHE_ESTADOS, CACHE_MUNICIPIOS = carregar_caches_padrao()
 
 def normalize_region(regiao_bruta: Any) -> str:
     """
@@ -105,4 +106,4 @@ def normalize_region(regiao_bruta: Any) -> str:
       2) lookup via cache de estados/municípios
     """
     texto_limpo = limpeza_basica(regiao_bruta)
-    return obter_estado_de_regiao(texto_limpo, _CACHE_MUNICIPIOS, _CACHE_ESTADOS)
+    return obter_estado_de_regiao(texto_limpo, CACHE_MUNICIPIOS, CACHE_ESTADOS)

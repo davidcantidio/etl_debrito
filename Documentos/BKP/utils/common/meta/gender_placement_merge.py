@@ -13,7 +13,7 @@ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-METRICAS: List[str] = ["Impressions", "Link clicks", "cost", "video_watches_100"]
+METRICAS: List[str] = ["Impressions", "Link clicks", "cost", "video_watched_100"]
 
 # ------------------------------- CACHE -------------------------------- #
 _client = get_google_client(CREDS_PATH)
@@ -51,7 +51,7 @@ def load_and_prepare_meta_gender_data() -> pd.DataFrame:
         # já padroniza para 'cost'
         df.rename(columns={cost_col: "cost"}, inplace=True)
     # 3) Outras métricas
-    for col in ["Impressions", "Link clicks", "video_watches_100"]:
+    for col in ["Impressions", "Link clicks", "video_watched_100"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
     return df
@@ -170,7 +170,7 @@ def distribute_gender_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
         dist: Dict[str, Dict[str, float | int]] = {}
         # cost separado: float 2 casas – demais inteiros
         dist["cost"] = _distribuir_cost(float(row["cost"]), pesos)
-        for m in ("Impressions", "Link clicks", "video_watches_100"):
+        for m in ("Impressions", "Link clicks", "video_watched_100"):
             dist[m] = _distribuir_contgenderm(int(row[m]), pesos)
 
         # gera 1 linha por placement

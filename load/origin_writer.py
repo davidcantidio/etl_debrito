@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 from typing import Optional
+from treat.utils.sheets_cache import get_worksheet
 
 import pandas as pd
 
@@ -24,56 +25,61 @@ def write_back_origin(
     creds_path: str,
     spreadsheet_id: str,
     sheet_name: str,
-    *,
-    write_back: bool = True,
+    write_back: bool,
     dry_run: bool = False,
     a1_range: str = "A1",
-    value_input_option: str = "USER_ENTERED",
-) -> Optional[pd.DataFrame]:
+    value_input_option: str = "RAW",
+) -> pd.DataFrame:
     """
-    Filtra `df_ok` para manter apenas as colunas de `df_raw` e grava de volta na aba de origem.
+    Grava as correções em `df_ok` de volta na aba de origem,
+    ajustando o tamanho da planilha para não ultrapassar limites.
 
-    :param df_raw: DataFrame original lido da aba de origem
-    :param df_ok: DataFrame normalizado completo
-    :param creds_path: caminho para credenciais do service account
-    :param spreadsheet_id: ID da planilha Google Sheets
-    :param sheet_name: nome da aba de origem
-    :param write_back: habilita/desabilita a gravação
-    :param dry_run: se True, apenas loga as ações sem chamar a API
-    :param a1_range: célula inicial para gravação (ex.: "A1")
-    :param value_input_option: modo de input para batch_update
-
-    :return: DataFrame gravado ou None se write_back=False
+    Retorna o DataFrame efetivamente gravado (ou apenas `df_ok` se dry_run).
     """
+    # 1) Se write_back desligado, não grava nada
     if not write_back:
-        log.info("Write-back desabilitado para '%s'", sheet_name)
-        return None
+        log.info("🔸 Write-back de origem desativado para '%s'", sheet_name)
+        return df_ok
 
-    # 1) Intersecção de colunas na ordem original de df_raw
-    cols_raw = list(df_raw.columns)
-    cols_to_write = [c for c in cols_raw if c in df_ok.columns]
-    df_wb = df_ok[cols_to_write].copy()
+    # 2) Prepara DataFrame para gravação
+    df_wb = df_ok.copy()
+    desired_rows = len(df_wb) + 1  # +1 para o cabeçalho
+    desired_cols = len(df_wb.columns)
 
-    # 2) Remove colunas duplicadas, mantendo a primeira
-    if df_wb.columns.duplicated().any():
-        dup = df_wb.columns[df_wb.columns.duplicated()].unique().tolist()
-        log.warning(
-            "Colunas duplicadas encontradas; mantendo 1ª ocorrência: %s", dup
-        )
-        df_wb = df_wb.loc[:, ~df_wb.columns.duplicated(keep="first")]
+    # 3) Recupera a worksheet via cache
+    ws = get_worksheet(creds_path, spreadsheet_id, sheet_name)
 
-    # 3) Normalização básica de valores
-    df_wb = _normalize_scalar(df_wb)
+    # ——— Redimensionamento seguro da aba ———
+    # Não podemos deixar só as linhas congeladas; garantimos ao menos 1 linha não-congelada
+    frozen = ws._properties.get("gridProperties", {}).get("frozenRowCount", 0)
+    min_rows = max(frozen + 1, 2)
 
+    # 3.1) Encolhe para liberar células extras (se houver muitas linhas)
+    if ws.row_count > min_rows or ws.col_count < desired_cols:
+        ws.resize(rows=min_rows, cols=desired_cols)
+
+    # 3.2) Expande até o tamanho exato necessário
+    if ws.row_count != desired_rows or ws.col_count < desired_cols:
+        ws.resize(rows=desired_rows, cols=desired_cols)
+    # ————————————————————————————————
+
+    # 4) Log de instrumentação
+    total_cells = desired_rows * desired_cols
     log.info(
-        "Write-back '%s': %d linhas, %d colunas", sheet_name, len(df_wb), df_wb.shape[1]
+        "ℹ️  Preparando write-back origin para '%s': %s dados + cabeçalho → %s linhas × %s colunas = %s células",
+        sheet_name,
+        len(df_wb),
+        desired_rows,
+        desired_cols,
+        f"{total_cells:,}",
     )
 
+    # 5) Se dry_run, não grava de fato
     if dry_run:
-        log.info("[dry-run] Nenhum batch_update enviado para '%s'", sheet_name)
+        log.info("🔸 Dry-run ativo: não gravando '%s'", sheet_name)
         return df_wb
 
-    # 4) Executa o write-back via cache de worksheet
+    # 6) Grava em batches (chunked dentro de write_back_df)
     write_back_df(
         df=df_wb,
         creds_path=creds_path,
@@ -83,4 +89,5 @@ def write_back_origin(
         value_input_option=value_input_option,
     )
     log.info("✅ Write-back concluído para '%s'", sheet_name)
+
     return df_wb

@@ -134,9 +134,22 @@ def _scalar(v):
 # ───────────────────────────── API de gravação pública ──────────────────────
 
 def _infer_data_type(sheet_name: str) -> str:
-    m = re.search(r"(geral|genero|idade|alcance|regiao)$", sheet_name.lower())
+    """Dado o nome da aba-origem, devolve o “tipo” de dados destino.
+
+    *Ignora* abas de Google Analytics (começam por ``ga``).
+    """
+    lower = sheet_name.lower()
+    if lower.startswith("ga"):            # ←  GA nunca vai para modelo*
+        raise ValueError(
+            f"Aba '{sheet_name}' é do Google Analytics – não grava em abas-modelo."
+        )
+
+    m = re.search(r"(geral|genero|idade|alcance|regiao)$", lower)
     if not m:
-        raise ValueError(f"Não reconheço o tipo de dados da aba '{sheet_name}'")
+        raise ValueError(
+            f"Não reconheço o tipo de dados da aba '{sheet_name}' "
+            "(esperava terminar em geral/genero/idade/alcance/regiao)."
+        )
     return m.group(1)
 
 

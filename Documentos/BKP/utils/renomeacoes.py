@@ -53,7 +53,7 @@ def renomear_colunas_origem_para_modelo(df):
         'link_clicks': 'Cliques_no_Link', 'clicks': 'Cliques_no_Link',
         'video_play': 'Video_Play', 'Video views': 'Video_Play',
         'video_watches_25': 'Visualizacoes_ate_25', 'video_watches_50': 'Visualizacoes_ate_50',
-        'video_watches_75': 'Visualizacoes_ate_75', 'video_watches_100': 'Visualizacoes_ate_100',
+        'video_watches_75': 'Visualizacoes_ate_75', 'video_watched_100': 'Visualizacoes_ate_100',
         'post_reactions': 'Reacoes', 'paid_likes': 'Reacoes', 'post_shares': 'Compartilhamentos',
         'paid_shares': 'Compartilhamentos', 'post_comments': 'Comentarios', 'paid_comments': 'Comentarios','age': 'Faixa_Etaria'
     }
@@ -82,7 +82,7 @@ renomeacao_metaGeral = {
     "Video watches at 25%": "video_watches_25",
     "Video watches at 50%": "video_watches_50",
     "Video watches at 75%": "video_watches_75",
-    "Video watches at 100%": "video_watches_100",
+    "Video watches at 100%": "video_watched_100",
     "Post reactions": "post_reactions",
     "Post shares": "post_shares",
     "Post comments": "post_comments",
@@ -102,7 +102,7 @@ renomeacao_metaIdade = {
     "Ad ID": "ad_id",
     "Impressions": "impressions",
     "Cost": "cost",
-    "Video watches at 100%": "video_watches_100",
+    "Video watches at 100%": "video_watched_100",
     "Link clicks": "link_clicks"
 }
 
@@ -120,7 +120,7 @@ renomeacao_metaGenero = {
     "Ad ID": "ad_id",
     "Impressions": "impressions",
     "Cost": "cost",
-    "Video watches at 100%": "video_watches_100",
+    "Video watches at 100%": "video_watched_100",
     "Link clicks": "link_clicks"
 }											
 

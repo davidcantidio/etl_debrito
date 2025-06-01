@@ -7,7 +7,9 @@ centralizando exceções que devem ser aplicadas em diferentes ETLs.
 
 ID_CONTENT_REPLACEMENTS: dict[str, str] = {
     "influenciador_gabi_bailas": "dbt_sbrae_2025_catalisa0001",
+    "dbt_sbrae_2025_emp_fem0204" : "dbt_sbrae_2025_emp_fem0203",
 }
+
 """Substituições específicas para o campo 'ID_Content'.
 
 Chave: valor exato vindo de 'Content (utm)' (após strip e lowercase).  
