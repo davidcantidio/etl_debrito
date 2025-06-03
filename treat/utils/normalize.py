@@ -1,24 +1,28 @@
-# utils/normalize.py
+# treat/utils/normalize.py
+"""
+Funções utilitárias de normalização que rodam 100 % em memória.
+Nenhuma rotina deste módulo faz chamadas à API do Google Sheets.
+"""
 
-import logging
+from __future__ import annotations
+
 import datetime as _dt
-import re as _re
-import pandas as pd
-from typing import List, Optional
-from gspread import Worksheet
-from gspread.utils import rowcol_to_a1
-from utils.get_google_client import get_google_client
-from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+import logging
+import re
 import unicodedata
+from typing import List, Optional
 
-# regex para detectar exatamente "YYYY-MM-DD hh:mm:ss"
-_TIME_STAMP_RE = _re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+import pandas as pd
+
+# ----------------------------------------------------------------------
+# Datas helpers
+# ----------------------------------------------------------------------
+
+_TIME_STAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+
 
 def _try_manual_parse(val: str) -> Optional[_dt.date]:
-    """
-    Tenta converter strings no formato 'YYYY-MM-DD HH:MM:SS' em date.
-    Retorna date ou None.
-    """
+    """Tenta converter 'YYYY-MM-DD HH:MM:SS' em date ou devolve None."""
     if not isinstance(val, str):
         return None
     txt = val.strip()
@@ -29,751 +33,168 @@ def _try_manual_parse(val: str) -> Optional[_dt.date]:
     except ValueError:
         return None
 
-def normalize_date_columns(
-    df: pd.DataFrame,
-    date_columns: Optional[List[str]] = None,
-    *,
-    sheet_name: Optional[str] = None,
-    worksheet: Worksheet | None = None,
-    write_back: bool = False,
-    inplace: bool = False,
-) -> pd.DataFrame:
-    """
-    Converte colunas datetime → YYYY-MM-DD.
-    Se write_back=True, grava as strings no Google Sheets.
-    """
-    log = logging.getLogger(__name__)
-    if not inplace:
-        df = df.copy()
 
-    # prepara worksheet para write_back
-    if write_back:
-        if worksheet is None:
-            if not sheet_name:
-                raise ValueError("sheet_name é obrigatório quando write_back=True")
-            client = get_google_client(CREDS_PATH)
-            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
-        header = worksheet.row_values(1)
-        header_lc = [h.strip().lower() for h in header]
-
-    # mapeia lower→real col name
-    col_lookup = {c.lower(): c for c in df.columns}
-    if date_columns is None:
-        # auto detecta colunas date, start, end
-        date_columns = [
-            real for low, real in col_lookup.items()
-            if "date" in low or low in {"start", "end"}
-        ]
-
-    updates = []
-    for col in date_columns:
-        low = col.lower()
-        if low not in col_lookup:
-            log.debug(f"[normalize_date_columns] coluna '{col}' não encontrada; pulando.")
-            continue
-        real = col_lookup[low]
-        orig = df[real]
-
-        # 1) parse principal
-        parsed = pd.to_datetime(orig, errors="coerce")
-
-        # 2) extraia só date para quem parseou bem
-        good_mask = ~parsed.isna()
-        dates = parsed.dt.date
-
-        # 3) second pass manual apenas nas falhas
-        bad_idx = parsed[~good_mask].index
-        manual_dates = orig.loc[bad_idx].apply(_try_manual_parse)
-        # manual_dates é Series de date ou None
-        # combine: para idx bons use dates, para idx manuais use manual_dates, pro resto ""
-        final_values = []
-        for i in df.index:
-            if good_mask.iat[i]:
-                final_values.append(dates.iat[i])
-            else:
-                md = manual_dates.get(i)
-                final_values.append(md if isinstance(md, _dt.date) else "")
-
-        # 4) logging das falhas
-        failed = sum(1 for v in final_values if v == "")
-        if failed:
-            samples = orig[ [i for i,v in enumerate(final_values) if v==""] ][:3].astype(str).drop_duplicates().tolist()
-            log.warning(f"[normalize_date_columns] {failed} valores inválidos em '{real}' (ex.: {samples})")
-
-        # 5) prepare write-back e atribuição
-        changed_mask = orig.astype(str) != [ (v.isoformat() if isinstance(v,_dt.date) else "") for v in final_values ]
-
-        # atribui no DataFrame (date ou string)
-        df[real] = final_values
-
-        if write_back and changed_mask.any():
-            # busca coluna no header do Sheet
-            try:
-                col_idx = header_lc.index(real.lower()) + 1
-            except ValueError:
-                log.warning(f"'{real}' não existe no header do Sheets; skip write-back")
-                continue
-
-            for r in df.index[changed_mask]:
-                v = df.at[r, real]
-                cell_val = v.isoformat() if isinstance(v, _dt.date) else ""
-                updates.append({"range": rowcol_to_a1(r+2, col_idx), "values": [[cell_val]]})
-
-    # 6) envia batch
-    if write_back and updates:
-        worksheet.batch_update(updates, value_input_option="RAW")
-        log.info(f"[normalize_date_columns] {len(updates)} células atualizadas no Sheets")
-
+def converter_data(df: pd.DataFrame, coluna: str) -> pd.DataFrame:
+    """Converte uma coluna datetime/string para YYYY-MM-DD (date)."""
+    if coluna in df.columns:
+        parsed = pd.to_datetime(df[coluna], errors="coerce")
+        df[coluna] = parsed.dt.date.where(~parsed.isna(), "")
     return df
 
 
-def fill_empty_objective_with_reach(
-    df: pd.DataFrame,
-    *,
-    sheet_name: Optional[str] = None,
-    worksheet: Worksheet | None = None,
-    write_back: bool = False,
-    inplace: bool = False,
-) -> pd.DataFrame:
-    """
-    Substitui células vazias na coluna 'Campaign objective type' por 'REACH'.
-    Se write_back=True, grava os valores diretamente na aba de origem do Google-Sheets.
+# ----------------------------------------------------------------------
+# Normalização de textos
+# ----------------------------------------------------------------------
 
-    Parâmetros
-    ----------
-    df : pd.DataFrame
-    sheet_name : nome da aba (necessário para write_back)
-    worksheet : objeto Worksheet já inicializado (opcional)
-    write_back : se True, faz batch_update no Sheets
-    inplace : se False, trabalha em cópia de df
-    """
-    log = logging.getLogger(__name__)
-    if not inplace:
-        df = df.copy()
-
-    col = "Campaign objective type"
-    if col not in df.columns:
-        log.warning(f"[fill_empty_objective_with_reach] coluna '{col}' não encontrada; nada a fazer.")
-        return df
-
-    # preparar worksheet se for gravar
-    if write_back:
-        if worksheet is None:
-            if not sheet_name:
-                raise ValueError("sheet_name é obrigatório quando write_back=True")
-            client = get_google_client(CREDS_PATH)
-            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
-        header = worksheet.row_values(1)
-        header_lc = [h.strip().lower() for h in header]
-
-        try:
-            col_idx = header_lc.index(col.lower()) + 1
-        except ValueError:
-            log.warning(f"[fill_empty_objective_with_reach] header não contém '{col}'; skip write-back")
-            write_back = False
-
-    # máscara de vazios
-    mask = df[col].astype(str).str.strip() == ""
-    total = int(mask.sum())
-    if total == 0:
-        log.debug(f"[fill_empty_objective_with_reach] nenhuma célula vazia em '{col}'")
-        return df
-
-    log.info(f"[fill_empty_objective_with_reach] preenchendo {total} células vazias em '{col}' com 'REACH'")
-    df.loc[mask, col] = "REACH"
-
-    if write_back:
-        updates = []
-        for r in df.index[mask]:
-            a1 = rowcol_to_a1(r + 2, col_idx)
-            updates.append({"range": a1, "values": [["REACH"]]})
-        worksheet.batch_update(updates, value_input_option="RAW")
-        log.info(f"[fill_empty_objective_with_reach] gravadas {len(updates)} células no Sheets")
-
-    return df
+def _strip_lower_noaccent(s: str) -> str:
+    """strip → lower → remove acentos."""
+    cleaned = s.strip().lower()
+    norm = unicodedata.normalize("NFKD", cleaned)
+    return "".join(c for c in norm if not unicodedata.combining(c))
 
 
 def normalize_campaign_name(value):
-    """
-    Normaliza o nome de campanha:
-
-    - Se for string, faz strip() e converte para uppercase.
-    - Se não for string, retorna o valor inalterado.
-
-    Parâmetros:
-        value: qualquer objeto; se for string, será normalizado.
-
-    Retorna:
-        str | qualquer: nome de campanha normalizado em uppercase, ou
-                        o valor original se não for string.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("normalize_campaign_name: recebendo %r", value)
-
-    if not isinstance(value, str):
-        logger.debug(
-            "normalize_campaign_name: valor não é string, retornando original %r",
-            value,
-        )
-        return value
-
-    normalized = value.strip().upper()
-    logger.debug(
-        "normalize_campaign_name: normalizado de %r para %r",
-        value,
-        normalized,
-    )
-    return normalized
-
-
-def normalize_name(nome):
-    """
-    Normaliza nomes:
-
-    - Se não for string, retorna string vazia.
-    - Remove espaços externos, converte para lowercase.
-    - Remove acentos e caracteres unicode combinantes.
-
-    Parâmetros:
-        nome: qualquer objeto; se for string, será normalizado.
-
-    Retorna:
-        str: nome normalizado sem acentos, em lowercase, ou '' se não for string.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("normalize_nome: recebendo %r", nome)
-
-    if not isinstance(nome, str):
-        logger.debug(
-            "normalize_nome: valor não é string, retornando vazio",
-        )
-        return ""
-
-    cleaned = nome.strip().lower()
-    logger.debug(
-        "normalize_nome: após strip/lower %r",
-        cleaned,
-    )
-
-    normalized = unicodedata.normalize("NFKD", cleaned)
-    no_accents = ''.join([c for c in normalized if not unicodedata.combining(c)])
-    logger.debug(
-        "normalize_nome: sem acentos %r",
-        no_accents,
-    )
-    return no_accents
+    """Normaliza nome de campanha: strip + upper (somente se for string)."""
+    return value.strip().upper() if isinstance(value, str) else value
 
 
 def normalize_campaign_series(series: pd.Series) -> pd.Series:
-    """
-    Normaliza uma Series contendo nomes de campanhas:
-    
-    - Converte cada valor para string.
-    - Remove espaços no início e fim.
-    - Converte para minúsculo.
-    - Remove acentuação e caracteres especiais.
-
-    Parâmetros:
-        series (pd.Series): Série contendo os nomes de campanha.
-
-    Retorna:
-        pd.Series: Série normalizada.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("normalize_campaign_series: normalizando série com %d elementos", len(series))
-
+    """Normaliza Series de nomes de campanha (strip/lower/rem. acentos)."""
     return (
-        series
-        .astype(str)
-        .str.strip()
-        .str.lower()
-        .map(lambda x: unicodedata.normalize("NFKD", x))
-        .map(lambda x: ''.join(c for c in x if not unicodedata.combining(c)))
+        series.astype(str)
+        .map(_strip_lower_noaccent)
     )
-
 
 
 def normalize_columns(columns: pd.Index) -> pd.Index:
-    """
-    Normaliza nomes de colunas:
-
-    - Converte cada coluna para string.
-    - Remove espaços externos e quebras de linha.
-    - Remove acentos e caracteres combinantes.
-    - Converte para lowercase.
-
-    Parâmetros:
-        columns (pd.Index): índice de colunas a ser normalizado.
-
-    Retorna:
-        pd.Index: índice de colunas normalizado.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("normalize_columns: recebendo colunas %r", list(columns))
-
-    # Passo a passo da normalização
-    result = (
+    """Normaliza nomes de colunas → strip/lower/rem. acentos."""
+    return (
         columns.astype(str)
         .str.strip()
-        .str.replace('\n', ' ', regex=False)
-        .map(lambda x: unicodedata.normalize("NFKD", x))
-        .map(lambda x: ''.join(c for c in x if not unicodedata.combining(c)))
-        .str.lower()
+        .str.replace("\n", " ", regex=False)
+        .map(_strip_lower_noaccent)
     )
 
-    logger.debug("normalize_columns: colunas normalizadas %r", list(result))
-    return result
 
-
-def normalize_parametrizacao_values(df: pd.DataFrame, cols: list[str] = None) -> pd.DataFrame:
-    """
-    Normaliza valores de parametrização em um DataFrame.
-
-    - Se 'cols' for None, aplica em todas as colunas do DataFrame.
-    - Para cada valor string em cada coluna especificada:
-        * faz strip() e converte para lowercase
-        * remove acentos e caracteres combinantes
-    - Se o valor não for string, substitui por string vazia.
-
-    Parâmetros:
-        df (pd.DataFrame): DataFrame a ser normalizado.
-        cols (list[str], opcional): lista de colunas para normalização.
-                                    Se None, todas as colunas serão processadas.
-
-    Retorna:
-        pd.DataFrame: cópia do DataFrame com valores de parametrização normalizados.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("normalize_parametrizacao_values: iniciando com cols=%r", cols)
-
-    df_norm = df.copy()
-    target_cols = cols if cols is not None else df_norm.columns.tolist()
-
-    for col in target_cols:
-        if col in df_norm.columns:
-            logger.debug("normalize_parametrizacao_values: processando coluna '%s'", col)
-            def _normalize_val(val):
-                if not isinstance(val, str):
-                    return ""
-                cleaned = val.strip().lower()
-                normalized = unicodedata.normalize("NFKD", cleaned)
-                return ''.join(c for c in normalized if not unicodedata.combining(c))
-            df_norm[col] = df_norm[col].apply(_normalize_val)
-        else:
-            logger.debug("normalize_parametrizacao_values: coluna '%s' não encontrada", col)
-
-    logger.debug("normalize_parametrizacao_values: conclusão da normalização")
-    return df_norm
-
-
-def normalize_name(nome):
-    """
-    Normaliza nomes:
-
-    - Se não for string, retorna string vazia.
-    - Remove espaços externos, converte para lowercase.
-    - Remove acentos e caracteres unicode combinantes.
-
-    Parâmetros:
-        nome: qualquer objeto; se for string, será normalizado.
-
-    Retorna:
-        str: nome normalizado sem acentos, em lowercase, ou '' se não for string.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("normalize_nome: recebendo %r", nome)
-
-    if not isinstance(nome, str):
-        logger.debug(
-            "normalize_nome: valor não é string, retornando vazio",
-        )
-        return ""
-
-    cleaned = nome.strip().lower()
-    logger.debug(
-        "normalize_nome: após strip/lower %r",
-        cleaned,
-    )
-
-    normalized = unicodedata.normalize("NFKD", cleaned)
-    no_accents = ''.join([c for c in normalized if not unicodedata.combining(c)])
-    logger.debug(
-        "normalize_nome: sem acentos %r",
-        no_accents,
-    )
-    return no_accents
-
-
-def infer_vehicle_meta_by_placement (df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Infere a coluna 'Veiculo' com base no conteúdo de 'Placement'.
-
-    Regras:
-        - Se contiver 'facebook' ou 'audience': atribui 'Facebook'.
-        - Se contiver 'instagram': atribui 'Instagram'.
-        - Caso contrário: atribui 'Meta'.
-
-    Parâmetros:
-        df (pd.DataFrame): DataFrame de entrada com coluna 'Placement'.
-
-    Retorna:
-        pd.DataFrame: Cópia do DataFrame com coluna 'Veiculo' atualizada.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("inferir_veiculo_meta_por_placement: iniciando inferência")
-
-    def _extrair_veiculo(placement):
-        if not isinstance(placement, str):
-            logger.debug("_extrair_veiculo: não-string %r, retornando 'Meta'", placement)
-            return "Meta"
-        lower = placement.lower()
-        if "facebook" in lower or "audience" in lower:
-            return "Facebook"
-        if "instagram" in lower:
-            return "Instagram"
-        logger.debug("_extrair_veiculo: padrão 'Meta' para %r", lower)
-        return "Meta"
-
-    df_out = df.copy()
-    df_out['Veiculo'] = df_out.get('Placement', "").apply(_extrair_veiculo)
-    logger.debug("inferir_veiculo_meta_por_placement: veículos únicos %r", df_out['Veiculo'].unique().tolist())
-    return df_out
-
-
-def assign_vehicle_by_creative(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Assigns the 'Veiculo' (media vehicle) column based on the 'Ad name' by
-    looking up the BI_PARAMETRIZAÇÃO sheet.
-
-    Steps:
-    1. Load the BI_PARAMETRIZAÇÃO sheet (starting at row 2).
-    2. Normalize header names to uppercase stripped strings.
-    3. Build a mapping from 'CRIATIVO' to 'VEÍCULOS'.
-    4. Apply the mapping to the 'Ad name' field to populate 'Veiculo'.
-
-    Parameters:
-        df (pd.DataFrame): Input DataFrame containing an 'Ad name' column.
-
-    Returns:
-        pd.DataFrame: Copy of the DataFrame with the 'Veiculo' column updated.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("assign_vehicle_by_creative: starting assignment for %d rows", len(df))
-
-    from utils.google_sheets import carregar_aba_google_sheets, CREDS_PATH, SPREADSHEET_URL
-
-    # Load the BI_PARAMETRIZAÇÃO sheet (headers on second row)
-    try:
-        df_param = carregar_aba_google_sheets(
-            CREDS_PATH,
-            SPREADSHEET_URL,
-            "BI_PARAMETRIZAÇÃO",
-            header_row_index=1
-        )
-        logger.debug(
-            "assign_vehicle_by_creative: loaded BI_PARAM with columns %r",
-            df_param.columns.tolist(),
-        )
-    except Exception as e:
-        logger.error(
-            "assign_vehicle_by_creative: failed to load BI_PARAM sheet: %s",
-            e,
-        )
-        df = df.copy()
-        df['Veiculo'] = ""
-        return df
-
-    # Normalize column names
-    df_param.columns = [col.strip().upper() for col in df_param.columns]
-    logger.debug(
-        "assign_vehicle_by_creative: normalized BI_PARAM headers to %r",
-        df_param.columns.tolist(),
-    )
-
-    # Ensure required columns exist
-    if 'CRIATIVO' not in df_param.columns or 'VEÍCULOS' not in df_param.columns:
-        logger.warning(
-            "assign_vehicle_by_creative: 'CRIATIVO' or 'VEÍCULOS' not found in BI_PARAM columns"
-        )
-        df = df.copy()
-        df['Veiculo'] = ""
-        return df
-
-    # Build mapping from creative to vehicle
-    mapping = {
-        str(cre).strip(): str(veh).strip()
-        for cre, veh in zip(df_param['CRIATIVO'], df_param['VEÍCULOS'])
-    }
-    logger.debug(
-        "assign_vehicle_by_creative: built mapping for %d creatives",
-        len(mapping),
-    )
-
-    # Apply mapping to 'Ad name'
-    df_out = df.copy()
-    df_out['Veiculo'] = (
-        df_out['Ad name']
-        .astype(str)
-        .str.strip()
-        .map(mapping)
-        .fillna("")
-    )
-    logger.debug(
-        "assign_vehicle_by_creative: completed assignment, vehicles present %r",
-        df_out['Veiculo'].unique().tolist(),
-    )
-    return df_out
-
-
-def normalize_gender(value) -> str:
-    """
-    Normaliza valores de gênero para português:
-    - 'female', 'feminino'  → 'Mulher'
-    - 'male',   'masculino' → 'Homem'
-    - vazio, 'unknown', 'others', 'none', '-' → 'Não classificado'
-    - quaisquer outros valores → capitalizados
-    """
-    logging.debug(">>> In normalize_gender; raw input: %r", value)
-
-    if not isinstance(value, str):
-        logging.debug("Value is not a string; returning 'Não classificado'")
-        return "Não classificado"
-
-    val = value.strip().lower()
-
-    if val in {"female", "feminino"}:
-        logging.debug("Matched female variants; returning 'Mulher'")
-        return "Mulher"
-    elif val in {"male", "masculino"}:
-        logging.debug("Matched male variants; returning 'Homem'")
-        return "Homem"
-    elif val in {"", "unknown", "others", "none", "-"}:
-        logging.debug("Matched null/unknown variants; returning 'Não classificado'")
-        return "Não classificado"
-
-    # para quaisquer outros valores, mantém o texto capitalizado
-    result = val.capitalize()
-    logging.debug("Capitalized '%s' to '%s'", val, result)
-    return result
-
-
-
-def _clean_numeric_series(s: pd.Series) -> pd.Series:
-    """
-    Converte uma Series de strings no formato BR para float,
-    trocando vírgula por ponto, removendo separador de milhar
-    e preenchendo vazios com zero.
-    """
-    s = s.astype(str)
-    s = s.str.replace("\u00a0", "", regex=False)                         # NB-space
-    s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)            # milhar
-    s = s.str.replace(",", ".", regex=False)                             # decimal
-    return pd.to_numeric(s, errors="coerce").fillna(0)
-
-
-def convert_numeric_columns(df: pd.DataFrame,
-                            columns: list[str]) -> pd.DataFrame:
+def normalize_parametrizacao_values(
+    df: pd.DataFrame, cols: list[str] | None = None
+) -> pd.DataFrame:
+    """Aplica `_strip_lower_noaccent` aos valores string das colunas escolhidas."""
     out = df.copy()
-
-    for col in columns:
-        if col not in out.columns:
-            logging.debug("convert_numeric_columns: Column '%s' not found; skipping.", col)
-            continue
-
-        obj = out[col]
-
-        # ------------------------------------------------------------------
-        # 1) Coluna única
-        # ------------------------------------------------------------------
-        if isinstance(obj, pd.Series):
-            out[col] = _clean_numeric_series(obj)
-            logging.debug("convert_numeric_columns: Converted '%s' – first 5 values: %s",
-                          col, out[col].head(5).tolist())
-            continue
-
-        # ------------------------------------------------------------------
-        # 2) Coluna duplicada
-        # ------------------------------------------------------------------
-        n_copies = obj.shape[1]
-        logging.warning("[convert_numeric_columns] Duplicate column '%s' detected "
-                        "(%d copies) – aggregating with sum.", col, n_copies)
-
-        cleaned_parts = [_clean_numeric_series(obj.iloc[:, i]) for i in range(n_copies)]
-        agg_series = pd.concat(cleaned_parts, axis=1).sum(axis=1)
-
-        # ---> coloca apenas UMA coluna com o resultado
-        out[col] = agg_series
-        # remove as demais cópias agora
-        out = out.loc[:, ~out.columns.duplicated(keep="first")]
-
-        logging.debug("convert_numeric_columns: Aggregated '%s' – first 5 values: %s",
-                      col, agg_series.head(5).tolist())
-
+    targets = cols or out.columns.tolist()
+    for col in targets:
+        if col in out.columns:
+            out[col] = out[col].apply(
+                lambda v: _strip_lower_noaccent(v) if isinstance(v, str) else ""
+            )
     return out
 
-def format_columns_to_comma_decimal(df: pd.DataFrame, cols: list[str], decimals: int = 2) -> pd.DataFrame:
-    """
-    Format specified float columns into Brazilian-style strings without thousands separators,
-    using a comma as the decimal separator.
 
-    Logs each conversion for debugging.
-
-    Parameters:
-        df (pd.DataFrame): Input DataFrame.
-        cols (list[str]): List of column names to format.
-        decimals (int): Number of decimal places to include (default is 2).
-
-    Returns:
-        pd.DataFrame: DataFrame with the specified columns reformatted as strings.
-    """
-    logging.debug(">>> In format_columns_to_comma_decimal; columns to format: %s with %d decimals", cols, decimals)
-    for col in cols:
-        if col not in df.columns:
-            logging.debug("Column '%s' not found; skipping.", col)
-            continue
-
-        logging.debug("Formatting column '%s'", col)
-        original_values = df[col].head(5).tolist()
-        logging.debug("  Original head: %s", original_values)
-
-        def fmt(x):
-            try:
-                s = f"{x:.{decimals}f}"
-                return s.replace(".", ",")
-            except Exception as e:
-                logging.debug("    Failed to format value '%s': %s", x, e)
-                return ""
-
-        df[col] = df[col].apply(fmt)
-
-        formatted_values = df[col].head(5).tolist()
-        logging.debug("  Formatted head: %s", formatted_values)
-
-    return df
+# ----------------------------------------------------------------------
+# Veículo / Placement
+# ----------------------------------------------------------------------
 
 def extract_meta_platform_from_placement(placement: str) -> str:
     """
-    Determine the ad vehicle based on the placement string.
-
-    Parameters:
-        placement (str): The placement value from Meta Ads
-                         (e.g. "Facebook Feed", "instagram|ig_stories", "fb").
-
-    Returns:
-        str:
-            - "Facebook" if the placement mentions Facebook, Audience Network, or common FB codes (fb, facebook_*).
-            - "Instagram" if the placement mentions Instagram or common IG codes (ig, instagram_*).
-            - Defaults to "Facebook" otherwise or if input isn’t a string.
+    Infere o veículo (“Facebook” ou “Instagram”) a partir do texto de placement.
     """
-    logging.debug(">>> In extract_meta_platform_from_placement; placement=%r", placement)
     if not isinstance(placement, str):
-        logging.debug("Placement is not a string; defaulting to 'Facebook'")
         return "Facebook"
 
     text = placement.lower()
-    # extrai tokens alfabéticos (separa por |, espaços, underscores etc.)
     tokens = re.findall(r"[a-z]+", text)
 
-    # definições de tokens que mapeiam a cada plataforma
-    fb_keys = {"facebook", "fb", "audience", "audiencenetwork"}
-    ig_keys = {"instagram", "ig"}
-
-    # se qualquer token indicar Instagram
-    if any(tok in ig_keys for tok in tokens):
-        logging.debug("Matched IG token in placement %r -> 'Instagram'", tokens)
+    if any(t in {"instagram", "ig"} for t in tokens):
         return "Instagram"
-
-    # se qualquer token indicar Facebook/Audience Network
-    if any(tok in fb_keys for tok in tokens):
-        logging.debug("Matched FB/Audience token in placement %r -> 'Facebook'", tokens)
+    if any(t in {"facebook", "fb", "audience", "audiencenetwork"} for t in tokens):
         return "Facebook"
+    return "Facebook"  # default
 
-    logging.debug("No platform token matched in %r; defaulting to 'Facebook'", tokens)
-    return "Facebook"
+
+# ----------------------------------------------------------------------
+# Demográfico
+# ----------------------------------------------------------------------
+
+def normalize_gender(value) -> str:
+    """Mapeia valores de gênero para ‘Homem’ / ‘Mulher’ / ‘Não classificado’."""
+    if not isinstance(value, str):
+        return "Não classificado"
+
+    val = value.strip().lower()
+    if val in {"female", "feminino"}:
+        return "Mulher"
+    if val in {"male", "masculino"}:
+        return "Homem"
+    if val in {"", "unknown", "others", "none", "-"}:
+        return "Não classificado"
+    return val.capitalize()
+
 
 def normalize_age(valor) -> str:
-    """
-    Normaliza faixas etárias para uso em dashboards e relatórios.
-    
-    • Trata primeiros os recortes específicos do Pinterest.
-    • Converte '55-64' e '65+' em '55+'.
-    • Converte valores vazios ou desconhecidos em 'Não classificado'.
-    • Mantém outros valores após strip e lowercase.
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug("normalize_age: recebendo valor %r", valor)
-
-    # 1) Força str e lowercase para comparar chaves do mapeamento
+    """Normaliza faixas etárias para padrões do dashboard."""
     if not isinstance(valor, str):
-        logger.debug("normalize_age: valor não é string")
         return "Não classificado"
     v = valor.strip().lower()
 
-    # 2) Mapeamento dos recortes do Pinterest → faixas padrão
-    # 2) Mapeamento dos recortes do Pinterest → faixas padrão
     pin_map = {
-        "0-17":  "Não classificado",
+        "0-17": "Não classificado",
         "18-24": "18-24",
         "25-34": "25-34",
         "35-49": "35-44",
-        "45-49": "45-54",      #  ← adicionado
+        "45-49": "45-54",
         "50-64": "55+",
-        "65+":   "55+",
+        "65+": "55+",
     }
-
     if v in pin_map:
-        logger.debug("normalize_age: recorte Pinterest '%s' → '%s'", v, pin_map[v])
         return pin_map[v]
-
-    # 3) casos genéricos
     if v in {"", "none", "unknown", "others"}:
-        logger.debug("normalize_age: valor em branco ou desconhecido")
         return "Não classificado"
     if v in {"55-64", "65+"}:
-        logger.debug("normalize_age: faixa genérica '%s' → '55+'", v)
         return "55+"
-
-    # 4) qualquer outro valor (ex.: '18-34', '21-25' etc.)
-    logger.debug("normalize_age: valor final %r", v)
     return v
 
-# def apply_arbitrary_id_content_replacements(
-#     df: pd.DataFrame,
-#     mapping_excecoes: dict[str, str]
-# ) -> pd.DataFrame:
-#     """
-#     Aplica substituições manuais para o campo 'ID_Content' com base em exceções.
 
-#     Para cada linha, normaliza o valor atual de 'ID_Content' (strip + lowercase)
-#     e, se existir em `mapping_excecoes`, substitui pelo valor mapeado.
-#     Caso contrário, mantém o original.
+# ----------------------------------------------------------------------
+# Números
+# ----------------------------------------------------------------------
 
-#     Parâmetros:
-#         df (pd.DataFrame): DataFrame de entrada contendo a coluna 'ID_Content'.
-#         mapping_excecoes (dict[str, str]): Dicionário de exceções a aplicar.
-#             - Chave: valor original normalizado de 'ID_Content'.
-#             - Valor: nova string a escrever em 'ID_Content'.
+def _clean_numeric_series(s: pd.Series) -> pd.Series:
+    """Converte strings br/pt 1.234,56 → 1234.56 (float)."""
+    s = s.astype(str)
+    s = s.str.replace("\u00a0", "", regex=False)           # NB-space
+    s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)  # separ. milhar
+    s = s.str.replace(",", ".", regex=False)               # decimal
+    return pd.to_numeric(s, errors="coerce").fillna(0)
 
-#     Retorna:
-#         pd.DataFrame: cópia do DataFrame com a coluna 'ID_Content' atualizada
-#                       segundo as exceções definidas.
-#     """
-#     logger = logging.getLogger(__name__)
 
-#     if "ID_Content" not in df.columns:
-#         logger.debug("Coluna 'ID_Content' não encontrada. Nenhuma substituição aplicada.")
-#         return df
+def convert_numeric_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """Aplica `_clean_numeric_series` em lista de colunas (somando duplicadas)."""
+    out = df.copy()
+    for col in columns:
+        if col not in out.columns:
+            continue
+        obj = out[col]
 
-#     df = df.copy()
-#     orig_series = df["ID_Content"].astype(str)
-#     norm_series = orig_series.str.strip().str.lower()
-    
-#     logger.debug("apply_arbitrary_id_content_replacements: carregadas %d regras", len(mapping_excecoes))
-#     # Aplica o mapeamento
-#     df["ID_Content"] = norm_series.map(lambda x: mapping_excecoes.get(x, x))
-    
-#     # Conta quantas efetivamente mudaram (comparing normalized originals)
-#     replaced = int((norm_series != df["ID_Content"].astype(str).str.strip().str.lower()).sum())
-#     logger.debug("Total de valores substituídos em 'ID_Content': %d", replaced)
+        # Coluna única
+        if isinstance(obj, pd.Series):
+            out[col] = _clean_numeric_series(obj)
+            continue
 
-#     return df
+        # Coluna duplicada (DataFrame de colunas repetidas)
+        cleaned_parts = [_clean_numeric_series(obj.iloc[:, i]) for i in range(obj.shape[1])]
+        out[col] = pd.concat(cleaned_parts, axis=1).sum(axis=1)
+        out = out.loc[:, ~out.columns.duplicated(keep="first")]
+    return out
+
+
+def format_columns_to_comma_decimal(
+    df: pd.DataFrame, cols: list[str], decimals: int = 2
+) -> pd.DataFrame:
+    """Formata floats para string BR (vírgula decimal, sem milhar)."""
+    for col in cols:
+        if col not in df.columns:
+            continue
+        df[col] = df[col].apply(
+            lambda x: f"{x:.{decimals}f}".replace(".", ",") if pd.notna(x) else ""
+        )
+    return df

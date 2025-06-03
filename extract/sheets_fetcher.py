@@ -1,4 +1,5 @@
 # File: extract/sheets_fetcher.py
+
 import os
 import time
 import logging
@@ -10,13 +11,15 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from treat.utils.get_google_client import get_google_client  # retorna um cliente gspread
+
 log = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
 
 def _build_sheets_service(creds_path: str):
-    """Constroi Google Sheets API service via google‑api‑python‑client."""
+    """Constrói o serviço da Google Sheets API via google-api-python-client."""
     import google.oauth2.service_account as sa
 
     creds = sa.Credentials.from_service_account_file(creds_path, scopes=SCOPES)
@@ -24,11 +27,9 @@ def _build_sheets_service(creds_path: str):
 
 
 class SheetsFetcher:
-    """Lê múltiplas abas de um Google Sheets num único *batchGet*, com cache TTL.
-
-    * **Leitura em lote** → economiza quota.
-    * **Retry/back‑off** → aguenta erros 429.
-    * **Cache em memória** → evita leituras repetidas em até `cache_ttl` segundos.
+    """
+    Lê múltiplas abas de um Google Sheets num único batchGet, com cache TTL,
+    e expõe método open_worksheet() para operações de write-back via gspread.
     """
 
     def __init__(
@@ -39,6 +40,16 @@ class SheetsFetcher:
         col_range: str = "A:ZZ",
         cache_ttl: int = 300,
     ):
+        """
+        Inicializa o fetcher.
+
+        Parâmetros:
+        - spreadsheet_id: ID da planilha Google.
+        - creds_path: caminho para o JSON de credenciais de serviço.
+        - header_row: índice da linha de cabeçalho ao ler como DataFrame (padrão: 0).
+        - col_range: faixa de colunas a ser usada em cada leitura (padrão: "A:ZZ").
+        - cache_ttl: tempo (em segundos) de validade do cache em memória (padrão: 300).
+        """
         self.spreadsheet_id = spreadsheet_id
         self.creds_path = creds_path
         self.header_row = header_row
@@ -47,16 +58,17 @@ class SheetsFetcher:
         self._cache: Dict[Tuple[str, ...], Tuple[float, Dict[str, List[List[str]]]]] = {}
         self._cache_ttl = cache_ttl
 
-    # ───────────────────────────────── retry / backoff ─────────────────────────
+        # Cliente gspread para operações de open_worksheet (write-back, etc.)
+        self._gclient = get_google_client(creds_path)
+
     @retry(
         retry=retry_if_exception_type(TooManyRequests),
-        stop=stop_after_attempt(6),                  # 1 + 2 + 4 + 8 + 16 + 32 ≈ 63 s
+        stop=stop_after_attempt(6),                  # 1 + 2 + 4 + 8 + 16 + 32 ≈ 63 s
         wait=wait_exponential(multiplier=1, min=1, max=32),
         reraise=True,
     )
     def _batch_get(self, ranges: List[str]) -> Dict[str, Any]:
-        """Faz uma chamada batchGet com back‑off para 429."""
-        # log da tentativa de batchGet
+        """Executa batchGet com retry/back-off para código 429."""
         log.info("🔄 batchGet tentativa para ranges: %s", ranges)
         try:
             return (
@@ -69,9 +81,11 @@ class SheetsFetcher:
             log.error("Sheets API HttpError: %s", e)
             raise
 
-    # ───────────────────────────────── cache helper ────────────────────────────
     def _fetch_and_cache(self, sheet_names: List[str]) -> Dict[str, List[List[str]]]:
-        # Prepara ranges a partir dos nomes solicitados (usa col_range)
+        """
+        Constrói ranges a partir dos nomes de abas e realiza batchGet,
+        retornando o payload em raw lists e atualizando o cache interno.
+        """
         ranges = [f"{name}!{self.col_range}" for name in sheet_names]
         resp = self._batch_get(ranges)
         if not resp.get("valueRanges"):
@@ -79,22 +93,28 @@ class SheetsFetcher:
 
         payload: Dict[str, List[List[str]]] = {}
         for name, vr in zip(sheet_names, resp["valueRanges"]):
-            # log do range completo retornado para debug de título
             log.info("🔍 range completo retornado pela API: %s", vr.get("range"))
             original_key = name.strip()
             returned_key = vr["range"].split("!", 1)[0].strip()
             if returned_key != original_key:
-                log.warning("Nome retornado pela API difere do solicitado: '%s' → '%s'", original_key, returned_key)
+                log.warning(
+                    "Nome retornado pela API difere do solicitado: '%s' → '%s'",
+                    original_key,
+                    returned_key,
+                )
             payload[original_key] = vr.get("values", [])
         return payload
 
-    # ───────────────────────────────── API pública ─────────────────────────────
     def get(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
+        """
+        Lê em lote as abas listadas em sheet_names.
+        Retorna dicionário {nome_aba: DataFrame|raw lists} conforme as_frame.
+        Utiliza cache TTL para evitar leituras desnecessárias.
+        """
         names = [n.strip() for n in dict.fromkeys(sheet_names)]
         key = tuple(sorted(names))
         now = time.time()
 
-        # — cache —
         if key in self._cache and now - self._cache[key][0] < self._cache_ttl:
             raw = self._cache[key][1]
             log.info("📥 Cache hit para %s", key)
@@ -103,23 +123,38 @@ class SheetsFetcher:
             self._cache[key] = (now, raw)
             log.info("📡 batchGet %d ranges", len(names))
 
-        # Retorna raw lists ou DataFrames com as chaves originais (sem lowercasing)
         if not as_frame:
             return {n: raw.get(n, []) for n in names}
 
         return {n: self._as_dataframe(raw.get(n, [])) for n in names}
 
     def refresh(self, sheet_names: Iterable[str]):
+        """
+        Invalida o cache para as abas listadas e força recarregamento.
+        """
         key = tuple(sorted(sheet_names))
         self._cache.pop(key, None)
         _ = self.get(sheet_names, as_frame=False)  # força reload
 
-    # ───────────────────────────────── utilidades ──────────────────────────────
     @staticmethod
     def _as_dataframe(raw: List[List[str]]) -> pd.DataFrame:
+        """
+        Converte raw lists (header + body) em pandas.DataFrame,
+        preenchendo linhas/colunas faltantes com strings vazias.
+        """
         if not raw:
             return pd.DataFrame()
         header, *body = raw
         max_cols = len(header)
-        normalized = [row + [""] * (max_cols - len(row)) if len(row) < max_cols else row[:max_cols] for row in body]
+        normalized = [
+            row + [""] * (max_cols - len(row)) if len(row) < max_cols else row[:max_cols]
+            for row in body
+        ]
         return pd.DataFrame(normalized, columns=[c.strip() for c in header])
+
+    def open_worksheet(self, sheet_name: str):
+        """
+        Retorna objeto gspread.Worksheet para a aba informada,
+        usando o cliente gspread inicializado em __init__.
+        """
+        return self._gclient.open_by_key(self.spreadsheet_id).worksheet(sheet_name)

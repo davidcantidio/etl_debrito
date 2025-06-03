@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Dict, Tuple
 import gspread
 
-from utils.get_google_client import get_google_client
+from treat.utils.get_google_client import get_google_client
 
 # chaves: (creds_path, spreadsheet_id)
 _SHEET_CACHE: Dict[Tuple[str, str], gspread.Spreadsheet] = {}

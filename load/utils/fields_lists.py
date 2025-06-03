@@ -25,7 +25,6 @@ NUMERIC_COLUMNS = [
 
 # Modelo geral (completo)
 GENERAL_MODEL_COLUMN_ORDER = [
-    'Numero',
     'Data',
     'Nome_da_Conta',
     'Campanha',

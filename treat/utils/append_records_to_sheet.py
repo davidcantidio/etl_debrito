@@ -1,41 +1,87 @@
-import logging
-import gspread
-from gspread_dataframe import set_with_dataframe
-from utils.get_google_client import get_google_client
+# treat/utils/append.py
 
-def append_records_to_sheet(creds_path, spreadsheet_id, sheet_name, df):
+import logging
+from typing import Optional
+
+import pandas as pd
+from gspread_dataframe import set_with_dataframe
+from extract.sheets_fetcher import SheetsFetcher
+
+log = logging.getLogger(__name__)
+
+
+def append_records_to_sheet(
+    fetcher: SheetsFetcher,
+    spreadsheet_id: str,
+    sheet_name: str,
+    df: pd.DataFrame,
+    *,
+    include_header: Optional[bool] = None
+) -> None:
     """
-    Insere os registros do DataFrame na aba de destino, a partir da coluna B,
-    e redimensiona a planilha para acomodar os dados inseridos.
+    Insere os registros de `df` na aba `sheet_name`, usando apenas UMA chamada de leitura
+    (via SheetsFetcher) e UMA chamada de escrita (batch_update). Depois redimensiona
+    a aba com base nas dimensões combinadas de dados existentes + novos.
 
     Parâmetros:
-        creds_path (str): Caminho para o arquivo de credenciais.
-        spreadsheet_id (str): ID da planilha.
-        sheet_name (str): Nome da aba de destino.
-        df (pandas.DataFrame): DataFrame contendo os registros a serem inseridos.
+    ----------
+    fetcher : SheetsFetcher
+        Instância pré-autenticada para acessar planilhas. Deve conter `spreadsheet_id`.
+    spreadsheet_id : str
+        ID da planilha (deve coincidir com o usado pelo fetcher).
+    sheet_name : str
+        Nome da aba onde serão inseridos os dados.
+    df : pd.DataFrame
+        DataFrame com os registros a serem inseridos.
+    include_header : bool | None
+        Se True, força incluir cabeçalho do DataFrame. Se False, nunca inclui. Se None (padrão),
+        inclui header apenas se a aba estiver vazia (sem linhas).
     """
-    # Obtém o cliente autenticado do Google Sheets
-    client = get_google_client(creds_path)
-    sh = client.open_by_key(spreadsheet_id)
-    worksheet = sh.worksheet(sheet_name)
-    
-    # Determina a próxima linha disponível e se deve incluir cabeçalho
-    data = worksheet.get_all_values()
-    if not data:
-        next_row = 1
-        include_header = True
-    else:
-        next_row = len(data) + 1
-        include_header = False
+    # 1) Obtém dados existentes via SheetsFetcher (em memória)
+    try:
+        existing = fetcher.get([sheet_name])[sheet_name]
+    except Exception as e:
+        log.error(f"Falha ao ler aba '{sheet_name}' via SheetsFetcher: {e}")
+        raise
 
-    # Insere o DataFrame na aba, iniciando na coluna B (col=1)
-    set_with_dataframe(worksheet, df, row=next_row, col=1, include_column_header=include_header)
-    
-    # Redimensiona a planilha de acordo com os dados atuais
-    data = worksheet.get_all_values()
-    total_rows = len(data)
-    total_cols = max(len(row) for row in data) if data else 0
-    worksheet.resize(rows=total_rows, cols=total_cols)
-    
-    logging.info(f"Inseridos {df.shape[0]} registros na aba '{sheet_name}' a partir da linha {next_row}.")
-    logging.info(f"Planilha redimensionada para {total_rows} linhas e {total_cols} colunas.")
+    existing_rows = existing.shape[0]
+    existing_cols = existing.shape[1] if existing_rows > 0 else 0
+
+    # 2) Decide se inclui cabeçalho
+    if include_header is None:
+        include_header = existing_rows == 0
+
+    # 3) Calcular a linha inicial (1-based)
+    next_row = existing_rows + 1 if not include_header else 1
+
+    # 4) Inserir DataFrame a partir da coluna B (col=1, index inicia em 1)
+    #    - include_column_header controla inclusão do cabeçalho
+    try:
+        worksheet = fetcher.open_worksheet(sheet_name)
+        set_with_dataframe(
+            worksheet,
+            df,
+            row=next_row,
+            col=1,
+            include_column_header=include_header
+        )
+    except Exception as e:
+        log.error(f"Falha ao escrever dados em '{sheet_name}': {e}")
+        raise
+
+    # 5) Calcular novas dimensões sem ler de novo:
+    new_rows = df.shape[0]
+    new_cols = df.shape[1] + (1 if include_header else 0)  # colunas do df, header não conta como coluna extra
+    total_rows = existing_rows + new_rows + (1 if include_header and existing_rows == 0 else 0)
+    total_cols = max(existing_cols, new_cols)
+
+    # 6) Ajustar tamanho da planilha
+    try:
+        worksheet.resize(rows=total_rows, cols=total_cols)
+        log.info(
+            f"Inseridos {new_rows} registros em '{sheet_name}' a partir da linha {next_row}. "
+            f"Planilha redimensionada para {total_rows} linhas e {total_cols} colunas."
+        )
+    except Exception as e:
+        log.error(f"Falha ao redimensionar '{sheet_name}': {e}")
+        raise

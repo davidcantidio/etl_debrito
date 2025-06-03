@@ -1,5 +1,5 @@
 # campanha_mapper.py
-from utils.normalize import normalize_campaign_name
+from treat.utils.normalize import normalize_campaign_name
 
 def buscar_mapping(mapping, valor):
     """

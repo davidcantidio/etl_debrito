@@ -4,8 +4,8 @@ from typing import Any, Dict, List, Optional, Tuple, Sequence
 import pandas as pd
 from gspread.utils import rowcol_to_a1
 
-from utils.get_google_client import get_google_client
-from utils.normalize import normalize_columns
+from treat.utils.get_google_client import get_google_client
+from treat.utils.normalize import normalize_columns
 
 log = logging.getLogger(__name__)
 

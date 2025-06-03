@@ -1,15 +1,15 @@
 from extract.sheets_fetcher import SheetsFetcher
-from utils.get_missing_records import get_missing_records
-from utils.numeracao import gerar_numeracao
+from treat.utils.get_missing_records import get_missing_records
+from treat.utils.numeracao import gerar_numeracao
 from treat.utils.organizar_dataframe import (
     remover_colunas_indesejadas,
     reordenar_colunas_para_modelo,
 )
 from treat.utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER
-from utils.append_records_to_sheet import append_records_to_sheet
+from treat.utils.append_records_to_sheet import append_records_to_sheet
 import pandas as pd
 import logging
-from utils.campos_calculados import gerar_id
+from treat.utils.campos_calculados import gerar_id
 
 log = logging.getLogger(__name__)
 

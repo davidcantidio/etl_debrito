@@ -1,50 +1,48 @@
-import logging
+# treat/utils/substitute_origin_values.py
+
+"""
+Aplica substituições (utm_content, campaign_name, …) em memória
+e, opcionalmente, grava as diferenças usando a worksheet já aberta
+pelo pipeline.  Nenhuma nova autenticação é feita aqui.
+"""
+
+from __future__ import annotations
 import itertools
-from typing import Mapping, Iterable, Optional, List, Dict
+import logging
+from typing import Iterable, List, Dict, Mapping, Optional
 
 import pandas as pd
 from gspread.utils import rowcol_to_a1
 from gspread import Worksheet
 
-from utils.substitutions_lists import (
+from treat.utils.substitutions_lists import (          # listas continuam no projeto
     ID_CONTENT_REPLACEMENTS,
     CAMPAIGN_NAME_REPLACEMENTS,
     AD_GROUP_NAME_REPLACEMENTS,
-    AD_NAME_REPLACEMENTS
+    AD_NAME_REPLACEMENTS,
 )
-from utils.get_google_client import get_google_client
-from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 
-__all__ = [
-    "apply_all_origin_substitutions",
-]
+__all__ = ["apply_all_origin_substitutions"]
 
 # ---------------------------------------------------------------------------
-# Configurações
-# ---------------------------------------------------------------------------
-
 _REPLACEMENT_SPECS: list[tuple[str, Mapping[str, str]]] = [
     ("utm_content", ID_CONTENT_REPLACEMENTS),
     ("campaign_name", CAMPAIGN_NAME_REPLACEMENTS),
     ("ad_group_name", AD_GROUP_NAME_REPLACEMENTS),
-    ("ad_name", AD_NAME_REPLACEMENTS)
+    ("ad_name", AD_NAME_REPLACEMENTS),
 ]
 
-# Segurança contra payloads enormes; 10k células ≅ 5 MiB.
-_MAX_CELLS_PER_BATCH = 10_000
-
-# ---------------------------------------------------------------------------
-# Helpers internos (mantidos privados deliberadamente)
+_MAX_CELLS_PER_BATCH = 10_000           # segurança – 10 k células ≅ 5 MiB
 # ---------------------------------------------------------------------------
 
 
 def _normalize_series(s: pd.Series) -> pd.Series:
-    """Normaliza *strings* – strip + lower. Preserva NaN como string vazia."""
+    """strip + lower; preserva NaN como string vazia."""
     return s.fillna("").astype(str).str.strip().str.lower()
 
 
 def _chunk(it: Iterable, n: int):
-    """Yield blocos de tamanho *n* sem levantar StopIteration externamente."""
+    """Yield blocos de tamanho n."""
     it = iter(it)
     while True:
         block = list(itertools.islice(it, n))
@@ -60,104 +58,83 @@ def _chunk(it: Iterable, n: int):
 
 def apply_all_origin_substitutions(
     df: pd.DataFrame,
-    sheet_name: Optional[str] = None,
     *,
     worksheet: Worksheet | None = None,
     write_back: bool = True,
     inplace: bool = True,
 ) -> pd.DataFrame:
-    """Substitui valores *in‑place* nas colunas de origem e, opcionalmente,
-    grava as mudanças na planilha Google.
-
-    A lógica é idêntica à versão original, porém:
-    • Header do Sheets é normalizado para *lower* → robusto a capitalização.
-    • Menos conversões redundantes (normaliza série **uma** vez).
-    • Evita re‑normalizar amostras de log.
-    • Usa list‑comprehension mais enxuta para construir *updates*.
-    • Mantém compatibilidade 100 % com a API e com os parâmetros da função.
     """
+    Aplica substituições nas colunas de origem.
 
+    Parâmetros
+    ----------
+    df         : DataFrame de origem.
+    worksheet  : Worksheet já aberta pelo pipeline (obrigatório se write_back=True).
+    write_back : Se True, atualiza apenas as células modificadas.
+    inplace    : Se False, opera sobre uma cópia de *df*.
+
+    Retorna
+    -------
+    DataFrame resultante (cópia ou referência, conforme *inplace*).
+    """
     log = logging.getLogger(__name__)
+
+    if write_back and worksheet is None:
+        raise ValueError("`worksheet` deve ser fornecido se write_back=True.")
 
     if not inplace:
         df = df.copy()
 
-    # --- prepara worksheet / cabeçalho ------------------------------------ #
+    header_lc: List[str] = []
     if write_back:
-        if worksheet is None:
-            if not sheet_name:
-                raise ValueError("sheet_name é obrigatório se write_back=True e worksheet=None.")
-            client = get_google_client(CREDS_PATH)
-            worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
-        header_sheet: list[str] = worksheet.row_values(1)
-        header_sheet_lc: list[str] = [h.strip().lower() for h in header_sheet]
+        header_lc = [h.strip().lower() for h in worksheet.row_values(1)]
 
-    # Mantemos um index consistente para mapear linhas → A1.
+    # Mantém index estável → mapeia linha → célula
     df.reset_index(drop=True, inplace=True)
 
-    # --- loop pelas colunas alvo ----------------------------------------- #
-    updates: list[Dict[str, object]] = []
+    updates: List[Dict[str, object]] = []
 
     for col_name, mapping in _REPLACEMENT_SPECS:
-        if col_name not in df.columns:
-            log.debug("[subst] coluna ausente: %s", col_name)
-            continue
-        if not mapping:
-            log.debug("[subst] mapping vazio para %s", col_name)
+        if col_name not in df.columns or not mapping:
             continue
 
-        # Normaliza apenas UMA vez
-        # normalizando as chaves do dicionário
-        mapping = {
-            k.strip().lower(): v
-            for k, v in mapping.items()
-        }
+        # normaliza dicionário
+        mapping_norm = {k.strip().lower(): v for k, v in mapping.items()}
 
         s_norm = _normalize_series(df[col_name])
-        mask = s_norm.isin(mapping)  # bool Series
+        mask = s_norm.isin(mapping_norm)
         n_changes = int(mask.sum())
         if n_changes == 0:
-            log.debug("[subst] nenhuma ocorrência em %s", col_name)
             continue
 
-        # Logging de amostra (não re‑normaliza)
+        # log de amostra
         sample_before = df.loc[mask, col_name].head(3).to_list()
-        sample_after = [mapping[_normalize_series(pd.Series([v]))[0]] for v in sample_before]
-        log.debug(
-            "[subst] %d alterações em '%s'. Ex.: %s → %s",
-            n_changes,
-            col_name,
-            sample_before,
-            sample_after,
-        )
+        sample_after = [mapping_norm[_normalize_series(pd.Series([v]))[0]] for v in sample_before]
+        log.debug("[%s] %d alterações. Ex.: %s → %s", col_name, n_changes, sample_before, sample_after)
 
-        # Aplica substituição usando Series.map
-        df.loc[mask, col_name] = s_norm[mask].map(mapping)
+        # aplica no DataFrame
+        df.loc[mask, col_name] = s_norm[mask].map(mapping_norm)
 
-        # --- write‑back --------------------------------------------------- #
+        # prepara updates
         if write_back:
-            col_lookup = col_name.strip().lower()
             try:
-                col_idx_1based = header_sheet_lc.index(col_lookup) + 1
+                col_idx = header_lc.index(col_name.lower()) + 1
             except ValueError:
-                log.warning("[subst] '%s' não encontrado no header da planilha – skip write‑back", col_name)
+                log.warning("[subst] coluna '%s' não existe no header – skip write-back", col_name)
                 continue
 
             updates.extend(
                 {
-                    "range": rowcol_to_a1(row_i + 2, col_idx_1based),
+                    "range": rowcol_to_a1(row_i + 2, col_idx),
                     "values": [[df.at[row_i, col_name]]],
                 }
                 for row_i in df.index[mask]
             )
-            log.info("[subst] %d células preparadas para gravação em '%s'", n_changes, col_name)
 
-    # --- envia batch updates --------------------------------------------- #
+    # envia batch
     if write_back and updates:
         for block in _chunk(updates, _MAX_CELLS_PER_BATCH):
             worksheet.batch_update(block, value_input_option="RAW")
-        log.info("[subst] gravação concluída – total de %d células", len(updates))
-    elif write_back:
-        log.info("[subst] nenhuma célula a gravar – nada foi alterado")
+        log.info("[subst] %d células gravadas em '%s'", len(updates), worksheet.title)
 
     return df
