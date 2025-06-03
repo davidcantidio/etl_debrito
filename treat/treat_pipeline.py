@@ -29,6 +29,7 @@ from gspread import Worksheet
 
 from extract.sheets_fetcher import SheetsFetcher
 from load.origin_writer import write_back_origin
+from treat.utils.sheets_cache import get_worksheet
 from treat.utils.datas import (
     converter_data,
     fill_missing_start_end_from_params,
@@ -95,7 +96,7 @@ class TreatPipeline:
 
         # Worksheet de origem (apenas se vamos fazer write-back)
         self.worksheet_origem: Optional[Worksheet] = (
-            self.fetcher.open_worksheet(sheet_name) if write_back else None
+            get_worksheet(creds_path, spreadsheet_id, sheet_name) if write_back else None
         )
 
         # Cache interno para “abas irmãs” (ex.: pinterestGeral)
@@ -138,15 +139,15 @@ class TreatPipeline:
             df_orig_to_write = df[orig_cols]
             validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
 
-            # Note: write_back_origin não aceita 'worksheet'; usamos assinatura antiga
+            # Usa write_back_origin passando o Worksheet já obtido
             write_back_origin(
                 df_raw=df_raw,
                 df_ok=df_orig_to_write,
                 creds_path=self.creds_path,
                 spreadsheet_id=self.spreadsheet_id,
-                sheet_name=self.sheet_name,
                 write_back=self.write_back,
                 dry_run=False,
+                worksheet=self.worksheet_origem,
             )
 
             df_geral = get_sibling_sheet("pinterestGeral", self.fetcher, self._sibling_cache)
@@ -157,7 +158,7 @@ class TreatPipeline:
         validate_utm_content_in_bi(df, df_bi)
         self._last_taxo_report = validate_taxonomy_consistency(df, df_bi)
 
-        # 5) Enriquecimento BI + ‘objective’
+        # 5) Enriquecimento BI + 'objective'
         df = enrich_with_bi_parametrizacao(
             df, self.creds_path, self.spreadsheet_id, sheet_name=self.sheet_name
         )
@@ -171,8 +172,13 @@ class TreatPipeline:
         # 7) Preenche start/end em memória (sem write-back aqui)
         df = fill_missing_start_end_from_params(df, lookup=self.bi_lookup, inplace=False)
 
-        # 8) Atribuição de ‘Veiculo’ + ‘ID_Veiculo’
-        df = assign_vehicle_and_id(df, self.sheet_name, self.fetcher, self.bi_lookup)
+        # 8) Atribuição de 'Veiculo' + 'ID_Veiculo'
+        df = assign_vehicle_and_id(
+            df,
+            sheet_name=self.sheet_name,
+            fetcher=self.fetcher,
+            bi_lookup=self.bi_lookup,
+        )
 
         # 9) Transformações específicas de cada plataforma
         df = dispatch(self.sheet_name)(df, lookup=self.bi_lookup)
@@ -197,7 +203,6 @@ class TreatPipeline:
         df_orig_to_write = df[orig_cols]
         validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
 
-        # Usamos aqui a assinatura clássica de write_back_origin (sem `worksheet`)
         write_back_origin(
             df_raw=df_raw,
             df_ok=df_orig_to_write,

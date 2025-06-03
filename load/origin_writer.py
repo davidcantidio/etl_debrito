@@ -1,98 +1,131 @@
-from __future__ import annotations
+# load/origin_writer.py
 
-import datetime
 import logging
 from typing import Optional
-from treat.utils.sheets_cache import get_worksheet
 
 import pandas as pd
+from gspread import Worksheet
 
-from treat.utils.write_back import write_back_df
+from treat.utils.sheets_cache import get_worksheet
+from treat.utils.write_back import write_back_df  # faz o batch_update
 
 log = logging.getLogger(__name__)
 
-def _normalize_scalar(df: pd.DataFrame) -> pd.DataFrame:
-    df_num   = df.select_dtypes("number").fillna(0)
-    df_other = df.select_dtypes(exclude="number").fillna("")
-    df = pd.concat([df_num, df_other], axis=1)[df.columns]  # preserva ordem
-    return df.applymap(lambda v: v.isoformat() if isinstance(v, datetime.date) else v)
 
 def write_back_origin(
     df_raw: pd.DataFrame,
     df_ok: pd.DataFrame,
     creds_path: str,
     spreadsheet_id: str,
-    sheet_name: str,
+    *,
     write_back: bool,
     dry_run: bool = False,
     a1_range: str = "A1",
     value_input_option: str = "RAW",
+    worksheet: Optional[Worksheet] = None,
+    sheet_name: Optional[str] = None,
 ) -> pd.DataFrame:
-    # Sanity-check: df_ok NÃO deve ter colunas novas
+    """
+    Grava correções de `df_ok` de volta na aba de origem, ajustando o tamanho da planilha
+    e escrevendo apenas uma vez via batch_update. Usa `worksheet` fornecido, se houver,
+    para evitar reabrir a conexão. Caso contrário, abre via `sheet_name`.
+
+    Parâmetros
+    ----------
+    df_raw : pd.DataFrame
+        DataFrame original lido da aba.
+    df_ok : pd.DataFrame
+        DataFrame com valores corrigidos (apenas colunas originais de df_raw).
+    creds_path : str
+        Caminho para o JSON de credenciais.
+    spreadsheet_id : str
+        ID da planilha Google.
+    write_back : bool
+        Se False, a função retorna imediatamente sem gravar nada.
+    dry_run : bool, default=False
+        Se True, simula o write-back (faz cálculos mas não chama batch_update).
+    a1_range : str, default="A1"
+        Intervalo inicial onde começa a escrita (por padrão, "A1").
+    value_input_option : str, default="RAW"
+        Opção de input para a API ao escrever (ex.: "RAW" ou "USER_ENTERED").
+    worksheet : Optional[gspread.Worksheet], default=None
+        Se fornecido, usa este objeto Worksheet para resize e batch_update, sem nova
+        chamada à API. Se None, `sheet_name` precisa estar definido e será usado para abrir.
+    sheet_name : Optional[str], default=None
+        Nome da aba de destino (somente usado se `worksheet` for None).
+
+    Retorna
+    -------
+    pd.DataFrame
+        O DataFrame efetivamente gravado (ou df_ok, no caso de dry_run ou write_back=False).
+    """
+
+    # 1) Sanity-check: df_ok não pode ter colunas extras em relação a df_raw
     extras = set(df_ok.columns) - set(df_raw.columns)
     if extras:
         raise ValueError(f"[write_back_origin] Colunas inesperadas: {sorted(extras)}")
 
-    """
-    Grava as correções em `df_ok` de volta na aba de origem,
-    ajustando o tamanho da planilha para não ultrapassar limites.
-
-    Retorna o DataFrame efetivamente gravado (ou apenas `df_ok` se dry_run).
-    """
-    # 1) Se write_back desligado, não grava nada
+    # 2) Se write_back estiver desligado, não grava nada
     if not write_back:
-        log.info("🔸 Write-back de origem desativado para '%s'", sheet_name)
+        log.info("🔸 Write-back de origem desativado")
         return df_ok
 
-    # 2) Prepara DataFrame para gravação
-    #    Assume que df_ok já foi filtrado para conter somente colunas originais
+    # 3) Prepara DataFrame para gravação (apenas colunas originais)
     df_wb = df_ok.copy()
     n_linhas, n_colunas = df_wb.shape
 
-    # 3) Dimensões esperadas (incluindo cabeçalho)
-    desired_rows = n_linhas + 1  # +1 para o cabeçalho
+    # 4) Calcula dimensões desejadas (incluindo cabeçalho)
+    desired_rows = n_linhas + 1  # +1 para a linha de cabeçalho
     desired_cols = n_colunas
 
-    # 4) Recupera a worksheet via cache
-    ws = get_worksheet(creds_path, spreadsheet_id, sheet_name)
+    # 5) Obtém o Worksheet (se não foi fornecido)
+    if worksheet is None:
+        if sheet_name is None:
+            raise ValueError("Quando `worksheet=None`, `sheet_name` deve ser fornecido.")
+        ws = get_worksheet(creds_path, spreadsheet_id, sheet_name)
+        actual_sheet_name = sheet_name
+    else:
+        ws = worksheet
+        actual_sheet_name = worksheet.title
 
-    # ——— Redimensionamento seguro da aba ———
+    # 6) Redimensionamento seguro:
     frozen = ws._properties.get("gridProperties", {}).get("frozenRowCount", 0)
     min_rows = max(frozen + 1, 2)
-
-    # calcula tamanho necessário (inclui cabeçalho)
     desired_rows = max(desired_rows, min_rows)
 
     if ws.row_count != desired_rows or ws.col_count != desired_cols:
         ws.resize(rows=desired_rows, cols=desired_cols)
-    # ————————————————————————————————
 
-    # ————————————————————————————————
-
-    # 5) Log de instrumentação: quantas linhas e colunas serão escritas
+    # 7) Logging de instrumentação
     total_cells = desired_rows * desired_cols
     log.info(
         "ℹ️  Preparando write-back origin para '%s': %d linhas × %d colunas (com cabeçalho) = %s células",
-        sheet_name,
+        actual_sheet_name,
         n_linhas,
         n_colunas,
         f"{total_cells:,}",
     )
 
-    # 6) Se dry_run, não grava de fato
+    # 8) Se dry_run, não grava de fato
     if dry_run:
-        log.info("🔸 Dry-run ativo: não gravando '%s'", sheet_name)
+        log.info("🔸 Dry-run ativo: não gravando '%s'", actual_sheet_name)
         return df_wb
 
-    # 7) Grava em batches (chunked dentro de write_back_df)
+    # 9) Grava em batch usando write_back_df
+    #    `write_back_df` ainda precisa receber o sheet_name (a string)
     write_back_df(
         df=df_wb,
         creds_path=creds_path,
         spreadsheet_id=spreadsheet_id,
-        sheet_name=sheet_name,
+        sheet_name=actual_sheet_name,
         a1_range=a1_range,
         value_input_option=value_input_option,
     )
-    log.info("✅ Write-back concluído para '%s' (%d linhas × %d colunas)", sheet_name, n_linhas, n_colunas)
+    log.info(
+        "✅ Write-back concluído para '%s' (%d linhas × %d colunas)",
+        actual_sheet_name,
+        n_linhas,
+        n_colunas,
+    )
 
     return df_wb

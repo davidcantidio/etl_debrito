@@ -1,31 +1,39 @@
-# File: load/dest_writer.py
-"""Write‑back otimizado para as abas **modelo\***
+# load/dest_writer.py
+
+"""
+Write-back otimizado para as abas **modelo***
 
 Principais características
 -------------------------
-* **01 leitura**: cabeçalho (linha 1) e coluna **ID** das 5 abas‑modelo são
-  obtidos de uma só vez via *batchGet* – não estoura a quota de leitura.
-* **Zero leituras extras** durante o loop de ETL; somente gravação.
-* **Deduplicação**: grava apenas registros cujo ``ID`` ainda não existe.
-* Compatível com *dry‑run* para testes e com execução em paralelo.
+* 01 leitura para cabeçalhos e IDs: usamos SheetsFetcher para recuperar todas
+  as abas-modelo de uma só vez (batchGet), poupando quota.
+* Zero leituras extras durante o loop de ETL; somente gravação (via write_back_df ou append).
+* Deduplicação: grava apenas registros cujo "ID" ainda não existe.
+* Compatível com dry-run e com execução em paralelo.
 """
-from __future__ import annotations
 
 import datetime as _dt
 import logging
 import re
 from typing import Dict, List, Optional, Set
-from treat.utils.validations import validate_columns
+
 import numpy as np
 import pandas as pd
-from googleapiclient.discovery import build
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
+from extract.sheets_fetcher import SheetsFetcher
 from treat.utils.write_back import write_back_df
+from load.utils.append_records_to_sheet import append_records_to_sheet
+from treat.utils.validations import validate_columns
 
 log = logging.getLogger(__name__)
 
-# ───────────────────────────── mapeamento origem → destino ──────────────────
+# ───────────────────────────── mapeamento origem → destino ──────────────────
 DESTINATION_SHEETS: Dict[str, str] = {
     "geral":   "modeloGeral",
     "genero":  "modeloGenero",
@@ -35,93 +43,82 @@ DESTINATION_SHEETS: Dict[str, str] = {
 }
 
 # ───────────────────────────── caches globais em memória ────────────────────
-_HEADERS: Dict[str, List[str]] = {}        # aba‑destino → header completo
-_EXISTING_IDS: Dict[str, Set[str]] = {}    # aba‑destino → set(ID)
-
-# ───────────────────────────── helpers de API & Excel col ───────────────────
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+_HEADERS: Dict[str, List[str]] = {}        # aba-destino → header completo
+_EXISTING_IDS: Dict[str, Set[str]] = {}    # aba-destino → set(ID)
 
 
 def _idx_to_col(idx: int) -> str:
-    """Converte índice 0‑based em letra(s) de coluna estilo A1 (A, B, … AA…)."""
+    """Converte índice 0-based em letras de coluna estilo A1 (A, B, …, AA…)."""
     out = ""
     while True:
         idx, rem = divmod(idx, 26)
         out = chr(65 + rem) + out
         if idx == 0:
             return out
-        idx -= 1  # Excel é *quase* base‑26 (A=1)
+        idx -= 1
 
 
-@retry(
-    retry=retry_if_exception_type(Exception),
-    stop=stop_after_attempt(6),
-    wait=wait_exponential(multiplier=1, min=1, max=32),
-    reraise=True,
-)
-def _build_service(creds_path: str):
-    """Instancia Google Sheets API (somente leitura) com retry/back‑off."""
-    import google.oauth2.service_account as sa
+def prefetch_meta(
+    fetcher: SheetsFetcher,
+    spreadsheet_id: str
+) -> None:
+    """
+    Carrega cabeçalhos (linha 1) e IDs (coluna 'ID' a partir da linha 2)
+    de todas as abas-modelo (modeloGeral, modeloGenero, etc.) em UMA ÚNICA
+    operação, poupando leitura repetida da API.
 
-    creds = sa.Credentials.from_service_account_file(creds_path, scopes=SCOPES)
-    return build("sheets", "v4", credentials=creds, cache_discovery=False)
-
-
-# ───────────────────────── pre‑fetch: header + coluna ID ─────────────────────
-
-def prefetch_meta(creds_path: str, spreadsheet_id: str) -> None:
-    """Carrega cabeçalhos e IDs das abas‑modelo (executar **uma** vez por run)."""
+    Depois disso, os caches globais _HEADERS e _EXISTING_IDS estão prontos
+    para uso em write_back_destination, sem novas leituras.
+    """
     global _HEADERS, _EXISTING_IDS
-    if _HEADERS:  # já executado nesta sessão
+    if _HEADERS:
+        # já realizou prefetch nesta sessão
         return
 
-    service = _build_service(creds_path)
+    abas = list(DESTINATION_SHEETS.values())
 
-    # 1) header da linha 1
-    hdr_ranges = [f"{tab}!1:1" for tab in DESTINATION_SHEETS.values()]
-    resp_hdr = (
-        service.spreadsheets()
-        .values()
-        .batchGet(spreadsheetId=spreadsheet_id, ranges=hdr_ranges)
-        .execute()
-    )
+    # 1) Buscar todas as linhas de cada aba no fetcher (cada aba → Lista[List[str]])
+    raw_data = fetcher.get(abas, as_frame=False)
 
-    id_ranges: List[str | None] = []
-    for vr in resp_hdr["valueRanges"]:
-        tab = vr["range"].split("!", 1)[0]
-        header = [c.strip() for c in vr.get("values", [[]])[0] if c.strip()]
+    # 2) Extrair cabeçalhos (linha 0 de cada aba) e armazenar em _HEADERS
+    for tab, values in raw_data.items():
+        primeira_linha = values[0] if values else []
+        header = [c.strip() for c in primeira_linha if c.strip()]
         _HEADERS[tab] = header
 
+    # 3) Identificar intervalos de ID para cada aba-modelo
+    id_ranges: List[Optional[str]] = []
+    for tab in abas:
+        header = _HEADERS.get(tab, [])
         try:
             idx_id = [h.lower() for h in header].index("id")
             col_a1 = _idx_to_col(idx_id)
+            # range a partir da linha 2 (sem cabeçalho)
             id_ranges.append(f"{tab}!{col_a1}2:{col_a1}")
-        except ValueError:  # não há coluna ID
+        except ValueError:
             _EXISTING_IDS[tab] = set()
             id_ranges.append(None)
 
-    # 2) coluna ID (apenas onde existe)
-    valid = [r for r in id_ranges if r]
-    if valid:
-        resp_id = (
-            service.spreadsheets()
-            .values()
-            .batchGet(spreadsheetId=spreadsheet_id, ranges=valid)
-            .execute()
-        )
-        it = iter(resp_id["valueRanges"])
-        for tab, rng in zip(DESTINATION_SHEETS.values(), id_ranges):
-            if rng is None:
-                continue
-            vr = next(it)
-            ids = [v for sub in vr.get("values", []) for v in sub if v.strip()]
+    # 4) Ler todas as colunas 'ID' de uma vez (quando existirem)
+    valid_tabs = []
+    for tab, rng in zip(abas, id_ranges):
+        if rng:
+            valid_tabs.append(tab)
+
+    if valid_tabs:
+        raw_ids = fetcher.get(valid_tabs, as_frame=False)
+        for tab in valid_tabs:
+            listas = raw_ids.get(tab, [])
+            # cada linha em listas corresponde a uma célula ID
+            ids = [item for row in listas for item in row if str(item).strip()]
             _EXISTING_IDS[tab] = set(ids)
 
-    log.info("📥 Prefetch destino concluído – headers=%d, IDs=%d",
-             len(_HEADERS), sum(len(s) for s in _EXISTING_IDS.values()))
+    log.info(
+        "📥 Prefetch destino concluído: %d abas com cabeçalho, total de IDs carregados=%d",
+        len(_HEADERS),
+        sum(len(s) for s in _EXISTING_IDS.values()),
+    )
 
-
-# ─────────────────────────────── util: scalarização ─────────────────────────
 
 def _scalar(v):
     if isinstance(v, _dt.date):
@@ -131,19 +128,16 @@ def _scalar(v):
     return v
 
 
-# ───────────────────────────── API de gravação pública ──────────────────────
-
 def _infer_data_type(sheet_name: str) -> str:
-    """Dado o nome da aba-origem, devolve o “tipo” de dados destino.
-
-    *Ignora* abas de Google Analytics (começam por ``ga``).
+    """
+    Dado nome de aba de origem (exemplo: 'metaGenero', 'tiktokIdade'), devolve
+    o sufixo que mapeia para a aba-modelo correspondente. Ex.: 'genero', 'idade'.
     """
     lower = sheet_name.lower()
-    if lower.startswith("ga"):            # ←  GA nunca vai para modelo*
+    if lower.startswith("ga"):
         raise ValueError(
             f"Aba '{sheet_name}' é do Google Analytics – não grava em abas-modelo."
         )
-
     m = re.search(r"(geral|genero|idade|alcance|regiao)$", lower)
     if not m:
         raise ValueError(
@@ -164,7 +158,12 @@ def write_back_destination(
     a1_range: str = "A1",
     value_input_option: str = "USER_ENTERED",
 ) -> Optional[pd.DataFrame]:
-    """Grava `df_model` na aba-modelo correspondente, deduplicando por `ID`."""
+    """
+    Grava `df_model` na aba-modelo correspondente, deduplicando por 'ID'.
+
+    Pré-requisito: `prefetch_meta(fetcher, spreadsheet_id)` já deve ter sido
+    invocado antes, para que _HEADERS e _EXISTING_IDS estejam preenchidos.
+    """
     if df_model.empty:
         log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
         return None
@@ -175,44 +174,54 @@ def write_back_destination(
 
     header = _HEADERS[sheet_name]
 
-    # 1) Reindexa para o layout final de colunas do modelo
+    # 1) Reindexa para o layout exato de colunas-modelo
     df_out = (
         df_model
         .reindex(columns=header, fill_value="")
         .applymap(_scalar)
     )
 
-    # 2) Validação de esquema APÓS reindexação (evita erro antes das colunas existirem)
+    # 2) Validação de esquema pós-reindexação
     validate_columns(df_out, header, stage=f"Destino {sheet_name}")
 
-    # Deduplicação por ID, se presente
+    # 3) Deduplicação por ID
     if "ID" in df_out.columns:
         existing = _EXISTING_IDS.get(sheet_name, set())
         df_out = df_out.loc[~df_out["ID"].isin(existing)]
 
     if df_out.empty:
-        log.info("Destino '%s': nenhuma linha nova para gravar", sheet_name)
+        log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
         return None
 
+    # 4) Se dry_run ou write_back=False, apenas logar e retornar
     if dry_run or not write_back:
-        log.info("[Dry-run] %d linha(s) seriam gravadas em '%s'", len(df_out), sheet_name)
+        log.info("[Dry-run] %d linhas seriam gravadas em '%s'", len(df_out), sheet_name)
         return df_out
 
-    # Grava efetivamente
-    write_back_df(
-        df=df_out,
-        creds_path=creds_path,
-        spreadsheet_id=spreadsheet_id,
-        sheet_name=sheet_name,
-        a1_range=a1_range,
-        value_input_option=value_input_option,
-    )
-    log.info("✅ Gravadas %d linha(s) em '%s'", len(df_out), sheet_name)
+    # 5) Gravação: APPEND em vez de overwrite
+    #    Usamos append_records_to_sheet, que faz append a partir da primeira linha vazia.
+    #    Caso append_records_to_sheet não retorne contagem, assumimos len(df_out).
+    try:
+        linhas_inseridas = append_records_to_sheet(
+            creds_path      = creds_path,
+            spreadsheet_id  = spreadsheet_id,
+            sheet_name      = sheet_name,
+            df              = df_out,
+        )
+        if linhas_inseridas is None:
+            linhas_inseridas = len(df_out)
+    except Exception as e:
+        log.error("Erro ao gravar em '%s' via append: %s", sheet_name, e)
+        raise
 
+    log.info("✅ Gravadas %d linha(s) em '%s'", linhas_inseridas, sheet_name)
+
+    # 6) Atualiza cache de IDs para futuras deduplicações
     if "ID" in df_out.columns:
-        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].tolist())
+        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].astype(str).tolist())
 
     return df_out
+
 
 def write_back_for_sheet(
     df_model: pd.DataFrame,
@@ -223,12 +232,16 @@ def write_back_for_sheet(
     write_back: bool = True,
     dry_run: bool = False,
 ) -> Optional[pd.DataFrame]:
-    """Wrapper: infere `data_type` a partir do nome da aba de origem."""
+    """
+    Wrapper: infere `data_type` a partir do nome da aba de origem
+    e chama write_back_destination.
+    """
+    data_type = _infer_data_type(sheet_name)
     return write_back_destination(
-        df_model       = df_model,
-        data_type      = _infer_data_type(sheet_name),
-        creds_path     = creds_path,
-        spreadsheet_id = spreadsheet_id,
-        write_back     = write_back,
-        dry_run        = dry_run,
+        df_model=df_model,
+        data_type=data_type,
+        creds_path=creds_path,
+        spreadsheet_id=spreadsheet_id,
+        write_back=write_back,
+        dry_run=dry_run,
     )
