@@ -9,7 +9,6 @@ import pandas as pd
 
 from treat.utils.write_back import write_back_df
 
-
 log = logging.getLogger(__name__)
 
 def _normalize_scalar(df: pd.DataFrame) -> pd.DataFrame:
@@ -17,7 +16,6 @@ def _normalize_scalar(df: pd.DataFrame) -> pd.DataFrame:
     df_other = df.select_dtypes(exclude="number").fillna("")
     df = pd.concat([df_num, df_other], axis=1)[df.columns]  # preserva ordem
     return df.applymap(lambda v: v.isoformat() if isinstance(v, datetime.date) else v)
-
 
 def write_back_origin(
     df_raw: pd.DataFrame,
@@ -30,6 +28,11 @@ def write_back_origin(
     a1_range: str = "A1",
     value_input_option: str = "RAW",
 ) -> pd.DataFrame:
+    # Sanity-check: df_ok NÃO deve ter colunas novas
+    extras = set(df_ok.columns) - set(df_raw.columns)
+    if extras:
+        raise ValueError(f"[write_back_origin] Colunas inesperadas: {sorted(extras)}")
+
     """
     Grava as correções em `df_ok` de volta na aba de origem,
     ajustando o tamanho da planilha para não ultrapassar limites.
@@ -42,44 +45,46 @@ def write_back_origin(
         return df_ok
 
     # 2) Prepara DataFrame para gravação
+    #    Assume que df_ok já foi filtrado para conter somente colunas originais
     df_wb = df_ok.copy()
-    desired_rows = len(df_wb) + 1  # +1 para o cabeçalho
-    desired_cols = len(df_wb.columns)
+    n_linhas, n_colunas = df_wb.shape
 
-    # 3) Recupera a worksheet via cache
+    # 3) Dimensões esperadas (incluindo cabeçalho)
+    desired_rows = n_linhas + 1  # +1 para o cabeçalho
+    desired_cols = n_colunas
+
+    # 4) Recupera a worksheet via cache
     ws = get_worksheet(creds_path, spreadsheet_id, sheet_name)
 
     # ——— Redimensionamento seguro da aba ———
-    # Não podemos deixar só as linhas congeladas; garantimos ao menos 1 linha não-congelada
     frozen = ws._properties.get("gridProperties", {}).get("frozenRowCount", 0)
     min_rows = max(frozen + 1, 2)
 
-    # 3.1) Encolhe para liberar células extras (se houver muitas linhas)
-    if ws.row_count > min_rows or ws.col_count < desired_cols:
-        ws.resize(rows=min_rows, cols=desired_cols)
+    # calcula tamanho necessário (inclui cabeçalho)
+    desired_rows = max(desired_rows, min_rows)
 
-    # 3.2) Expande até o tamanho exato necessário
-    if ws.row_count != desired_rows or ws.col_count < desired_cols:
+    if ws.row_count != desired_rows or ws.col_count != desired_cols:
         ws.resize(rows=desired_rows, cols=desired_cols)
     # ————————————————————————————————
 
-    # 4) Log de instrumentação
+    # ————————————————————————————————
+
+    # 5) Log de instrumentação: quantas linhas e colunas serão escritas
     total_cells = desired_rows * desired_cols
     log.info(
-        "ℹ️  Preparando write-back origin para '%s': %s dados + cabeçalho → %s linhas × %s colunas = %s células",
+        "ℹ️  Preparando write-back origin para '%s': %d linhas × %d colunas (com cabeçalho) = %s células",
         sheet_name,
-        len(df_wb),
-        desired_rows,
-        desired_cols,
+        n_linhas,
+        n_colunas,
         f"{total_cells:,}",
     )
 
-    # 5) Se dry_run, não grava de fato
+    # 6) Se dry_run, não grava de fato
     if dry_run:
         log.info("🔸 Dry-run ativo: não gravando '%s'", sheet_name)
         return df_wb
 
-    # 6) Grava em batches (chunked dentro de write_back_df)
+    # 7) Grava em batches (chunked dentro de write_back_df)
     write_back_df(
         df=df_wb,
         creds_path=creds_path,
@@ -88,6 +93,6 @@ def write_back_origin(
         a1_range=a1_range,
         value_input_option=value_input_option,
     )
-    log.info("✅ Write-back concluído para '%s'", sheet_name)
+    log.info("✅ Write-back concluído para '%s' (%d linhas × %d colunas)", sheet_name, n_linhas, n_colunas)
 
     return df_wb

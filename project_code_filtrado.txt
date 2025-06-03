@@ -392,7 +392,7 @@ import datetime as _dt
 import logging
 import re
 from typing import Dict, List, Optional, Set
-
+from treat.utils.validations import validate_columns
 import numpy as np
 import pandas as pd
 from googleapiclient.discovery import build
@@ -541,7 +541,7 @@ def write_back_destination(
     a1_range: str = "A1",
     value_input_option: str = "USER_ENTERED",
 ) -> Optional[pd.DataFrame]:
-    """Grava `df_model` na aba‑modelo correspondente, deduplicando por ``ID``."""
+    """Grava `df_model` na aba-modelo correspondente, deduplicando por `ID`."""
     if df_model.empty:
         log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
         return None
@@ -551,13 +551,18 @@ def write_back_destination(
         raise RuntimeError("Caches destino não carregados – chame prefetch_meta() antes.")
 
     header = _HEADERS[sheet_name]
+
+    # 1) Reindexa para o layout final de colunas do modelo
     df_out = (
         df_model
         .reindex(columns=header, fill_value="")
         .applymap(_scalar)
     )
 
-    # deduplicação por ID, se presente
+    # 2) Validação de esquema APÓS reindexação (evita erro antes das colunas existirem)
+    validate_columns(df_out, header, stage=f"Destino {sheet_name}")
+
+    # Deduplicação por ID, se presente
     if "ID" in df_out.columns:
         existing = _EXISTING_IDS.get(sheet_name, set())
         df_out = df_out.loc[~df_out["ID"].isin(existing)]
@@ -567,10 +572,10 @@ def write_back_destination(
         return None
 
     if dry_run or not write_back:
-        log.info("[Dry‑run] %d linha(s) seriam gravadas em '%s'", len(df_out), sheet_name)
+        log.info("[Dry-run] %d linha(s) seriam gravadas em '%s'", len(df_out), sheet_name)
         return df_out
 
-    # grava efetivamente
+    # Grava efetivamente
     write_back_df(
         df=df_out,
         creds_path=creds_path,
@@ -585,7 +590,6 @@ def write_back_destination(
         _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].tolist())
 
     return df_out
-
 
 def write_back_for_sheet(
     df_model: pd.DataFrame,
@@ -753,7 +757,6 @@ import pandas as pd
 
 from treat.utils.write_back import write_back_df
 
-
 log = logging.getLogger(__name__)
 
 def _normalize_scalar(df: pd.DataFrame) -> pd.DataFrame:
@@ -761,7 +764,6 @@ def _normalize_scalar(df: pd.DataFrame) -> pd.DataFrame:
     df_other = df.select_dtypes(exclude="number").fillna("")
     df = pd.concat([df_num, df_other], axis=1)[df.columns]  # preserva ordem
     return df.applymap(lambda v: v.isoformat() if isinstance(v, datetime.date) else v)
-
 
 def write_back_origin(
     df_raw: pd.DataFrame,
@@ -774,6 +776,11 @@ def write_back_origin(
     a1_range: str = "A1",
     value_input_option: str = "RAW",
 ) -> pd.DataFrame:
+    # Sanity-check: df_ok NÃO deve ter colunas novas
+    extras = set(df_ok.columns) - set(df_raw.columns)
+    if extras:
+        raise ValueError(f"[write_back_origin] Colunas inesperadas: {sorted(extras)}")
+
     """
     Grava as correções em `df_ok` de volta na aba de origem,
     ajustando o tamanho da planilha para não ultrapassar limites.
@@ -786,44 +793,46 @@ def write_back_origin(
         return df_ok
 
     # 2) Prepara DataFrame para gravação
+    #    Assume que df_ok já foi filtrado para conter somente colunas originais
     df_wb = df_ok.copy()
-    desired_rows = len(df_wb) + 1  # +1 para o cabeçalho
-    desired_cols = len(df_wb.columns)
+    n_linhas, n_colunas = df_wb.shape
 
-    # 3) Recupera a worksheet via cache
+    # 3) Dimensões esperadas (incluindo cabeçalho)
+    desired_rows = n_linhas + 1  # +1 para o cabeçalho
+    desired_cols = n_colunas
+
+    # 4) Recupera a worksheet via cache
     ws = get_worksheet(creds_path, spreadsheet_id, sheet_name)
 
     # ——— Redimensionamento seguro da aba ———
-    # Não podemos deixar só as linhas congeladas; garantimos ao menos 1 linha não-congelada
     frozen = ws._properties.get("gridProperties", {}).get("frozenRowCount", 0)
     min_rows = max(frozen + 1, 2)
 
-    # 3.1) Encolhe para liberar células extras (se houver muitas linhas)
-    if ws.row_count > min_rows or ws.col_count < desired_cols:
-        ws.resize(rows=min_rows, cols=desired_cols)
+    # calcula tamanho necessário (inclui cabeçalho)
+    desired_rows = max(desired_rows, min_rows)
 
-    # 3.2) Expande até o tamanho exato necessário
-    if ws.row_count != desired_rows or ws.col_count < desired_cols:
+    if ws.row_count != desired_rows or ws.col_count != desired_cols:
         ws.resize(rows=desired_rows, cols=desired_cols)
     # ————————————————————————————————
 
-    # 4) Log de instrumentação
+    # ————————————————————————————————
+
+    # 5) Log de instrumentação: quantas linhas e colunas serão escritas
     total_cells = desired_rows * desired_cols
     log.info(
-        "ℹ️  Preparando write-back origin para '%s': %s dados + cabeçalho → %s linhas × %s colunas = %s células",
+        "ℹ️  Preparando write-back origin para '%s': %d linhas × %d colunas (com cabeçalho) = %s células",
         sheet_name,
-        len(df_wb),
-        desired_rows,
-        desired_cols,
+        n_linhas,
+        n_colunas,
         f"{total_cells:,}",
     )
 
-    # 5) Se dry_run, não grava de fato
+    # 6) Se dry_run, não grava de fato
     if dry_run:
         log.info("🔸 Dry-run ativo: não gravando '%s'", sheet_name)
         return df_wb
 
-    # 6) Grava em batches (chunked dentro de write_back_df)
+    # 7) Grava em batches (chunked dentro de write_back_df)
     write_back_df(
         df=df_wb,
         creds_path=creds_path,
@@ -832,9 +841,10 @@ def write_back_origin(
         a1_range=a1_range,
         value_input_option=value_input_option,
     )
-    log.info("✅ Write-back concluído para '%s'", sheet_name)
+    log.info("✅ Write-back concluído para '%s' (%d linhas × %d colunas)", sheet_name, n_linhas, n_colunas)
 
     return df_wb
+
 
 === FILE: load/utils/__init__.py ===
 
@@ -2848,6 +2858,7 @@ from treat.utils.validations import (
     validate_aggregates,
     validate_taxonomy_consistency,
 )
+from treat.utils.validations import validate_columns
 
 log = logging.getLogger(__name__)
 CACHE_ESTADOS, CACHE_MUNICIPIOS = carregar_caches_padrao()
@@ -2939,53 +2950,65 @@ class TreatPipeline:
     def run(self, df_raw: pd.DataFrame) -> pd.DataFrame:
         lower = self.sheet_name.lower()
 
-        # 1) Pré-processo comum (substituições + normalize_region)
-        df = self._preprocess(df_raw)
+        # 1) Captura colunas originais e faz cópia para não alterar df_raw
+        orig_cols = df_raw.columns.tolist()
+        df = df_raw.copy()
 
-        # 2) Tratamento especial: Pinterest Idade/Gênero/Região
+        # 2) Pré-processo comum (substituições + normalize_region) sobre a cópia
+        df = self._preprocess(df)
+
+        # 3) Tratamento especial: Pinterest Idade/Gênero/Região
         if lower in {"pinterestgenero", "pinterestidade", "pinterestregiao"}:
-            # 2a) grava o DF limpo (normalizado) na aba de origem
+            # 3a) filtra apenas colunas originais antes do write-back
+            df_orig_to_write = df[orig_cols]
+            log.debug(
+                f"[{self.sheet_name}] Antes de write_back_origin (Pinterest): "
+                f"Colunas originais: {orig_cols} | Colunas em df: {df.columns.tolist()}"
+            )
+            # Nova validação de esquema antes de gravar origem
+            validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
+
             write_back_origin(
                 df_raw         = df_raw,
-                df_ok          = df,
+                df_ok          = df_orig_to_write,
                 creds_path     = self.creds_path,
                 spreadsheet_id = self.spreadsheet_id,
                 sheet_name     = self.sheet_name,
                 write_back     = self.write_back,
                 dry_run        = not self.write_back,
             )
-            # 2b) executa só o merge demográfico e devolve o DataFrame de destino
+            # 3b) executa só o merge demográfico e devolve o DataFrame de destino
             return pin_merge(
                 df_general   = self._fetch_sibling_sheet("pinterestGeral"),
                 df_dimension = df,
             )
 
-        # 3) Validações iniciais contra BI
+        # 4) Validações iniciais contra BI
         df_bi = self._bi_lookup.df()
         validate_utm_content_in_bi(df, df_bi)
         self._last_taxo_report = validate_taxonomy_consistency(df, df_bi)
 
-        # 4) Enriquecimento BI (campanha, start/end)
+        # 5) Enriquecimento BI (campanha, start/end)
         df = self._enrich_bi(df)
 
-        # 5) Conversão datetime → date/start/end
+        # 6) Conversão datetime → date/start/end
         for col in ("date", "start", "end"):
             if col in df.columns:
                 df = converter_data(df, col)
 
-        # 6) Atribuição de veículo + ID interno
+        # 7) Atribuição de veículo + ID interno
         df = self._assign_vehicle_and_id(df)
 
-        # 7) Transformações específicas de plataforma
+        # 8) Transformações específicas de plataforma
         df = dispatch(self.sheet_name)(df, lookup=self._bi_lookup)
 
-        # 8) Substituições de objetivo
+        # 9) Substituições de objetivo
         df = self.subs_obj_fn(df)
 
-        # 9) Validação de agregados
+        # 10) Validação de agregados
         validate_aggregates(df_raw, df)
 
-        # 10) Checagem de colunas obrigatórias (zero OK em algumas métricas)
+        # 11) Checagem de colunas obrigatórias (zero OK em algumas métricas)
         ZERO_OK = [
             "impressions", "cost", "link_clicks", "video_play",
             "video_watches_25", "video_watches_50", "video_watches_75",
@@ -2998,21 +3021,29 @@ class TreatPipeline:
             zero_valid_cols=ZERO_OK,
         )
 
-        # 11) Write-back de correções na aba de origem (somente para não-Pinterest dim)
+        # 12) Write-back de correções na aba de origem (somente para não-Pinterest dim)
+        df_orig_to_write = df[orig_cols]
+        log.debug(
+            f"[{self.sheet_name}] Antes de write_back_origin (Geral): "
+            f"Colunas originais: {orig_cols} | Colunas em df: {df.columns.tolist()}"
+        )
+        # Nova validação de esquema antes de gravar origem
+        validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
+
         write_back_origin(
-            df_raw        = df_raw,
-            df_ok         = df,
-            creds_path    = self.creds_path,
-            spreadsheet_id= self.spreadsheet_id,
-            sheet_name    = self.sheet_name,
-            write_back    = self.write_back,
-            dry_run       = False,
+            df_raw         = df_raw,
+            df_ok          = df_orig_to_write,
+            creds_path     = self.creds_path,
+            spreadsheet_id = self.spreadsheet_id,
+            sheet_name     = self.sheet_name,
+            write_back     = self.write_back,
+            dry_run        = False,
         )
 
-        # 12) Renomeação para modelo destino
+        # 13) Renomeação para modelo destino
         df = renomear_colunas_origem_para_modelo(df, self.mapping)
 
-        # 13) Cálculo de engajamento + geração de ID sintético
+        # 14) Cálculo de engajamento + geração de ID sintético
         df = calcular_engajamento_total(df)
         df["ID"] = df.apply(gerar_id, axis=1)
 
@@ -7991,6 +8022,43 @@ def check_required_columns(
                 col, len(linhas), preview
             )
 
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+def validate_columns(df: pd.DataFrame, expected_cols: List[str], stage: str):
+    """
+    Verifica se as colunas de `df` correspondem exatamente a `expected_cols`.
+    Se houver discrepância, registra um WARNING com detalhes e levanta ValueError.
+
+    Parâmetros:
+    - df: pandas.DataFrame a ser verificado.
+    - expected_cols: lista de strings com as colunas esperadas.
+    - stage: string indicando a etapa ou contexto (ex.: "origem" ou "destino").
+    """
+    actual_cols = df.columns.tolist()
+    set_actual = set(actual_cols)
+    set_expected = set(expected_cols)
+
+    if set_actual != set_expected:
+        missing = set_expected - set_actual
+        extra = set_actual - set_expected
+        msg_parts = []
+        if missing:
+            msg_parts.append(f"Colunas faltando: {sorted(missing)}")
+        if extra:
+            msg_parts.append(f"Colunas inesperadas: {sorted(extra)}")
+        msg = "; ".join(msg_parts)
+
+        logger.warning(
+            f"[{stage}] Discrepância de colunas detectada. "
+            f"Esperado: {expected_cols}, Encontrado: {actual_cols}. {msg}"
+        )
+        # Levanta exceção para interromper a execução
+        raise ValueError(f"[{stage}] Discrepância de colunas: {msg}")
+
+
 def validate_utm_content_in_bi(
     df_raw: pd.DataFrame,
     df_bi: pd.DataFrame,
@@ -8300,20 +8368,18 @@ def validate_consistent_dates_across_models(
 
 
 === FILE: treat/utils/write_back.py ===
-# File: treat/utils/write_back.py
-import pandas as pd
-from treat.utils.sheets_cache import get_worksheet
 import re
 import datetime
+import pandas as pd
+from treat.utils.sheets_cache import get_worksheet
 
 def _col_idx_to_letter(idx: int) -> str:
     """Converte índice 1-based em letra A1 (1→A, 27→AA)."""
     letters = ""
     while idx > 0:
-        idx, rem = divmod(idx-1, 26)
+        idx, rem = divmod(idx - 1, 26)
         letters = chr(65 + rem) + letters
     return letters
-
 
 def write_back_df(
     df: pd.DataFrame,
@@ -8324,40 +8390,50 @@ def write_back_df(
     value_input_option: str = "USER_ENTERED",
 ) -> None:
     """
-    Grava `df` em lote no Google Sheets usando a worksheet cacheada.
+    Grava `df` em lote no Google Sheets usando a worksheet cacheada, unindo
+    cabeçalho e linhas em um único batch_update por aba (ou o mínimo de chunks).
+
+    Parâmetros:
+    - df: DataFrame a ser gravado.
+    - creds_path: caminho/variável de credenciais.
+    - spreadsheet_id: ID da planilha no Google Sheets.
+    - sheet_name: nome da aba de destino.
+    - a1_range: célula inicial para o cabeçalho (ex.: "A1").
+    - value_input_option: modo de inserção de valores ("USER_ENTERED", "RAW" etc.).
     """
+    # Obtém a worksheet via cache
     ws = get_worksheet(creds_path, spreadsheet_id, sheet_name)
 
-    # cabeçalho + linhas em batches
+    # Prepara cabeçalho + dados
     cols = df.columns.tolist()
     rows = df.values.tolist()
 
-    # envia só o cabeçalho
-    ws.batch_update(
-        [{"range": a1_range, "values": [cols]}],
-        value_input_option=value_input_option,
-    )
+    # Junta cabeçalho + linhas numa única lista de listas
+    data_rows = [cols] + rows  # cabeçalho na primeira linha
 
-    # determina colunas A1
+    # Determina colunas A1
     n_cols = len(cols)
-    # extrai letras iniciais de a1_range (ex.: "A" de "A1"); default "A"
+    # Extrai letras iniciais de a1_range (ex.: "A" de "A1"); default "A"
     m = re.match(r"([A-Z]+)", a1_range.upper())
     first_col = m.group(1) if m else "A"
-    # encontra índice numérico da primeira coluna (A→1, B→2, …)
-    first_idx = sum((ord(c)-64)*(26**i) for i,c in enumerate(reversed(first_col)))
+    # Encontra índice numérico da primeira coluna (A→1, B→2, …)
+    first_idx = sum((ord(c) - 64) * (26 ** i) for i, c in enumerate(reversed(first_col)))
     last_idx = first_idx + n_cols - 1
     last_col = _col_idx_to_letter(last_idx)
 
-    # calcula chunk_size dinâmico (até 95% de 10M células)
+    # Calcula chunk_size dinâmico (até 95% de 10M células)
     MAX_CELLS = 10_000_000
-    safe = int(MAX_CELLS * 0.95)
-    chunk_size = max(1, safe // n_cols)
+    safe_cells = int(MAX_CELLS * 0.95)
+    # Número de linhas totais (incluindo cabeçalho)
+    total_rows = len(data_rows)
+    # Define o tamanho de cada chunk em número de linhas
+    chunk_size = max(1, safe_cells // n_cols)
 
-    total = len(rows)
-    for start in range(0, total, chunk_size):
-        chunk = rows[start : start + chunk_size]
+    # Loop para enviar em poucos batch_updates
+    for start in range(0, total_rows, chunk_size):
+        chunk = data_rows[start : start + chunk_size]
 
-        # 🔧 NOVO: sanitiza valores p/ JSON (datas → ISO, NaN → "")
+        # Sanitiza valores para JSON (datas → ISO, NaN → "")
         clean_chunk = []
         for r in chunk:
             clean_row = []
@@ -8370,14 +8446,17 @@ def write_back_df(
                     clean_row.append(v)
             clean_chunk.append(clean_row)
 
-        row_start = 2 + start
-        row_end   = row_start + len(clean_chunk) - 1
+        # Calcula o intervalo de escrita: começa em a1_range (linha 1) + offset
+        row_start = int(re.sub(r"\D+", "", a1_range)) + start
+        row_end = row_start + len(clean_chunk) - 1
         range_str = f"{first_col}{row_start}:{last_col}{row_end}"
 
+        # Envia o chunk (cabeçalho incluído no primeiro chunk)
         ws.batch_update(
             [{"range": range_str, "values": clean_chunk}],
             value_input_option=value_input_option,
         )
+
 
 === FILE: treat/utils/merges/__init__.py ===
 

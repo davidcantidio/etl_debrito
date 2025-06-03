@@ -15,7 +15,7 @@ import datetime as _dt
 import logging
 import re
 from typing import Dict, List, Optional, Set
-
+from treat.utils.validations import validate_columns
 import numpy as np
 import pandas as pd
 from googleapiclient.discovery import build
@@ -164,7 +164,7 @@ def write_back_destination(
     a1_range: str = "A1",
     value_input_option: str = "USER_ENTERED",
 ) -> Optional[pd.DataFrame]:
-    """Grava `df_model` na aba‑modelo correspondente, deduplicando por ``ID``."""
+    """Grava `df_model` na aba-modelo correspondente, deduplicando por `ID`."""
     if df_model.empty:
         log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
         return None
@@ -174,13 +174,18 @@ def write_back_destination(
         raise RuntimeError("Caches destino não carregados – chame prefetch_meta() antes.")
 
     header = _HEADERS[sheet_name]
+
+    # 1) Reindexa para o layout final de colunas do modelo
     df_out = (
         df_model
         .reindex(columns=header, fill_value="")
         .applymap(_scalar)
     )
 
-    # deduplicação por ID, se presente
+    # 2) Validação de esquema APÓS reindexação (evita erro antes das colunas existirem)
+    validate_columns(df_out, header, stage=f"Destino {sheet_name}")
+
+    # Deduplicação por ID, se presente
     if "ID" in df_out.columns:
         existing = _EXISTING_IDS.get(sheet_name, set())
         df_out = df_out.loc[~df_out["ID"].isin(existing)]
@@ -190,10 +195,10 @@ def write_back_destination(
         return None
 
     if dry_run or not write_back:
-        log.info("[Dry‑run] %d linha(s) seriam gravadas em '%s'", len(df_out), sheet_name)
+        log.info("[Dry-run] %d linha(s) seriam gravadas em '%s'", len(df_out), sheet_name)
         return df_out
 
-    # grava efetivamente
+    # Grava efetivamente
     write_back_df(
         df=df_out,
         creds_path=creds_path,
@@ -208,7 +213,6 @@ def write_back_destination(
         _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].tolist())
 
     return df_out
-
 
 def write_back_for_sheet(
     df_model: pd.DataFrame,

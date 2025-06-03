@@ -79,6 +79,43 @@ def check_required_columns(
                 col, len(linhas), preview
             )
 
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+def validate_columns(df: pd.DataFrame, expected_cols: List[str], stage: str):
+    """
+    Verifica se as colunas de `df` correspondem exatamente a `expected_cols`.
+    Se houver discrepância, registra um WARNING com detalhes e levanta ValueError.
+
+    Parâmetros:
+    - df: pandas.DataFrame a ser verificado.
+    - expected_cols: lista de strings com as colunas esperadas.
+    - stage: string indicando a etapa ou contexto (ex.: "origem" ou "destino").
+    """
+    actual_cols = df.columns.tolist()
+    set_actual = set(actual_cols)
+    set_expected = set(expected_cols)
+
+    if set_actual != set_expected:
+        missing = set_expected - set_actual
+        extra = set_actual - set_expected
+        msg_parts = []
+        if missing:
+            msg_parts.append(f"Colunas faltando: {sorted(missing)}")
+        if extra:
+            msg_parts.append(f"Colunas inesperadas: {sorted(extra)}")
+        msg = "; ".join(msg_parts)
+
+        logger.warning(
+            f"[{stage}] Discrepância de colunas detectada. "
+            f"Esperado: {expected_cols}, Encontrado: {actual_cols}. {msg}"
+        )
+        # Levanta exceção para interromper a execução
+        raise ValueError(f"[{stage}] Discrepância de colunas: {msg}")
+
+
 def validate_utm_content_in_bi(
     df_raw: pd.DataFrame,
     df_bi: pd.DataFrame,

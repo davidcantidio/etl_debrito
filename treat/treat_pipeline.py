@@ -38,6 +38,7 @@ from treat.utils.validations import (
     validate_aggregates,
     validate_taxonomy_consistency,
 )
+from treat.utils.validations import validate_columns
 
 log = logging.getLogger(__name__)
 CACHE_ESTADOS, CACHE_MUNICIPIOS = carregar_caches_padrao()
@@ -129,53 +130,65 @@ class TreatPipeline:
     def run(self, df_raw: pd.DataFrame) -> pd.DataFrame:
         lower = self.sheet_name.lower()
 
-        # 1) Pré-processo comum (substituições + normalize_region)
-        df = self._preprocess(df_raw)
+        # 1) Captura colunas originais e faz cópia para não alterar df_raw
+        orig_cols = df_raw.columns.tolist()
+        df = df_raw.copy()
 
-        # 2) Tratamento especial: Pinterest Idade/Gênero/Região
+        # 2) Pré-processo comum (substituições + normalize_region) sobre a cópia
+        df = self._preprocess(df)
+
+        # 3) Tratamento especial: Pinterest Idade/Gênero/Região
         if lower in {"pinterestgenero", "pinterestidade", "pinterestregiao"}:
-            # 2a) grava o DF limpo (normalizado) na aba de origem
+            # 3a) filtra apenas colunas originais antes do write-back
+            df_orig_to_write = df[orig_cols]
+            log.debug(
+                f"[{self.sheet_name}] Antes de write_back_origin (Pinterest): "
+                f"Colunas originais: {orig_cols} | Colunas em df: {df.columns.tolist()}"
+            )
+            # Nova validação de esquema antes de gravar origem
+            validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
+
             write_back_origin(
                 df_raw         = df_raw,
-                df_ok          = df,
+                df_ok          = df_orig_to_write,
                 creds_path     = self.creds_path,
                 spreadsheet_id = self.spreadsheet_id,
                 sheet_name     = self.sheet_name,
                 write_back     = self.write_back,
                 dry_run        = not self.write_back,
             )
-            # 2b) executa só o merge demográfico e devolve o DataFrame de destino
+            # 3b) executa só o merge demográfico e devolve o DataFrame de destino
             return pin_merge(
                 df_general   = self._fetch_sibling_sheet("pinterestGeral"),
                 df_dimension = df,
             )
 
-        # 3) Validações iniciais contra BI
+        # 4) Validações iniciais contra BI
         df_bi = self._bi_lookup.df()
         validate_utm_content_in_bi(df, df_bi)
         self._last_taxo_report = validate_taxonomy_consistency(df, df_bi)
 
-        # 4) Enriquecimento BI (campanha, start/end)
+        # 5) Enriquecimento BI (campanha, start/end)
         df = self._enrich_bi(df)
 
-        # 5) Conversão datetime → date/start/end
+        # 6) Conversão datetime → date/start/end
         for col in ("date", "start", "end"):
             if col in df.columns:
                 df = converter_data(df, col)
 
-        # 6) Atribuição de veículo + ID interno
+        # 7) Atribuição de veículo + ID interno
         df = self._assign_vehicle_and_id(df)
 
-        # 7) Transformações específicas de plataforma
+        # 8) Transformações específicas de plataforma
         df = dispatch(self.sheet_name)(df, lookup=self._bi_lookup)
 
-        # 8) Substituições de objetivo
+        # 9) Substituições de objetivo
         df = self.subs_obj_fn(df)
 
-        # 9) Validação de agregados
+        # 10) Validação de agregados
         validate_aggregates(df_raw, df)
 
-        # 10) Checagem de colunas obrigatórias (zero OK em algumas métricas)
+        # 11) Checagem de colunas obrigatórias (zero OK em algumas métricas)
         ZERO_OK = [
             "impressions", "cost", "link_clicks", "video_play",
             "video_watches_25", "video_watches_50", "video_watches_75",
@@ -188,21 +201,29 @@ class TreatPipeline:
             zero_valid_cols=ZERO_OK,
         )
 
-        # 11) Write-back de correções na aba de origem (somente para não-Pinterest dim)
+        # 12) Write-back de correções na aba de origem (somente para não-Pinterest dim)
+        df_orig_to_write = df[orig_cols]
+        log.debug(
+            f"[{self.sheet_name}] Antes de write_back_origin (Geral): "
+            f"Colunas originais: {orig_cols} | Colunas em df: {df.columns.tolist()}"
+        )
+        # Nova validação de esquema antes de gravar origem
+        validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
+
         write_back_origin(
-            df_raw        = df_raw,
-            df_ok         = df,
-            creds_path    = self.creds_path,
-            spreadsheet_id= self.spreadsheet_id,
-            sheet_name    = self.sheet_name,
-            write_back    = self.write_back,
-            dry_run       = False,
+            df_raw         = df_raw,
+            df_ok          = df_orig_to_write,
+            creds_path     = self.creds_path,
+            spreadsheet_id = self.spreadsheet_id,
+            sheet_name     = self.sheet_name,
+            write_back     = self.write_back,
+            dry_run        = False,
         )
 
-        # 12) Renomeação para modelo destino
+        # 13) Renomeação para modelo destino
         df = renomear_colunas_origem_para_modelo(df, self.mapping)
 
-        # 13) Cálculo de engajamento + geração de ID sintético
+        # 14) Cálculo de engajamento + geração de ID sintético
         df = calcular_engajamento_total(df)
         df["ID"] = df.apply(gerar_id, axis=1)
 
