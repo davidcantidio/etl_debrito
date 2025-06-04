@@ -1,9 +1,8 @@
-from __future__ import annotations
+# treat/utils/preprocess_utils.py
 
 import re
-from typing import Dict, Optional
-
 import pandas as pd
+from typing import Optional, Dict
 from gspread import Worksheet
 
 from treat.utils.geo_normalize import normalize_region
@@ -12,7 +11,6 @@ from treat.utils.atribuicoes_via_lookup import (
     atribuir_veiculo_e_id_meta,
     atribuir_veiculo_por_prefixo,
     atribuir_id_veiculo_generico,
-    atribuir_veiculo_por_criativo,
     SourceLookup,
 )
 from extract.sheets_fetcher import SheetsFetcher
@@ -25,10 +23,6 @@ __all__ = [
     "assign_vehicle_and_id",
     "get_sibling_sheet",
 ]
-
-# ────────────────────────────────────────────────────────────────────────────
-# Funções auxiliares de texto
-# ────────────────────────────────────────────────────────────────────────────
 
 
 def apply_origin_substitutions(df: pd.DataFrame) -> pd.DataFrame:
@@ -82,11 +76,6 @@ def _extract_platform(sheet_name: str) -> str:
     return m.group(0).lower() if m else sheet_name.lower()
 
 
-# ────────────────────────────────────────────────────────────────────────────
-# Pipeline de pré-processamento (substituições + região)
-# ────────────────────────────────────────────────────────────────────────────
-
-
 def preprocess_origin(
     df: pd.DataFrame,
     *,
@@ -109,11 +98,6 @@ def preprocess_origin(
     )
     df2 = normalize_region_column(df2, col_name="region")
     return df2
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Enriquecimento de Veiculo / ID_Veiculo (100 % in-memory)
-# ────────────────────────────────────────────────────────────────────────────
 
 
 def assign_vehicle_and_id(
@@ -139,7 +123,7 @@ def assign_vehicle_and_id(
         Lookup já inicializado no pipeline.
     """
     lower = sheet_name.lower()
-    platform = _extract_platform(sheet_name)          # ← correção essencial
+    platform = _extract_platform(sheet_name)  # ex.: "tiktok", "linkedin", etc.
     source_map = SourceLookup.get_mapping(fetcher)
 
     # ── Meta (Facebook / Instagram) ───────────────────────────────────────
@@ -148,24 +132,10 @@ def assign_vehicle_and_id(
             return atribuir_veiculo_e_id_meta(df, source_map)
         return atribuir_veiculo_por_prefixo(df, "meta", source_map)
 
-    # ── LinkedIn ──────────────────────────────────────────────────────────
-    if lower.startswith("linkedin"):
-        df = atribuir_veiculo_por_criativo(df, bi_lookup)
-        return atribuir_id_veiculo_generico(df, source_map)
-
-    # ── Pinterest ─────────────────────────────────────────────────────────
-    if lower.startswith("pinterest"):
-        df["Veiculo"] = "Pinterest"
-        return atribuir_id_veiculo_generico(df, source_map)
-
-    # ── Fallback (TikTok, Twitter, YouTube, …) ────────────────────────────
+    # ── Fallback para todas as outras plataformas
+    # Inclui LinkedIn, Pinterest, TikTok, Twitter, YouTube, etc.
     df = atribuir_veiculo_por_prefixo(df, platform, source_map)
     return atribuir_id_veiculo_generico(df, source_map)
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Utilitário para ler “abas irmãs” (Pinterest merge, etc.)
-# ────────────────────────────────────────────────────────────────────────────
 
 
 def get_sibling_sheet(
