@@ -134,102 +134,135 @@ class TreatPipeline:
         # 2) Pré-processamento genérico (substituições + normalize_region)
         df = self._preprocess(df)
 
-        # 3) Tratamento exclusivo de Pinterest dimensão demográfica
-        if lower in {"pinterestgenero", "pinterestidade", "pinterestregiao"}:
+        # ───────────────────────────────────────────────────────────────
+        # 3) Tratamento EXCLUSIVO das abas demográficas do Pinterest
+        #    (pinterestIdade / pinterestGenero / pinterestRegiao)
+        # ───────────────────────────────────────────────────────────────
+        if lower in {"pinterestidade", "pinterestgenero", "pinterestregiao"}:
+            # 3a) grava correções na própria aba-origem
             df_orig_to_write = df[orig_cols]
-            validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
-
-            # Usa write_back_origin passando o Worksheet já obtido
+            validate_columns(df_orig_to_write, orig_cols,
+                            stage=f"Origem {self.sheet_name}")
             write_back_origin(
-                df_raw=df_raw,
-                df_ok=df_orig_to_write,
-                creds_path=self.creds_path,
-                spreadsheet_id=self.spreadsheet_id,
-                write_back=self.write_back,
-                dry_run=False,
-                worksheet=self.worksheet_origem,
+                df_raw        = df_raw,
+                df_ok         = df_orig_to_write,
+                creds_path    = self.creds_path,
+                spreadsheet_id= self.spreadsheet_id,
+                write_back    = self.write_back,
+                dry_run       = False,
+                worksheet     = self.worksheet_origem,
             )
 
-            df_geral = get_sibling_sheet("pinterestGeral", self.fetcher, self._sibling_cache)
+            # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache global)
+            import builtins
+            df_geral = getattr(builtins, "_pinterest_geral_tratado", None)
+            if df_geral is None:
+                raise RuntimeError("pinterestGeral não foi processado antes da dimensão.")
+
+            # 3c) merge demográfico (gera modeloIdade/Genero/Regiao)
             return pin_merge(df_general=df_geral, df_dimension=df)
 
+        # ───────────────────────────────────────────────────────────────
         # 4) Validações iniciais contra BI
+        # ───────────────────────────────────────────────────────────────
         df_bi = self.bi_lookup.df()
         validate_utm_content_in_bi(df, df_bi)
         self._last_taxo_report = validate_taxonomy_consistency(df, df_bi)
 
-        # 5) Enriquecimento BI + 'objective'
+        # ───────────────────────────────────────────────────────────────
+        # 5) Enriquecimento BI + preenchimento de ‘objective’
+        # ───────────────────────────────────────────────────────────────
         df = enrich_with_bi_parametrizacao(
             df, self.creds_path, self.spreadsheet_id, sheet_name=self.sheet_name
         )
         df = fill_objective_from_bi(df, self.bi_lookup)
 
-        # 6) Conversão de colunas datetime → date/start/end
+        # ───────────────────────────────────────────────────────────────
+        # 6) Conversão de colunas datetime → date / start / end
+        # ───────────────────────────────────────────────────────────────
         for col in ("date", "start", "end"):
             if col in df.columns:
                 df = converter_data(df, col)
 
-        # 7) Preenche start/end em memória (sem write-back aqui)
+        # ───────────────────────────────────────────────────────────────
+        # 7) Preenche start/end em memória
+        # ───────────────────────────────────────────────────────────────
         df = fill_missing_start_end_from_params(df, lookup=self.bi_lookup, inplace=False)
 
-        # 8) Atribuição de 'Veiculo' + 'ID_Veiculo'
+        # ───────────────────────────────────────────────────────────────
+        # 8) Atribuição de Veiculo + ID_Veiculo (lookup BI)
+        # ───────────────────────────────────────────────────────────────
         df = assign_vehicle_and_id(
-            df,
-            sheet_name=self.sheet_name,
-            fetcher=self.fetcher,
-            bi_lookup=self.bi_lookup,
+            df, sheet_name=self.sheet_name, fetcher=self.fetcher, bi_lookup=self.bi_lookup
         )
 
-        # 9) Transformações específicas de cada plataforma
+        # ───────────────────────────────────────────────────────────────
+        # 9) Transformações específicas da plataforma
+        # ───────────────────────────────────────────────────────────────
         df = dispatch(self.sheet_name)(df, lookup=self.bi_lookup)
 
+        # ───────────────────────────────────────────────────────────────
         # 10) Substituições de objetivo customizadas
+        # ───────────────────────────────────────────────────────────────
         df = self.subs_obj_fn(df)
 
+        # ───────────────────────────────────────────────────────────────
+        # 10a)  Se for pinterestGeral, guarda VERSÃO ENRIQUECIDA no cache
+        #       (antes de renomear colunas → usada no merge demográfico)
+        # ───────────────────────────────────────────────────────────────
+        if lower == "pinterestgeral":
+            import builtins
+            builtins._pinterest_geral_tratado = df.copy()
+
+        # ───────────────────────────────────────────────────────────────
         # 11) Validação de agregados
+        # ───────────────────────────────────────────────────────────────
         validate_aggregates(df_raw, df)
 
-        # 12) Checagem de colunas obrigatórias (zeros válidos)
+        # ───────────────────────────────────────────────────────────────
+        # 12) Checagem de colunas obrigatórias
+        # ───────────────────────────────────────────────────────────────
         ZERO_OK = [
             "impressions", "cost", "link_clicks", "video_play",
             "video_watches_25", "video_watches_50", "video_watches_75",
             "video_watched_100", "post_reactions", "post_shares", "post_comments",
         ]
-        check_required_columns(
-            df, optional_cols=["URL_do_Anúncio"], zero_valid_cols=ZERO_OK
-        )
+        check_required_columns(df, optional_cols=["URL_do_Anúncio"], zero_valid_cols=ZERO_OK)
 
-        # 13) Write-back das correções na aba de origem (não-Pinterest dim)
+        # ───────────────────────────────────────────────────────────────
+        # 13) Write-back das correções na aba-origem (todas as demais)
+        # ───────────────────────────────────────────────────────────────
         df_orig_to_write = df[orig_cols]
-        validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
-
+        validate_columns(df_orig_to_write, orig_cols,
+                        stage=f"Origem {self.sheet_name}")
         write_back_origin(
-            df_raw=df_raw,
-            df_ok=df_orig_to_write,
-            creds_path=self.creds_path,
-            spreadsheet_id=self.spreadsheet_id,
-            sheet_name=self.sheet_name,
-            write_back=self.write_back,
-            dry_run=False,
+            df_raw        = df_raw,
+            df_ok         = df_orig_to_write,
+            creds_path    = self.creds_path,
+            spreadsheet_id= self.spreadsheet_id,
+            sheet_name    = self.sheet_name,
+            write_back    = self.write_back,
+            dry_run       = False,
         )
 
+        # ───────────────────────────────────────────────────────────────
         # 14) Renomeia colunas para o modelo destino + cálculos finais
+        # ───────────────────────────────────────────────────────────────
         df = renomear_colunas_origem_para_modelo(df, self.mapping)
         df = calcular_engajamento_total(df)
         df["ID"] = df.apply(gerar_id, axis=1)
 
-        # 15) Logs finais de verificação
+        # ───────────────────────────────────────────────────────────────
+        # 15) Logs de verificação
+        # ───────────────────────────────────────────────────────────────
         if not df[df["Veiculo"].fillna("") == ""].empty:
-            log.warning(
-                "[%s] linhas sem Veiculo: %s",
-                self.sheet_name,
-                df.index[df["Veiculo"].fillna("") == ""].tolist(),
-            )
+            log.warning("[%s] linhas sem Veiculo: %s",
+                        self.sheet_name,
+                        df.index[df["Veiculo"].fillna('') == ""].tolist())
         if not df[df["objective"].fillna("") == ""].empty:
-            log.warning(
-                "[%s] linhas sem objective: %s",
-                self.sheet_name,
-                df.index[df["objective"].fillna("") == ""].tolist(),
-            )
+            log.warning("[%s] linhas sem objective: %s",
+                        self.sheet_name,
+                        df.index[df["objective"].fillna('') == ""].tolist())
 
         return df
+

@@ -39,6 +39,7 @@ class SheetsFetcher:
         header_row: int = 0,
         col_range: str = "A:ZZ",
         cache_ttl: int = 300,
+         
     ):
         """
         Inicializa o fetcher.
@@ -57,6 +58,7 @@ class SheetsFetcher:
         self._service = _build_sheets_service(creds_path)
         self._cache: Dict[Tuple[str, ...], Tuple[float, Dict[str, List[List[str]]]]] = {}
         self._cache_ttl = cache_ttl
+        self._spreadsheet_meta: dict | None = None
 
         # Cliente gspread para operações de open_worksheet (write-back, etc.)
         self._gclient = get_google_client(creds_path)
@@ -67,6 +69,19 @@ class SheetsFetcher:
         wait=wait_exponential(multiplier=1, min=1, max=32),
         reraise=True,
     )
+
+
+    def _get_meta(self):
+        if self._spreadsheet_meta is None:
+            self._spreadsheet_meta = (
+                self.service.spreadsheets().get(
+                    spreadsheetId=self.spreadsheet_id,
+                    includeGridData=False,
+                ).execute()
+            )
+        return self._spreadsheet_meta
+    
+    
     def _batch_get(self, ranges: List[str]) -> Dict[str, Any]:
         """Executa batchGet com retry/back-off para código 429."""
         log.info("🔄 batchGet tentativa para ranges: %s", ranges)

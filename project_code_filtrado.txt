@@ -274,6 +274,7 @@ class SheetsFetcher:
         header_row: int = 0,
         col_range: str = "A:ZZ",
         cache_ttl: int = 300,
+         
     ):
         """
         Inicializa o fetcher.
@@ -292,6 +293,7 @@ class SheetsFetcher:
         self._service = _build_sheets_service(creds_path)
         self._cache: Dict[Tuple[str, ...], Tuple[float, Dict[str, List[List[str]]]]] = {}
         self._cache_ttl = cache_ttl
+        self._spreadsheet_meta: dict | None = None
 
         # Cliente gspread para operações de open_worksheet (write-back, etc.)
         self._gclient = get_google_client(creds_path)
@@ -302,6 +304,19 @@ class SheetsFetcher:
         wait=wait_exponential(multiplier=1, min=1, max=32),
         reraise=True,
     )
+
+
+    def _get_meta(self):
+        if self._spreadsheet_meta is None:
+            self._spreadsheet_meta = (
+                self.service.spreadsheets().get(
+                    spreadsheetId=self.spreadsheet_id,
+                    includeGridData=False,
+                ).execute()
+            )
+        return self._spreadsheet_meta
+    
+    
     def _batch_get(self, ranges: List[str]) -> Dict[str, Any]:
         """Executa batchGet com retry/back-off para código 429."""
         log.info("🔄 batchGet tentativa para ranges: %s", ranges)
@@ -419,7 +434,7 @@ Principais características
 -------------------------
 * 01 leitura para cabeçalhos e IDs: usamos SheetsFetcher para recuperar todas
   as abas-modelo de uma só vez (batchGet), poupando quota.
-* Zero leituras extras durante o loop de ETL; somente gravação (via write_back_df).
+* Zero leituras extras durante o loop de ETL; somente gravação (via write_back_df ou append).
 * Deduplicação: grava apenas registros cujo "ID" ainda não existe.
 * Compatível com dry-run e com execução em paralelo.
 """
@@ -431,7 +446,6 @@ from typing import Dict, List, Optional, Set
 
 import numpy as np
 import pandas as pd
-
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -439,9 +453,10 @@ from tenacity import (
     wait_exponential,
 )
 
-from treat.utils.validations import validate_columns
 from extract.sheets_fetcher import SheetsFetcher
 from treat.utils.write_back import write_back_df
+from load.utils.append_records_to_sheet import append_records_to_sheet
+from treat.utils.validations import validate_columns
 
 log = logging.getLogger(__name__)
 
@@ -477,51 +492,52 @@ def prefetch_meta(
     """
     Carrega cabeçalhos (linha 1) e IDs (coluna 'ID' a partir da linha 2)
     de todas as abas-modelo (modeloGeral, modeloGenero, etc.) em UMA ÚNICA
-    batchGet para cabeçalhos e outra única batchGet para IDs.
+    operação, poupando leitura repetida da API.
 
     Depois disso, os caches globais _HEADERS e _EXISTING_IDS estão prontos
     para uso em write_back_destination, sem novas leituras.
     """
     global _HEADERS, _EXISTING_IDS
-    if _HEADERS:  # já fez prefetch nesta sessão
+    if _HEADERS:
+        # já realizou prefetch nesta sessão
         return
 
-    # 1) Cabeçalhos na linha 1 de cada aba-modelo
     abas = list(DESTINATION_SHEETS.values())
-    raw_hdr = fetcher.get(abas, as_frame=False)
-    for tab, raw_vals in raw_hdr.items():
-        # raw_vals = List[List[str]]; a primeira linha (índice 0) é o header
-        primeira_linha = raw_vals[0] if raw_vals else []
-        # remove blanks e espaços
+
+    # 1) Buscar todas as linhas de cada aba no fetcher (cada aba → Lista[List[str]])
+    raw_data = fetcher.get(abas, as_frame=False)
+
+    # 2) Extrair cabeçalhos (linha 0 de cada aba) e armazenar em _HEADERS
+    for tab, values in raw_data.items():
+        primeira_linha = values[0] if values else []
         header = [c.strip() for c in primeira_linha if c.strip()]
         _HEADERS[tab] = header
 
-    # 2) Descobrir range de 'ID' em cada aba
+    # 3) Identificar intervalos de ID para cada aba-modelo
     id_ranges: List[Optional[str]] = []
     for tab in abas:
         header = _HEADERS.get(tab, [])
         try:
             idx_id = [h.lower() for h in header].index("id")
             col_a1 = _idx_to_col(idx_id)
-            # intervalo a partir da linha 2 (sem cabeçalho)
+            # range a partir da linha 2 (sem cabeçalho)
             id_ranges.append(f"{tab}!{col_a1}2:{col_a1}")
         except ValueError:
-            # Se não existir coluna 'ID', coloca set vazio
             _EXISTING_IDS[tab] = set()
             id_ranges.append(None)
 
-    # 3) Ler todas as colunas 'ID' de uma vez, se existirem
-    valid_ranges = [r for r in id_ranges if r]
-    if valid_ranges:
-        # Extraí nomes das abas (sem o "!..."), pois SheetsFetcher.get espera lista de abas
-        abas_com_id = [r.split("!", 1)[0] for r in valid_ranges]
-        raw_ids = fetcher.get(abas_com_id, as_frame=False)
-        for tab, rng in zip(abas, id_ranges):
-            if rng is None:
-                continue
-            # raw_ids[tab] = List[List[str]] (cada linha traz 1 única célula ID)
+    # 4) Ler todas as colunas 'ID' de uma vez (quando existirem)
+    valid_tabs = []
+    for tab, rng in zip(abas, id_ranges):
+        if rng:
+            valid_tabs.append(tab)
+
+    if valid_tabs:
+        raw_ids = fetcher.get(valid_tabs, as_frame=False)
+        for tab in valid_tabs:
             listas = raw_ids.get(tab, [])
-            ids = [item for row in listas for item in row if item.strip()]
+            # cada linha em listas corresponde a uma célula ID
+            ids = [item for row in listas for item in row if str(item).strip()]
             _EXISTING_IDS[tab] = set(ids)
 
     log.info(
@@ -604,24 +620,32 @@ def write_back_destination(
         log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
         return None
 
+    # 4) Se dry_run ou write_back=False, apenas logar e retornar
     if dry_run or not write_back:
         log.info("[Dry-run] %d linhas seriam gravadas em '%s'", len(df_out), sheet_name)
         return df_out
 
-    # 4) Grava em batch via write_back_df (que faz apenas um batch_update)
-    write_back_df(
-        df=df_out,
-        creds_path=creds_path,
-        spreadsheet_id=spreadsheet_id,
-        sheet_name=sheet_name,
-        a1_range=a1_range,
-        value_input_option=value_input_option,
-    )
-    log.info("✅ Gravadas %d linhas em '%s'", len(df_out), sheet_name)
+    # 5) Gravação: APPEND em vez de overwrite
+    #    Usamos append_records_to_sheet, que faz append a partir da primeira linha vazia.
+    #    Caso append_records_to_sheet não retorne contagem, assumimos len(df_out).
+    try:
+        linhas_inseridas = append_records_to_sheet(
+            creds_path      = creds_path,
+            spreadsheet_id  = spreadsheet_id,
+            sheet_name      = sheet_name,
+            df              = df_out,
+        )
+        if linhas_inseridas is None:
+            linhas_inseridas = len(df_out)
+    except Exception as e:
+        log.error("Erro ao gravar em '%s' via append: %s", sheet_name, e)
+        raise
 
-    # 5) Atualiza cache de IDs
+    log.info("✅ Gravadas %d linha(s) em '%s'", linhas_inseridas, sheet_name)
+
+    # 6) Atualiza cache de IDs para futuras deduplicações
     if "ID" in df_out.columns:
-        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].tolist())
+        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].astype(str).tolist())
 
     return df_out
 
@@ -2094,105 +2118,138 @@ class TreatPipeline:
         # 2) Pré-processamento genérico (substituições + normalize_region)
         df = self._preprocess(df)
 
-        # 3) Tratamento exclusivo de Pinterest dimensão demográfica
-        if lower in {"pinterestgenero", "pinterestidade", "pinterestregiao"}:
+        # ───────────────────────────────────────────────────────────────
+        # 3) Tratamento EXCLUSIVO das abas demográficas do Pinterest
+        #    (pinterestIdade / pinterestGenero / pinterestRegiao)
+        # ───────────────────────────────────────────────────────────────
+        if lower in {"pinterestidade", "pinterestgenero", "pinterestregiao"}:
+            # 3a) grava correções na própria aba-origem
             df_orig_to_write = df[orig_cols]
-            validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
-
-            # Usa write_back_origin passando o Worksheet já obtido
+            validate_columns(df_orig_to_write, orig_cols,
+                            stage=f"Origem {self.sheet_name}")
             write_back_origin(
-                df_raw=df_raw,
-                df_ok=df_orig_to_write,
-                creds_path=self.creds_path,
-                spreadsheet_id=self.spreadsheet_id,
-                write_back=self.write_back,
-                dry_run=False,
-                worksheet=self.worksheet_origem,
+                df_raw        = df_raw,
+                df_ok         = df_orig_to_write,
+                creds_path    = self.creds_path,
+                spreadsheet_id= self.spreadsheet_id,
+                write_back    = self.write_back,
+                dry_run       = False,
+                worksheet     = self.worksheet_origem,
             )
 
-            df_geral = get_sibling_sheet("pinterestGeral", self.fetcher, self._sibling_cache)
+            # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache global)
+            import builtins
+            df_geral = getattr(builtins, "_pinterest_geral_tratado", None)
+            if df_geral is None:
+                raise RuntimeError("pinterestGeral não foi processado antes da dimensão.")
+
+            # 3c) merge demográfico (gera modeloIdade/Genero/Regiao)
             return pin_merge(df_general=df_geral, df_dimension=df)
 
+        # ───────────────────────────────────────────────────────────────
         # 4) Validações iniciais contra BI
+        # ───────────────────────────────────────────────────────────────
         df_bi = self.bi_lookup.df()
         validate_utm_content_in_bi(df, df_bi)
         self._last_taxo_report = validate_taxonomy_consistency(df, df_bi)
 
-        # 5) Enriquecimento BI + 'objective'
+        # ───────────────────────────────────────────────────────────────
+        # 5) Enriquecimento BI + preenchimento de ‘objective’
+        # ───────────────────────────────────────────────────────────────
         df = enrich_with_bi_parametrizacao(
             df, self.creds_path, self.spreadsheet_id, sheet_name=self.sheet_name
         )
         df = fill_objective_from_bi(df, self.bi_lookup)
 
-        # 6) Conversão de colunas datetime → date/start/end
+        # ───────────────────────────────────────────────────────────────
+        # 6) Conversão de colunas datetime → date / start / end
+        # ───────────────────────────────────────────────────────────────
         for col in ("date", "start", "end"):
             if col in df.columns:
                 df = converter_data(df, col)
 
-        # 7) Preenche start/end em memória (sem write-back aqui)
+        # ───────────────────────────────────────────────────────────────
+        # 7) Preenche start/end em memória
+        # ───────────────────────────────────────────────────────────────
         df = fill_missing_start_end_from_params(df, lookup=self.bi_lookup, inplace=False)
 
-        # 8) Atribuição de 'Veiculo' + 'ID_Veiculo'
+        # ───────────────────────────────────────────────────────────────
+        # 8) Atribuição de Veiculo + ID_Veiculo (lookup BI)
+        # ───────────────────────────────────────────────────────────────
         df = assign_vehicle_and_id(
-            df,
-            sheet_name=self.sheet_name,
-            fetcher=self.fetcher,
-            bi_lookup=self.bi_lookup,
+            df, sheet_name=self.sheet_name, fetcher=self.fetcher, bi_lookup=self.bi_lookup
         )
 
-        # 9) Transformações específicas de cada plataforma
+        # ───────────────────────────────────────────────────────────────
+        # 9) Transformações específicas da plataforma
+        # ───────────────────────────────────────────────────────────────
         df = dispatch(self.sheet_name)(df, lookup=self.bi_lookup)
 
+        # ───────────────────────────────────────────────────────────────
         # 10) Substituições de objetivo customizadas
+        # ───────────────────────────────────────────────────────────────
         df = self.subs_obj_fn(df)
 
+        # ───────────────────────────────────────────────────────────────
+        # 10a)  Se for pinterestGeral, guarda VERSÃO ENRIQUECIDA no cache
+        #       (antes de renomear colunas → usada no merge demográfico)
+        # ───────────────────────────────────────────────────────────────
+        if lower == "pinterestgeral":
+            import builtins
+            builtins._pinterest_geral_tratado = df.copy()
+
+        # ───────────────────────────────────────────────────────────────
         # 11) Validação de agregados
+        # ───────────────────────────────────────────────────────────────
         validate_aggregates(df_raw, df)
 
-        # 12) Checagem de colunas obrigatórias (zeros válidos)
+        # ───────────────────────────────────────────────────────────────
+        # 12) Checagem de colunas obrigatórias
+        # ───────────────────────────────────────────────────────────────
         ZERO_OK = [
             "impressions", "cost", "link_clicks", "video_play",
             "video_watches_25", "video_watches_50", "video_watches_75",
             "video_watched_100", "post_reactions", "post_shares", "post_comments",
         ]
-        check_required_columns(
-            df, optional_cols=["URL_do_Anúncio"], zero_valid_cols=ZERO_OK
-        )
+        check_required_columns(df, optional_cols=["URL_do_Anúncio"], zero_valid_cols=ZERO_OK)
 
-        # 13) Write-back das correções na aba de origem (não-Pinterest dim)
+        # ───────────────────────────────────────────────────────────────
+        # 13) Write-back das correções na aba-origem (todas as demais)
+        # ───────────────────────────────────────────────────────────────
         df_orig_to_write = df[orig_cols]
-        validate_columns(df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}")
-
+        validate_columns(df_orig_to_write, orig_cols,
+                        stage=f"Origem {self.sheet_name}")
         write_back_origin(
-            df_raw=df_raw,
-            df_ok=df_orig_to_write,
-            creds_path=self.creds_path,
-            spreadsheet_id=self.spreadsheet_id,
-            sheet_name=self.sheet_name,
-            write_back=self.write_back,
-            dry_run=False,
+            df_raw        = df_raw,
+            df_ok         = df_orig_to_write,
+            creds_path    = self.creds_path,
+            spreadsheet_id= self.spreadsheet_id,
+            sheet_name    = self.sheet_name,
+            write_back    = self.write_back,
+            dry_run       = False,
         )
 
+        # ───────────────────────────────────────────────────────────────
         # 14) Renomeia colunas para o modelo destino + cálculos finais
+        # ───────────────────────────────────────────────────────────────
         df = renomear_colunas_origem_para_modelo(df, self.mapping)
         df = calcular_engajamento_total(df)
         df["ID"] = df.apply(gerar_id, axis=1)
 
-        # 15) Logs finais de verificação
+        # ───────────────────────────────────────────────────────────────
+        # 15) Logs de verificação
+        # ───────────────────────────────────────────────────────────────
         if not df[df["Veiculo"].fillna("") == ""].empty:
-            log.warning(
-                "[%s] linhas sem Veiculo: %s",
-                self.sheet_name,
-                df.index[df["Veiculo"].fillna("") == ""].tolist(),
-            )
+            log.warning("[%s] linhas sem Veiculo: %s",
+                        self.sheet_name,
+                        df.index[df["Veiculo"].fillna('') == ""].tolist())
         if not df[df["objective"].fillna("") == ""].empty:
-            log.warning(
-                "[%s] linhas sem objective: %s",
-                self.sheet_name,
-                df.index[df["objective"].fillna("") == ""].tolist(),
-            )
+            log.warning("[%s] linhas sem objective: %s",
+                        self.sheet_name,
+                        df.index[df["objective"].fillna('') == ""].tolist())
 
         return df
+
 
 
 === FILE: treat/treat_runner.py ===
@@ -5325,12 +5382,11 @@ def reordenar_colunas_para_modelo(df, column_order_list):
 
 
 === FILE: treat/utils/preprocess_utils.py ===
-from __future__ import annotations
+# treat/utils/preprocess_utils.py
 
 import re
-from typing import Dict, Optional
-
 import pandas as pd
+from typing import Optional, Dict
 from gspread import Worksheet
 
 from treat.utils.geo_normalize import normalize_region
@@ -5339,7 +5395,6 @@ from treat.utils.atribuicoes_via_lookup import (
     atribuir_veiculo_e_id_meta,
     atribuir_veiculo_por_prefixo,
     atribuir_id_veiculo_generico,
-    atribuir_veiculo_por_criativo,
     SourceLookup,
 )
 from extract.sheets_fetcher import SheetsFetcher
@@ -5352,10 +5407,6 @@ __all__ = [
     "assign_vehicle_and_id",
     "get_sibling_sheet",
 ]
-
-# ────────────────────────────────────────────────────────────────────────────
-# Funções auxiliares de texto
-# ────────────────────────────────────────────────────────────────────────────
 
 
 def apply_origin_substitutions(df: pd.DataFrame) -> pd.DataFrame:
@@ -5409,11 +5460,6 @@ def _extract_platform(sheet_name: str) -> str:
     return m.group(0).lower() if m else sheet_name.lower()
 
 
-# ────────────────────────────────────────────────────────────────────────────
-# Pipeline de pré-processamento (substituições + região)
-# ────────────────────────────────────────────────────────────────────────────
-
-
 def preprocess_origin(
     df: pd.DataFrame,
     *,
@@ -5436,11 +5482,6 @@ def preprocess_origin(
     )
     df2 = normalize_region_column(df2, col_name="region")
     return df2
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Enriquecimento de Veiculo / ID_Veiculo (100 % in-memory)
-# ────────────────────────────────────────────────────────────────────────────
 
 
 def assign_vehicle_and_id(
@@ -5466,7 +5507,7 @@ def assign_vehicle_and_id(
         Lookup já inicializado no pipeline.
     """
     lower = sheet_name.lower()
-    platform = _extract_platform(sheet_name)          # ← correção essencial
+    platform = _extract_platform(sheet_name)  # ex.: "tiktok", "linkedin", etc.
     source_map = SourceLookup.get_mapping(fetcher)
 
     # ── Meta (Facebook / Instagram) ───────────────────────────────────────
@@ -5475,24 +5516,10 @@ def assign_vehicle_and_id(
             return atribuir_veiculo_e_id_meta(df, source_map)
         return atribuir_veiculo_por_prefixo(df, "meta", source_map)
 
-    # ── LinkedIn ──────────────────────────────────────────────────────────
-    if lower.startswith("linkedin"):
-        df = atribuir_veiculo_por_criativo(df, bi_lookup)
-        return atribuir_id_veiculo_generico(df, source_map)
-
-    # ── Pinterest ─────────────────────────────────────────────────────────
-    if lower.startswith("pinterest"):
-        df["Veiculo"] = "Pinterest"
-        return atribuir_id_veiculo_generico(df, source_map)
-
-    # ── Fallback (TikTok, Twitter, YouTube, …) ────────────────────────────
+    # ── Fallback para todas as outras plataformas
+    # Inclui LinkedIn, Pinterest, TikTok, Twitter, YouTube, etc.
     df = atribuir_veiculo_por_prefixo(df, platform, source_map)
     return atribuir_id_veiculo_generico(df, source_map)
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Utilitário para ler “abas irmãs” (Pinterest merge, etc.)
-# ────────────────────────────────────────────────────────────────────────────
 
 
 def get_sibling_sheet(
@@ -8262,13 +8289,13 @@ __all__ = ["merge_pinterest_dimension"]
 === FILE: treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py ===
 from __future__ import annotations
 
-"""Pinterest demographic merge (Idade/Gênero/Região)
-----------------------------------------------------
-Une a aba **pinterestGeral** (métricas por pin) com
-**pinterestIdade | pinterestGenero | pinterestRegiao** (métricas demográficas
-por campanha), redistribuindo proporcionalmente as métricas aos pins.
-Todo o pré-processamento demográfico já deve ter ocorrido in-place.
+"""Pinterest demographic merge (Idade/Gênero/Região) — versão corrigida
+------------------------------------------------------------------------
+Une pinterestGeral (métricas por pin) com pinterestIdade / pinterestGenero /
+pinterestRegiao (métricas demográficas por campanha), redistribuindo
+proporcionalmente as métricas aos pins e PRESERVANDO colunas de contexto.
 """
+
 import logging
 from typing import List, Tuple
 
@@ -8277,9 +8304,9 @@ from treat.utils.campos_calculados import calcular_engajamento_total, gerar_id
 
 log = logging.getLogger(__name__)
 
-# --------------------------------------------------------------------------- #
-#  Constantes                                                                  #
-# --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------- #
+#  Constantes                                                           #
+# --------------------------------------------------------------------- #
 _METRICS: Tuple[str, ...] = (
     "impressions",
     "link_clicks",
@@ -8287,52 +8314,55 @@ _METRICS: Tuple[str, ...] = (
     "video_watched_100",
 )
 
+# Campos que queremos manter no resultado final
 _DESIRED_BASE: Tuple[str, ...] = (
     "pin_id", "campaign_id", "campaign_name", "account_name",
     "ID_Veiculo", "Veiculo", "ID_Campanha", "Campanha",
     "ad_group_name", "ad_name", "objective", "utm_content",
 )
 
+# Campos obrigatórios (precisam existir no output, mesmo que vazios)
+_MANDATORY: Tuple[str, ...] = (
+    "account_name", "Veiculo", "ID_Veiculo", "ID_Campanha", "objective",
+)
+
+# Layout desejado para cada dimensão  (já inclui os obrigatórios)
 _FINAL_ORDER: dict[str, List[str]] = {
     "age": [
-        "date", "account_name", "ID_Veiculo", "Veiculo", "ID_Campanha",
-        "Campanha", "ad_group_name", "ad_name", "objective", "age",
-        "impressions", "cost", "link_clicks", "video_watched_100",
-        "campaign_id", "campaign_name", "pin_id",
+        "date", * _MANDATORY, "Campanha", "ad_group_name", "ad_name",
+        "age", * _METRICS, "campaign_id", "campaign_name", "pin_id",
     ],
     "gender": [
-        "date", "account_name", "ID_Veiculo", "Veiculo", "ID_Campanha",
-        "Campanha", "ad_group_name", "ad_name", "objective", "gender",
-        "impressions", "cost", "link_clicks", "video_watched_100",
-        "campaign_id", "campaign_name", "pin_id",
+        "date", * _MANDATORY, "Campanha", "ad_group_name", "ad_name",
+        "gender", * _METRICS, "campaign_id", "campaign_name", "pin_id",
     ],
     "region": [
-        "Numero", "date", "account_name", "ID_Veiculo", "Veiculo",
-        "ID_Campanha", "Campanha", "ad_group_name", "ad_name", "objective",
-        "region", "impressions", "cost", "link_clicks", "video_watched_100",
-        "campaign_id", "campaign_name", "pin_id",
+        "Numero", "date", * _MANDATORY, "Campanha", "ad_group_name",
+        "ad_name", "region", * _METRICS, "campaign_id", "campaign_name",
+        "pin_id",
     ],
 }
 
-# --------------------------------------------------------------------------- #
-#  Helpers                                                                     #
-# --------------------------------------------------------------------------- #
-
+# --------------------------------------------------------------------- #
+#  Helpers                                                              #
+# --------------------------------------------------------------------- #
 def _coerce_numeric(df: pd.DataFrame, cols: Tuple[str, ...]) -> pd.DataFrame:
     for c in cols:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
     return df
 
-# --------------------------------------------------------------------------- #
-#  Preparação das abas                                                         #
-# --------------------------------------------------------------------------- #
-
+# --------------------------------------------------------------------- #
+#  Preparação das abas                                                  #
+# --------------------------------------------------------------------- #
 def _prepare_general(df: pd.DataFrame) -> pd.DataFrame:
-    keep = set(_DESIRED_BASE) | {"date", * _METRICS}
+    keep = set(_DESIRED_BASE) | {"date", *_METRICS}
     df = df.copy()
     df.columns = df.columns.str.strip()
     df = df[[c for c in df.columns if c in keep]]
+    # 🔑 unifica tipo – evita mismatch no merge por campaign_id
+    if "campaign_id" in df.columns:
+        df["campaign_id"] = df["campaign_id"].astype(str)
     df = df.dropna(subset=["pin_id", "campaign_id", "date"]).reset_index(drop=True)
     return _coerce_numeric(df, _METRICS)
 
@@ -8341,98 +8371,112 @@ def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     dim_col = next((c for c in ("age", "gender", "region") if c in df.columns), None)
     if dim_col is None:
         raise KeyError("Dimensão sem coluna age/gender/region.")
+
     df = df.copy()
     df.columns = df.columns.str.strip()
-    # assumimos normalização in-place; só garantimos numeric
+
+    # ── 1) Converter strings vazias em NaN para evitar dropna indevido ────
+    for c in ("campaign_id", "date", dim_col):
+        if c in df.columns:
+            # transforma("" → NA") antes do dropna
+            df[c] = df[c].astype(str).str.strip().replace({"": pd.NA})
+
+    # ── 2) Garante que todas as métricas existam, preenchendo com 0 se faltar ─
     for m in _METRICS:
         if m not in df.columns:
             df[m] = 0
+
+    # ── 3) Agora sim, removemos linhas onde campaign_id, date ou dim_col sejam NaN ─
     df = df.dropna(subset=["campaign_id", "date", dim_col]).reset_index(drop=True)
+
+    # ── 4) Coerce as métricas para numérico (até aqui, sem filtrar por impressões) ─
     df = _coerce_numeric(df, _METRICS)
-    # só dimensões com impressões > 0
-    df = df[df["impressions"] > 0]
-    return df.reset_index(drop=True), dim_col
 
-# --------------------------------------------------------------------------- #
-#  Cálculo de pesos por pin                                                   #
-# --------------------------------------------------------------------------- #
+    log.info("📊 %s → %d linhas após _prepare_dimension", dim_col, len(df))
+    return df, dim_col
 
+# --------------------------------------------------------------------- #
+#  Cálculo de pesos por pin                                             #
+# --------------------------------------------------------------------- #
 def _weights(df_gen: pd.DataFrame) -> pd.DataFrame:
     grp = (
-        df_gen.groupby(["campaign_id", "date"], as_index=False)["impressions"].sum()
+        df_gen.groupby(["campaign_id", "date"], as_index=False)["impressions"]
+        .sum()
         .rename(columns={"impressions": "total_impressions"})
     )
     df = df_gen.merge(grp, on=["campaign_id", "date"], how="left")
     df["weight"] = df["impressions"] / df["total_impressions"]
-    return df[["campaign_id", "date", "pin_id", "weight"]]
+    out = df[["campaign_id", "date", "pin_id", "weight"]].copy()
+    out["campaign_id"] = out["campaign_id"].astype(str)
+    return out
 
-# --------------------------------------------------------------------------- #
-#  Merge principal                                                             #
-# --------------------------------------------------------------------------- #
-
-def merge_pinterest_dimension(*, df_general: pd.DataFrame, df_dimension: pd.DataFrame) -> pd.DataFrame:
-    """Une pinterestGeral + dimensão demográfica vetorizadamente."""
-    # prepara ambos DataFrames
-    df_gen = _prepare_general(df_general)
+# --------------------------------------------------------------------- #
+#  Merge principal                                                      #
+# --------------------------------------------------------------------- #
+def merge_pinterest_dimension(*, df_general: pd.DataFrame,
+                              df_dimension: pd.DataFrame) -> pd.DataFrame:
+    # 1) normalização
+    df_gen          = _prepare_general(df_general)
     df_dim, dim_col = _prepare_dimension(df_dimension)
-    # evita duplicação de pin_id caso esteja presente em df_dim
-    df_dim = df_dim.drop(columns=["pin_id"], errors="ignore")
 
-    # metadados de pin
-    meta_cols = [c for c in _DESIRED_BASE if c in df_gen.columns]
-    df_meta = df_gen[meta_cols].drop_duplicates("pin_id").set_index("pin_id")
+    # 2) metadados por campaign_id  (já temos colunas BI aqui!)
+    META_CORE = ["account_name", "Veiculo", "ID_Veiculo",
+                 "ID_Campanha", "objective", "Campanha"]
+    df_meta = (
+        df_gen[["campaign_id", *META_CORE]]
+        .drop_duplicates("campaign_id")
+        .set_index("campaign_id")
+    )
 
-    # pesos vetorizados
-    df_w = _weights(df_gen)
-    # renomeia métricas demográficas
+    # 3) pesos por pin
+    df_w = _weights(df_gen)                                # pin_id, campaign_id, date, weight
     dim_renamed = df_dim.rename(columns={m: f"{m}_dim" for m in _METRICS})
 
-    # merge dimension + pesos (pin_id virá apenas de df_w)
-    df_merge = pd.merge(
-        dim_renamed,
-        df_w,
-        on=["campaign_id", "date"],
-        how="inner",
-        validate="many_to_many",
-    )
-    # se aparecerem pin_id_x ou pin_id_y, unifica em pin_id
-    if "pin_id_y" in df_merge.columns:
-        df_merge["pin_id"] = df_merge["pin_id_y"]
-    df_merge = df_merge.drop(columns=["pin_id_x", "pin_id_y"], errors="ignore")
-
-    # merge com metadados de pin (many_to_one)
-    df = pd.merge(
-        df_merge,
-        df_meta,
-        left_on="pin_id",
-        right_index=True,
-        how="left",
-        validate="many_to_one",
+    # 4) dimensão × pesos  (traz pin_id do df_w)
+    df_merge = dim_renamed.merge(
+        df_w, on=["campaign_id", "date"], how="inner", validate="many_to_many"
     )
 
-    # redistribuir métricas
+    # 4a) remove duplicados exceto pin_id e campaign_id
+    dup = (set(df_merge.columns) & set(df_meta.columns)) - {"pin_id", "campaign_id"}
+    if dup:
+        df_merge = df_merge.drop(columns=list(dup))
+
+    # 5) junta metadados (many-to-one via campaign_id)
+    df = df_merge.merge(
+        df_meta, left_on="campaign_id", right_index=True,
+        how="left", validate="many_to_one"
+    )
+
+    # 6) redistribui métricas
     for m in _METRICS:
         src = f"{m}_dim"
-        if m == "cost":
-            df[m] = (df[src] * df["weight"]).round(2)
-        else:
-            df[m] = (df[src] * df["weight"]).round().astype(int)
+        df[m] = (df[src] * df["weight"]).round(2 if m == "cost" else 0).astype(
+            float if m == "cost" else int
+        )
 
-    # descarta linhas sem métrica
-    mask = df[list(_METRICS)].sum(axis=1) > 0
-    df = df.loc[mask].copy()
+    # 7) remove linhas sem métricas
+    df = df[df[list(_METRICS)].sum(axis=1) > 0].copy()
 
-    # campo Numero para region
+    # 8) region → Numero
     if dim_col == "region":
         df.insert(0, "Numero", range(1, len(df) + 1))
 
-    # engajamento + ID sintético
+    # 9) engajamento + ID sintético
     df = calcular_engajamento_total(df)
     df["ID"] = df.apply(gerar_id, axis=1)
 
-    # ordena colunas finais e retorna
+    # 10) garante campos obrigatórios
+
+    for col in _MANDATORY:
+        if col not in df.columns:
+            df[col] = ""
+
+    # 11) ordena
     df_final = df.reindex(columns=_FINAL_ORDER[dim_col], fill_value="")
-    log.info("✅ merge_pinterest_dimension – %s linhas (%s)", len(df_final), dim_col)
+
+    log.info("✅ merge_pinterest_dimension – %d linhas (%s)",
+             len(df_final), dim_col)
     return df_final
 
 __all__ = ["merge_pinterest_dimension"]

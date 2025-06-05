@@ -71,6 +71,7 @@ if __name__ == "__main__":
         "treat",
         "utils"
     ]
+    
 
     # Arquivos .py que ficam no nível raiz e que você quer trazer (exatamente esses nomes)
     include_root_files = [
