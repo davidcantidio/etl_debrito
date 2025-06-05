@@ -27,32 +27,70 @@ _METRICS: Tuple[str, ...] = (
 
 # Campos que queremos manter no resultado final
 _DESIRED_BASE: Tuple[str, ...] = (
-    "pin_id", "campaign_id", "campaign_name", "account_name",
-    "ID_Veiculo", "Veiculo", "ID_Campanha", "Campanha",
-    "ad_group_name", "ad_name", "objective", "utm_content",
+    "pin_id",
+    "campaign_id",
+    "campaign_name",
+    "account_name",
+    "ID_Veiculo",
+    "Veiculo",
+    "ID_Campanha",
+    "Campanha",
+    "ad_group_name",
+    "ad_name",
+    "objective",
+    "utm_content",
 )
 
 # Campos obrigatórios (precisam existir no output, mesmo que vazios)
 _MANDATORY: Tuple[str, ...] = (
-    "account_name", "Veiculo", "ID_Veiculo", "ID_Campanha", "objective",
+    "account_name",
+    "Veiculo",
+    "ID_Veiculo",
+    "ID_Campanha",
+    "objective",
 )
 
 # Layout desejado para cada dimensão  (já inclui os obrigatórios)
 _FINAL_ORDER: dict[str, List[str]] = {
     "age": [
-        "date", * _MANDATORY, "Campanha", "ad_group_name", "ad_name",
-        "age", * _METRICS, "campaign_id", "campaign_name", "pin_id",
+        "date",
+        *_MANDATORY,
+        "Campanha",
+        "ad_group_name",
+        "ad_name",
+        "age",
+        *_METRICS,
+        "campaign_id",
+        "campaign_name",
+        "pin_id",
     ],
     "gender": [
-        "date", * _MANDATORY, "Campanha", "ad_group_name", "ad_name",
-        "gender", * _METRICS, "campaign_id", "campaign_name", "pin_id",
+        "date",
+        *_MANDATORY,
+        "Campanha",
+        "ad_group_name",
+        "ad_name",
+        "gender",
+        *_METRICS,
+        "campaign_id",
+        "campaign_name",
+        "pin_id",
     ],
     "region": [
-        "Numero", "date", * _MANDATORY, "Campanha", "ad_group_name",
-        "ad_name", "region", * _METRICS, "campaign_id", "campaign_name",
+        "Numero",
+        "date",
+        *_MANDATORY,
+        "Campanha",
+        "ad_group_name",
+        "ad_name",
+        "region",
+        *_METRICS,
+        "campaign_id",
+        "campaign_name",
         "pin_id",
     ],
 }
+
 
 # --------------------------------------------------------------------- #
 #  Helpers                                                              #
@@ -63,6 +101,7 @@ def _coerce_numeric(df: pd.DataFrame, cols: Tuple[str, ...]) -> pd.DataFrame:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
     return df
 
+
 # --------------------------------------------------------------------- #
 #  Preparação das abas                                                  #
 # --------------------------------------------------------------------- #
@@ -71,9 +110,13 @@ def _prepare_general(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = df.columns.str.strip()
     df = df[[c for c in df.columns if c in keep]]
-    # 🔑 unifica tipo – evita mismatch no merge por campaign_id
+    # 🔑 unifica tipos – evita mismatch no merge por campaign_id e date
     if "campaign_id" in df.columns:
-        df["campaign_id"] = df["campaign_id"].astype(str)
+        df["campaign_id"] = (
+            pd.to_numeric(df["campaign_id"], errors="coerce").astype("Int64").astype(str)
+        )
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
     df = df.dropna(subset=["pin_id", "campaign_id", "date"]).reset_index(drop=True)
     return _coerce_numeric(df, _METRICS)
 
@@ -100,11 +143,21 @@ def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     # ── 3) Agora sim, removemos linhas onde campaign_id, date ou dim_col sejam NaN ─
     df = df.dropna(subset=["campaign_id", "date", dim_col]).reset_index(drop=True)
 
+    if "campaign_id" in df.columns:
+        df["campaign_id"] = (
+            pd.to_numeric(df["campaign_id"], errors="coerce").astype("Int64").astype(str)
+        )
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+    if dim_col in df.columns:
+        df[dim_col] = df[dim_col].astype(str).str.strip()
+
     # ── 4) Coerce as métricas para numérico (até aqui, sem filtrar por impressões) ─
     df = _coerce_numeric(df, _METRICS)
 
     log.info("📊 %s → %d linhas após _prepare_dimension", dim_col, len(df))
     return df, dim_col
+
 
 # --------------------------------------------------------------------- #
 #  Cálculo de pesos por pin                                             #
@@ -121,26 +174,25 @@ def _weights(df_gen: pd.DataFrame) -> pd.DataFrame:
     out["campaign_id"] = out["campaign_id"].astype(str)
     return out
 
+
 # --------------------------------------------------------------------- #
 #  Merge principal                                                      #
 # --------------------------------------------------------------------- #
-def merge_pinterest_dimension(*, df_general: pd.DataFrame,
-                              df_dimension: pd.DataFrame) -> pd.DataFrame:
+def merge_pinterest_dimension(
+    *, df_general: pd.DataFrame, df_dimension: pd.DataFrame
+) -> pd.DataFrame:
     # 1) normalização
-    df_gen          = _prepare_general(df_general)
+    df_gen = _prepare_general(df_general)
     df_dim, dim_col = _prepare_dimension(df_dimension)
 
     # 2) metadados por campaign_id  (já temos colunas BI aqui!)
-    META_CORE = ["account_name", "Veiculo", "ID_Veiculo",
-                 "ID_Campanha", "objective", "Campanha"]
+    META_CORE = ["account_name", "Veiculo", "ID_Veiculo", "ID_Campanha", "objective", "Campanha"]
     df_meta = (
-        df_gen[["campaign_id", *META_CORE]]
-        .drop_duplicates("campaign_id")
-        .set_index("campaign_id")
+        df_gen[["campaign_id", *META_CORE]].drop_duplicates("campaign_id").set_index("campaign_id")
     )
 
     # 3) pesos por pin
-    df_w = _weights(df_gen)                                # pin_id, campaign_id, date, weight
+    df_w = _weights(df_gen)  # pin_id, campaign_id, date, weight
     dim_renamed = df_dim.rename(columns={m: f"{m}_dim" for m in _METRICS})
 
     # 4) dimensão × pesos  (traz pin_id do df_w)
@@ -155,15 +207,21 @@ def merge_pinterest_dimension(*, df_general: pd.DataFrame,
 
     # 5) junta metadados (many-to-one via campaign_id)
     df = df_merge.merge(
-        df_meta, left_on="campaign_id", right_index=True,
-        how="left", validate="many_to_one"
+        df_meta, left_on="campaign_id", right_index=True, how="left", validate="many_to_one"
     )
+
+    if "campaign_id" in df.columns:
+        df["campaign_id"] = (
+            pd.to_numeric(df["campaign_id"], errors="coerce").astype("Int64").astype(str)
+        )
 
     # 6) redistribui métricas
     for m in _METRICS:
         src = f"{m}_dim"
-        df[m] = (df[src] * df["weight"]).round(2 if m == "cost" else 0).astype(
-            float if m == "cost" else int
+        df[m] = (
+            (df[src] * df["weight"])
+            .round(2 if m == "cost" else 0)
+            .astype(float if m == "cost" else int)
         )
 
     # 7) remove linhas sem métricas
@@ -186,8 +244,8 @@ def merge_pinterest_dimension(*, df_general: pd.DataFrame,
     # 11) ordena
     df_final = df.reindex(columns=_FINAL_ORDER[dim_col], fill_value="")
 
-    log.info("✅ merge_pinterest_dimension – %d linhas (%s)",
-             len(df_final), dim_col)
+    log.info("✅ merge_pinterest_dimension – %d linhas (%s)", len(df_final), dim_col)
     return df_final
+
 
 __all__ = ["merge_pinterest_dimension"]
