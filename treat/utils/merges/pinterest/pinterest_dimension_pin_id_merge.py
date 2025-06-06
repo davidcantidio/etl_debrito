@@ -191,14 +191,12 @@ def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
         df[dim_col] = df[dim_col].astype(str).str.strip()
 
 
-    # ── 4) Coerce as métricas para numérico (até aqui, sem filtrar por impressões) ─
+
+    # ── 4) Coerce as métricas para numérico (sem descartar linhas) ─
     df = _coerce_numeric(df, _METRICS)
     keep = {"campaign_id", "date", dim_col, *_METRICS}
     df = df[[c for c in df.columns if c in keep]]
 
-     # remove linhas sem nenhuma métrica relevante
-    if not df.empty:
-        df = df[df[list(_METRICS)].sum(axis=1) > 0].copy()
 
     log.info("📊 %s → %d linhas após _prepare_dimension", dim_col, len(df))
     return df, dim_col
