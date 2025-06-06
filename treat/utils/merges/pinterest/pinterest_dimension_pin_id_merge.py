@@ -290,10 +290,14 @@ def merge_pinterest_dimension(
             )
 
     df_temp = pd.DataFrame(out_rows)
+    if df_temp.empty:
+        log.warning("Demographic sheet produced no usable rows.")
+        return pd.DataFrame(columns=_FINAL_ORDER[dim_col])
 
     # 4) junta metadados de campanha
     df = df_temp.merge(
         meta_campaign,
+        left_on="campaign_id",
         right_index=True,
         how="left",
         validate="many_to_one",
