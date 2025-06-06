@@ -133,7 +133,7 @@ def _infer_data_type(sheet_name: str) -> str:
     Dado nome de aba de origem (exemplo: 'metaGenero', 'tiktokIdade'), devolve
     o sufixo que mapeia para a aba-modelo correspondente. Ex.: 'genero', 'idade'.
     """
-    lower = sheet_name.lower()
+    lower = sheet_name.strip().lower()
     if lower.startswith("ga"):
         raise ValueError(
             f"Aba '{sheet_name}' é do Google Analytics – não grava em abas-modelo."

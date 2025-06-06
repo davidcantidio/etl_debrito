@@ -1,4 +1,6 @@
 creds.json
-creds.json
-creds.json
 .env
+venv/
+env/
+.venv/
+__pycache__/
