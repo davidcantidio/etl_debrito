@@ -63,7 +63,11 @@ def write_back_origin(
     # 1) Sanity-check: df_ok não pode ter colunas extras em relação a df_raw
     extras = set(df_ok.columns) - set(df_raw.columns)
     if extras:
-        raise ValueError(f"[write_back_origin] Colunas inesperadas: {sorted(extras)}")
+        log.warning(
+            "[write_back_origin] Ignorando colunas extras: %s",
+            sorted(extras),
+        )
+        df_ok = df_ok.drop(columns=list(extras))
 
     # 2) Se write_back estiver desligado, não grava nada
     if not write_back:
