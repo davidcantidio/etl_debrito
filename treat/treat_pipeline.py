@@ -23,7 +23,7 @@ from __future__ import annotations
 import builtins
 import logging
 from typing import Callable, Dict, List, Optional
-
+from treat.utils.normalize import normalize_age        # novo import
 import pandas as pd
 from gspread import Worksheet
 
@@ -249,6 +249,8 @@ class TreatPipeline:
         # 14) Renomeia colunas para o modelo destino + cálculos finais
         # ───────────────────────────────────────────────────────────────
         df = renomear_colunas_origem_para_modelo(df, self.mapping)
+        if "age" in df.columns:                                
+            df["age"] = df["age"].apply(normalize_age)
         df = calcular_engajamento_total(df)
         df["ID"] = df.apply(gerar_id, axis=1)
 

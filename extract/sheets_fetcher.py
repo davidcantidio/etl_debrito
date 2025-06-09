@@ -74,14 +74,14 @@ class SheetsFetcher:
     def _get_meta(self):
         if self._spreadsheet_meta is None:
             self._spreadsheet_meta = (
-                self.service.spreadsheets().get(
+                self._service.spreadsheets().get(
                     spreadsheetId=self.spreadsheet_id,
                     includeGridData=False,
                 ).execute()
             )
         return self._spreadsheet_meta
     
-    
+
     def _batch_get(self, ranges: List[str]) -> Dict[str, Any]:
         """Executa batchGet com retry/back-off para código 429."""
         log.info("🔄 batchGet tentativa para ranges: %s", ranges)
