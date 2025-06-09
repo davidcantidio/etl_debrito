@@ -160,6 +160,7 @@ def _prepare_general(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
+    """Normaliza aba demográfica sem descartar linhas com métricas zeradas."""
     dim_col = next((c for c in ("age", "gender", "region") if c in df.columns), None)
     if dim_col is None:
         raise KeyError("Dimensão sem coluna age/gender/region.")
