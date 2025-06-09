@@ -560,7 +560,7 @@ def _infer_data_type(sheet_name: str) -> str:
     Dado nome de aba de origem (exemplo: 'metaGenero', 'tiktokIdade'), devolve
     o sufixo que mapeia para a aba-modelo correspondente. Ex.: 'genero', 'idade'.
     """
-    lower = sheet_name.lower()
+    lower = sheet_name.strip().lower()
     if lower.startswith("ga"):
         raise ValueError(
             f"Aba '{sheet_name}' é do Google Analytics – não grava em abas-modelo."
@@ -874,7 +874,11 @@ def write_back_origin(
     # 1) Sanity-check: df_ok não pode ter colunas extras em relação a df_raw
     extras = set(df_ok.columns) - set(df_raw.columns)
     if extras:
-        raise ValueError(f"[write_back_origin] Colunas inesperadas: {sorted(extras)}")
+        log.warning(
+            "[write_back_origin] Ignorando colunas extras: %s",
+            sorted(extras),
+        )
+        df_ok = df_ok.drop(columns=list(extras))
 
     # 2) Se write_back estiver desligado, não grava nada
     if not write_back:
@@ -1396,6 +1400,9 @@ def validate_impressions_consistency(
         raise ValueError(
             "Divergência de impressões:\\n" + mismatch.to_string(index=False)
         )
+
+
+=== FILE: tests/test_pinterest_merge.py ===
 
 
 === FILE: treat/__init__.py ===
@@ -8297,10 +8304,12 @@ proporcionalmente as métricas aos pins e PRESERVANDO colunas de contexto.
 """
 
 import logging
-from typing import List, Tuple
+from math import floor
+from typing import Dict, List, Tuple
 
 import pandas as pd
 from treat.utils.campos_calculados import calcular_engajamento_total, gerar_id
+from treat.utils.normalize import convert_numeric_columns
 
 log = logging.getLogger(__name__)
 
@@ -8385,10 +8394,43 @@ _FINAL_ORDER: dict[str, List[str]] = {
 #  Helpers                                                              #
 # --------------------------------------------------------------------- #
 def _coerce_numeric(df: pd.DataFrame, cols: Tuple[str, ...]) -> pd.DataFrame:
-    for c in cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-    return df
+    """Converte colunas numéricas respeitando vírgula decimal."""
+    return convert_numeric_columns(df, list(cols))
+
+
+def _floor_cents(v: float) -> float:
+    return floor(v * 100) / 100.0
+
+
+def _dist_float_total(valor: float, pesos: Dict[str, float]) -> Dict[str, float]:
+    """Distribui valor monetário preservando centavos."""
+    if valor == 0 or not any(pesos.values()):
+        return {k: 0.0 for k in pesos}
+    total = sum(pesos.values())
+    bruto = {k: v / total * valor for k, v in pesos.items()}
+    base = {k: _floor_cents(x) for k, x in bruto.items()}
+    resto = round(valor - sum(base.values()), 2)
+    if resto:
+        frac = {k: bruto[k] - base[k] for k in pesos}
+        for k in sorted(frac, key=frac.get, reverse=True)[: int(resto / 0.01)]:
+            base[k] += 0.01
+    return {k: round(x, 2) for k, x in base.items()}
+
+
+def _dist_int_total(valor: int, pesos: Dict[str, float]) -> Dict[str, int]:
+    """Distribui inteiros preservando soma."""
+    if valor == 0 or not any(pesos.values()):
+        return {k: 0 for k in pesos}
+    total = sum(pesos.values())
+    bruto = {k: v / total * valor for k, v in pesos.items()}
+    base = {k: int(floor(x)) for k, x in bruto.items()}
+    resto = valor - sum(base.values())
+    if resto:
+        frac = {k: bruto[k] - base[k] for k in pesos}
+        for k in sorted(frac, key=frac.get, reverse=True)[: resto]:
+            base[k] += 1
+    return base
+
 
 # --------------------------------------------------------------------- #
 #  Preparação das abas                                                  #
@@ -8398,11 +8440,15 @@ def _prepare_general(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = df.columns.str.strip()
     df = df[[c for c in df.columns if c in keep]]
-    # 🔑 unifica tipos – evita mismatch no merge por campaign_id e date
-    if "campaign_id" in df.columns:
-       df["campaign_id"] = (
-            pd.to_numeric(df["campaign_id"], errors="coerce").astype("Int64").astype(str)
-        )
+    
+
+    # 🔑 normaliza chaves antes do dropna
+    for c in ("campaign_id", "date"):
+        if c in df.columns:
+            s = df[c].astype(str).str.strip()
+            s = s.str.replace(r"\.0+$", "", regex=True)
+            df[c] = s.replace({"": pd.NA})
+
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
     df = df.dropna(subset=["pin_id", "campaign_id", "date"]).reset_index(drop=True)
@@ -8410,6 +8456,7 @@ def _prepare_general(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
+    """Normaliza aba demográfica sem descartar linhas com métricas zeradas."""
     dim_col = next((c for c in ("age", "gender", "region") if c in df.columns), None)
     if dim_col is None:
         raise KeyError("Dimensão sem coluna age/gender/region.")
@@ -8434,19 +8481,19 @@ def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
 
 
     if "campaign_id" in df.columns:
-        df["campaign_id"] = (
-            pd.to_numeric(df["campaign_id"], errors="coerce").astype("Int64").astype(str)
-        )
+         df["campaign_id"] = df["campaign_id"].astype(str).str.strip()
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
     if dim_col in df.columns:
         df[dim_col] = df[dim_col].astype(str).str.strip()
 
 
-    # ── 4) Coerce as métricas para numérico (até aqui, sem filtrar por impressões) ─
+
+    # ── 4) Coerce as métricas para numérico (sem descartar linhas) ─
     df = _coerce_numeric(df, _METRICS)
     keep = {"campaign_id", "date", dim_col, *_METRICS}
     df = df[[c for c in df.columns if c in keep]]
+
 
     log.info("📊 %s → %d linhas após _prepare_dimension", dim_col, len(df))
     return df, dim_col
@@ -8454,18 +8501,21 @@ def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
 # --------------------------------------------------------------------- #
 #  Cálculo de pesos por pin                                             #
 # --------------------------------------------------------------------- #
-def _weights(df_gen: pd.DataFrame) -> pd.DataFrame:
-    grp = (
-        df_gen.groupby(["campaign_id", "date"], as_index=False)["impressions"]
-        .sum()
-        .rename(columns={"impressions": "total_impressions"})
-    )
-    df = df_gen.merge(grp, on=["campaign_id", "date"], how="left")
-    df["weight"] = df["impressions"] / df["total_impressions"]
-    out = df[["campaign_id", "date", "pin_id", "weight"]].copy()
-    out["campaign_id"] = out["campaign_id"].astype(str)
-    return out
-
+def _build_weights(df_gen: pd.DataFrame) -> Dict[Tuple[str, str], Dict[str, float]]:
+    """Retorna pesos por pin dentro de cada campanha e data."""
+    weights: Dict[Tuple[str, str], Dict[str, float]] = {}
+    for (cid, dt), grp in df_gen.groupby(["campaign_id", "date"]):
+        total_imp = grp["impressions"].sum()
+        if total_imp > 0:
+            base = grp.set_index("pin_id")["impressions"].astype(float)
+        else:
+            total_cost = grp["cost"].sum()
+            if total_cost > 0:
+                base = grp.set_index("pin_id")["cost"].astype(float)
+            else:
+                base = pd.Series(0.0, index=grp["pin_id"])
+        weights[(cid, dt)] = base.to_dict()
+    return weights
 # --------------------------------------------------------------------- #
 #  Merge principal                                                      #
 # --------------------------------------------------------------------- #
@@ -8476,78 +8526,111 @@ def merge_pinterest_dimension(
     # 1) normalização
     df_gen = _prepare_general(df_general)
     df_dim, dim_col = _prepare_dimension(df_dimension)
+    # 2) metadados por pin e por campanha
+    meta_pin = (
+        df_gen[["pin_id", "campaign_id", "campaign_name", "ad_group_name", "ad_name"]]
+        .drop_duplicates("pin_id")
+        .set_index("pin_id")
+    )
+    meta_campaign = (
+        df_gen[[
+            "campaign_id",
+            "account_name",
+            "Veiculo",
+            "ID_Veiculo",
+            "ID_Campanha",
+            "Campanha",
+            "objective",
+        ]]
+        .drop_duplicates("campaign_id")
+        .set_index("campaign_id")
 
-    # 2) metadados por pin_id  (já temos colunas BI aqui!)
-    META_COLS = [
-        "pin_id",
-        "campaign_id",
-        "campaign_name",
-        "account_name",
-        "Veiculo",
-        "ID_Veiculo",
-        "ID_Campanha",
-        "Campanha",
-        "ad_group_name",
-        "ad_name",
-        "objective",
-    ]
-    df_meta=(
-    df_gen[META_COLS]
-    .drop_duplicates("pin_id")
-    .set_index("pin_id"))
-
-    # 3) pesos por pin
-    df_w = _weights(df_gen)                                # pin_id, campaign_id, date, weight
-    dim_renamed = df_dim.rename(columns={m: f"{m}_dim" for m in _METRICS})
-
-    # 4) dimensão × pesos  (traz pin_id do df_w)
-    df_merge = dim_renamed.merge(
-        df_w, on=["campaign_id", "date"], how="inner", validate="many_to_many"
     )
 
-    # 4a) remove duplicados exceto pin_id e colunas relevantes
-    dup = (
-        set(df_merge.columns) & set(df_meta.columns)
-    ) - {"pin_id", "ad_group_name", "ad_name"}
-    if dup:
-        df_merge = df_merge.drop(columns=list(dup))
+    # 3) pesos por pin
+    weights = _build_weights(df_gen)
 
-    # 5) junta metadados (many-to-one via pin_id)
-    df = df_merge.merge(
-        df_meta,
-        left_on="pin_id",
+    out_rows: List[dict] = []
+
+    for row in df_dim.itertuples(index=False):
+        key = (row.campaign_id, row.date)
+        if key not in weights:
+            continue
+        w_pins = weights[key]
+
+        dist_cost = _dist_float_total(float(row.cost), w_pins)
+        dist_ints = {
+            "impressions": _dist_int_total(int(row.impressions), w_pins),
+            "link_clicks": _dist_int_total(int(row.link_clicks), w_pins),
+            "video_watched_100": _dist_int_total(int(row.video_watched_100), w_pins),
+        }
+
+        for pin_id in w_pins:
+            pin_meta = meta_pin.loc[pin_id] if pin_id in meta_pin.index else {}
+
+            out_rows.append(
+                {
+                    "campaign_id": row.campaign_id,
+                    "date": row.date,
+                    dim_col: getattr(row, dim_col),
+                    "pin_id": pin_id,
+                    "campaign_name": pin_meta.get("campaign_name", ""),
+                    "ad_group_name": pin_meta.get("ad_group_name", ""),
+                    "ad_name": pin_meta.get("ad_name", ""),
+                    "impressions": dist_ints["impressions"][pin_id],
+                    "cost": dist_cost[pin_id],
+                    "link_clicks": dist_ints["link_clicks"][pin_id],
+                    "video_watched_100": dist_ints["video_watched_100"][pin_id],
+                }
+            )
+
+    df_temp = pd.DataFrame(out_rows)
+    if df_temp.empty:
+        log.warning("Demographic sheet produced no usable rows.")
+        return pd.DataFrame(columns=_FINAL_ORDER[dim_col])
+
+    # 4) junta metadados de campanha
+    df = df_temp.merge(
+        meta_campaign,
+        left_on="campaign_id",
         right_index=True,
         how="left",
         validate="many_to_one",
-        suffixes=("", "_meta"),
     )
 
-    for col in ("ad_group_name", "ad_name"):
-        meta_col = f"{col}_meta"
-        if meta_col in df.columns:
-            df[col] = df[col].fillna(df[meta_col])
-            df = df.drop(columns=[meta_col])
+     # preenche valores ausentes das colunas BI
+    for c in meta_campaign.columns:
+        if c in df.columns:
+            if pd.api.types.is_numeric_dtype(meta_campaign[c]):
+                df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+            else:
+                df[c] = df[c].fillna("Não identificado")
+
 
     if "campaign_id" in df.columns:
-        df["campaign_id"] = df["campaign_id"].astype(str)
+        df["campaign_id"] = df["campaign_id"].astype(str).str.strip()
 
+    # validação de soma por campanha
+    try:
+        orig_tot = df_gen.groupby(["campaign_id", "date"])[list(_METRICS)].sum()
+        new_tot = df.groupby(["campaign_id", "date"])[list(_METRICS)].sum()
+        for idx, row in orig_tot.iterrows():
+            if idx not in new_tot.index:
+                continue
+            for m in _METRICS:
+                o = row[m]
+                d = new_tot.loc[idx, m]
+                if o == 0:
+                    continue
+                if abs(o - d) / o > 0.001:
+                    log.warning(
+                        "Divergência %s em %s: %s vs %s", m, idx, o, d
+                    )
+        log.info("Validação de soma concluída para %d grupos", len(orig_tot))
+    except Exception as exc:
+        log.warning("Validação de soma falhou: %s", exc)
 
-    if "campaign_id" in df.columns:
-        df["campaign_id"] = (
-            pd.to_numeric(df["campaign_id"], errors="coerce").astype("Int64").astype(str)
-        )
-
-
-    # 6) redistribui métricas
-    for m in _METRICS:
-        src = f"{m}_dim"
-        df[m] = (
-            (df[src] * df["weight"])
-            .round(2 if m == "cost" else 0)
-            .astype(float if m == "cost" else int)
-        )
-
-    # 7) remove linhas sem métricas
+    # remove linhas sem métricas
     df = df[df[list(_METRICS)].sum(axis=1) > 0].copy()
 
     # 8) region → Numero
