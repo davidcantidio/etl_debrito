@@ -160,7 +160,10 @@ class TreatPipeline:
                 raise RuntimeError("pinterestGeral não foi processado antes da dimensão.")
 
             # 3c) merge demográfico (gera modeloIdade/Genero/Regiao)
-            return pin_merge(df_general=df_geral, df_dimension=df)
+            df = pin_merge(df_general=df_geral, df_dimension=df)
+            log.info(
+                "merge_pinterest_dimension concluído – retornando ao pipeline genérico"
+            )
 
         # ───────────────────────────────────────────────────────────────
         # 4) Validações iniciais contra BI
@@ -229,22 +232,25 @@ class TreatPipeline:
         ]
         check_required_columns(df, optional_cols=["URL_do_Anúncio"], zero_valid_cols=ZERO_OK)
 
-        # ───────────────────────────────────────────────────────────────
-        # 13) Write-back das correções na aba-origem (todas as demais)
-        # ───────────────────────────────────────────────────────────────
-        df_orig_to_write = df[orig_cols]
-        validate_columns(df_orig_to_write, orig_cols,
-                        stage=f"Origem {self.sheet_name}")
-        write_back_origin(
-            df_raw        = df_raw,
-            df_ok         = df_orig_to_write,
-            creds_path    = self.creds_path,
-            spreadsheet_id= self.spreadsheet_id,
-            sheet_name    = self.sheet_name,
-            write_back    = self.write_back,
-            dry_run       = False,
-        )
+         # 13) Write-back das correções na aba-origem (padrão)
+        #     Para as dimensões do Pinterest já gravamos no passo 3a.
 
+        if lower not in {"pinterestidade", "pinterestgenero", "pinterestregiao"}:
+                    df_orig_to_write = df[orig_cols]
+                    validate_columns(
+                        df_orig_to_write,
+                        orig_cols,
+                        stage=f"Origem {self.sheet_name}",
+                    )
+                    write_back_origin(
+                        df_raw=df_raw,
+                        df_ok=df_orig_to_write,
+                        creds_path=self.creds_path,
+                        spreadsheet_id=self.spreadsheet_id,
+                        sheet_name=self.sheet_name,
+                        write_back=self.write_back,
+                        dry_run=False,
+                    )
         # ───────────────────────────────────────────────────────────────
         # 14) Renomeia colunas para o modelo destino + cálculos finais
         # ───────────────────────────────────────────────────────────────

@@ -12,7 +12,6 @@ from math import floor
 from typing import Dict, List, Tuple
 
 import pandas as pd
-from treat.utils.campos_calculados import calcular_engajamento_total, gerar_id
 from treat.utils.normalize import convert_numeric_columns
 
 log = logging.getLogger(__name__)
@@ -180,8 +179,11 @@ def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
         if m not in df.columns:
             df[m] = 0
 
-    # ── 3) Agora sim, removemos linhas onde campaign_id, date ou dim_col sejam NaN ─
-    df = df.dropna(subset=["campaign_id", "date", dim_col]).reset_index(drop=True)
+        # ── 3) Preenche valores ausentes da dimensão e descarta apenas chaves nulas ─
+    if dim_col in df.columns:
+        df[dim_col] = df[dim_col].fillna("Não classificado")
+
+    df = df.dropna(subset=["campaign_id", "date"]).reset_index(drop=True)
 
 
     if "campaign_id" in df.columns:
@@ -334,27 +336,13 @@ def merge_pinterest_dimension(
     except Exception as exc:
         log.warning("Validação de soma falhou: %s", exc)
 
-    # remove linhas sem métricas
-    df = df[df[list(_METRICS)].sum(axis=1) > 0].copy()
+    # Mantém linhas mesmo que todas as métricas sejam zero –
+    # a ausência de valores será tratada a jusante
 
     # 8) region → Numero
     if dim_col == "region":
         df.insert(0, "Numero", range(1, len(df) + 1))
-
-    # 9) engajamento + ID sintético
-    df = calcular_engajamento_total(df)
-    df["ID"] = df.apply(gerar_id, axis=1)
-
-    # 10) garante campos obrigatórios
-
-    for col in _MANDATORY:
-        if col not in df.columns:
-            df[col] = ""
-
-    # 11) ordena
-    df_final = df.reindex(columns=_FINAL_ORDER[dim_col], fill_value="")
-
-    log.info("✅ merge_pinterest_dimension – %d linhas (%s)", len(df_final), dim_col)
-    return df_final
-
+    log.info("✅ merge_pinterest_dimension – %d linhas (%s)", len(df), dim_col)
+    return df
+    
 __all__ = ["merge_pinterest_dimension"]
