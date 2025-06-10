@@ -1,9 +1,15 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/README.md b/README.md
-index bcd3d7cd92b4200e91991bbbc986fbc20384c017..76f74a9c3e916772814b3401768bde1df83d605e 100644
+index 76f74a9c3e916772814b3401768bde1df83d605e..fd65aff0e3a79c8e15ee3c91d01c122630aad6e0 100644
 --- a/README.md
 +++ b/README.md
-@@ -50,50 +50,52 @@ Gera logs detalhados informando quantidade de linhas e colunas atualizadas, e em
+@@ -44,50 +44,53 @@ Quando dry_run_flag=True, valida apenas a estrutura (colunas e tipos) sem sobres
+ 
+ Quando write_back_flag=True, grava os dados transformados in-place na planilha, preservando fórmulas e formatações definidas pelo usuário.
+ 
+ Gera logs detalhados informando quantidade de linhas e colunas atualizadas, e emite warnings caso haja discrepâncias de ordenação ou colunas inesperadas.
+ 
+ [...] (mesmo conteúdo anterior)
  
  🔄 Etapa 4 – Mecanismo de Controle, Logs, Execução Modular e Flags
  
@@ -23,14 +29,17 @@ index bcd3d7cd92b4200e91991bbbc986fbc20384c017..76f74a9c3e916772814b3401768bde1d
  
  O loop garante execução modular para cada aba, respeitando configurações específicas.
  
++Todo o conjunto de abas é carregado em memória via **uma única chamada** `batchGet`,
++e os resultados de destino são enviados em um único `batchUpdate` ao final.
++
  Controle de Flags
  
  WRITE_BACK_ORIGIN: habilita/desabilita gravação in-place das correções na aba de origem (via write_back_origin).
  
  WRITE_BACK_DEST: habilita/desabilita gravação dos resultados nas abas de modelo de destino (via write_back_destiny).
  
-+Gravação em lote usando `batchUpdate` garante apenas uma chamada POST mesmo para várias abas de modelo.
-+
+ Gravação em lote usando `batchUpdate` garante apenas uma chamada POST mesmo para várias abas de modelo.
+ 
  DRY_RUN_DEST: quando True, valida apenas estrutura e ordenação de colunas sem sobrescrever dados existentes.
  
  Geração de Logs
@@ -48,81 +57,77 @@ index bcd3d7cd92b4200e91991bbbc986fbc20384c017..76f74a9c3e916772814b3401768bde1d
  As exceções e stacks são logadas para auditoria posterior.
  
  Retorno da Função
+diff --git a/extract/sheets_fetcher.py b/extract/sheets_fetcher.py
+index f77f8d9c2199a28ce8c3f43ca831d09ba0198126..d66da714cfd1a86250b35324348d42309c2f3bc5 100644
+--- a/extract/sheets_fetcher.py
++++ b/extract/sheets_fetcher.py
+@@ -121,50 +121,61 @@ class SheetsFetcher:
+         return payload
  
- Ao fim do loop, execute_pipeline() retorna o dicionário results com detalhes de destino (dest) e eventuais dados de taxonomia (taxo).
+     def get(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
+         """
+         Lê em lote as abas listadas em sheet_names.
+         Retorna dicionário {nome_aba: DataFrame|raw lists} conforme as_frame.
+         Utiliza cache TTL para evitar leituras desnecessárias.
+         """
+         names = [n.strip() for n in dict.fromkeys(sheet_names)]
+         key = tuple(sorted(names))
+         now = time.time()
  
- Esta arquitetura garante separação clara entre a lógica de ETL para cada aba e o controle central de execução, permitindo ajustes via flags sem alterar o fluxo principal.
+         if key in self._cache and now - self._cache[key][0] < self._cache_ttl:
+             raw = self._cache[key][1]
+             log.info("📥 Cache hit para %s", key)
+         else:
+             raw = self._fetch_and_cache(names)
+             self._cache[key] = (now, raw)
+             log.info("📡 batchGet %d ranges", len(names))
  
- [...] (mesmo conteúdo anterior)
+         if not as_frame:
+             return {n: raw.get(n, []) for n in names}
  
- ✅ Considerações Finais
+         return {n: self._as_dataframe(raw.get(n, [])) for n in names}
+ 
++    def get_cached(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
++        """Retorna dados do cache sem acionar a API."""
++        names = [n.strip() for n in dict.fromkeys(sheet_names)]
++        key = tuple(sorted(names))
++        if key not in self._cache:
++            raise KeyError(f"Cache miss para {names}")
++        raw = self._cache[key][1]
++        if not as_frame:
++            return {n: raw.get(n, []) for n in names}
++        return {n: self._as_dataframe(raw.get(n, [])) for n in names}
++
+     def refresh(self, sheet_names: Iterable[str]):
+         """
+         Invalida o cache para as abas listadas e força recarregamento.
+         """
+         key = tuple(sorted(sheet_names))
+         self._cache.pop(key, None)
+         _ = self.get(sheet_names, as_frame=False)  # força reload
+ 
+     @staticmethod
+     def _as_dataframe(raw: List[List[str]]) -> pd.DataFrame:
+         """
+         Converte raw lists (header + body) em pandas.DataFrame,
+         preenchendo linhas/colunas faltantes com strings vazias.
+         """
+         if not raw:
+             return pd.DataFrame()
+         header, *body = raw
+         max_cols = len(header)
+         normalized = [
+             row + [""] * (max_cols - len(row)) if len(row) < max_cols else row[:max_cols]
+             for row in body
+         ]
+         return pd.DataFrame(normalized, columns=[c.strip() for c in header])
+ 
+     def open_worksheet(self, sheet_name: str):
 diff --git a/load/dest_writer.py b/load/dest_writer.py
-index 2e5da77e056cde63d8032d5238e523889c4a8db1..07cd9d8b36766907ebb5f7846ead48cfe3398a6c 100644
+index 07cd9d8b36766907ebb5f7846ead48cfe3398a6c..fe7c20136e5f15f6be34cca22f98335878a43dc0 100644
 --- a/load/dest_writer.py
 +++ b/load/dest_writer.py
-@@ -1,89 +1,87 @@
- # load/dest_writer.py
- 
- """
- Write-back otimizado para as abas **modelo***
- 
- Principais características
- -------------------------
- * 01 leitura para cabeçalhos e IDs: usamos SheetsFetcher para recuperar todas
-   as abas-modelo de uma só vez (batchGet), poupando quota.
- * Zero leituras extras durante o loop de ETL; somente gravação (via write_back_df ou append).
- * Deduplicação: grava apenas registros cujo "ID" ainda não existe.
- * Compatível com dry-run e com execução em paralelo.
- """
- 
- import datetime as _dt
-+import json
- import logging
- import re
--from typing import Dict, List, Optional, Set
-+from typing import Dict, Iterable, List, Optional, Set
- 
- import numpy as np
- import pandas as pd
-+from google.oauth2.service_account import Credentials
-+from googleapiclient.discovery import build
- from tenacity import (
-     retry,
-     retry_if_exception_type,
-     stop_after_attempt,
-     wait_exponential,
- )
- 
- from extract.sheets_fetcher import SheetsFetcher
--from treat.utils.write_back import write_back_df
--from load.utils.append_records_to_sheet import append_records_to_sheet
- from treat.utils.validations import validate_columns
- 
- log = logging.getLogger(__name__)
- 
- # ───────────────────────────── mapeamento origem → destino ──────────────────
- DESTINATION_SHEETS: Dict[str, str] = {
--    "geral":   "modeloGeral",
--    "genero":  "modeloGenero",
--    "idade":   "modeloIdade",
-+    "geral": "modeloGeral",
-+    "genero": "modeloGenero",
-+    "idade": "modeloIdade",
-     "alcance": "modeloAlcance",
--    "regiao":  "modeloRegiao",
-+    "regiao": "modeloRegiao",
- }
- 
- # ───────────────────────────── caches globais em memória ────────────────────
--_HEADERS: Dict[str, List[str]] = {}        # aba-destino → header completo
--_EXISTING_IDS: Dict[str, Set[str]] = {}    # aba-destino → set(ID)
-+_HEADERS: Dict[str, List[str]] = {}  # aba-destino → header completo
-+_EXISTING_IDS: Dict[str, Set[str]] = {}  # aba-destino → set(ID)
- 
- 
- def _idx_to_col(idx: int) -> str:
-     """Converte índice 0-based em letras de coluna estilo A1 (A, B, …, AA…)."""
-     out = ""
+@@ -54,79 +54,85 @@ def _idx_to_col(idx: int) -> str:
      while True:
          idx, rem = divmod(idx, 26)
          out = chr(65 + rem) + out
@@ -131,11 +136,7 @@ index 2e5da77e056cde63d8032d5238e523889c4a8db1..07cd9d8b36766907ebb5f7846ead48cf
          idx -= 1
  
  
--def prefetch_meta(
--    fetcher: SheetsFetcher,
--    spreadsheet_id: str
--) -> None:
-+def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
+ def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
      """
      Carrega cabeçalhos (linha 1) e IDs (coluna 'ID' a partir da linha 2)
      de todas as abas-modelo (modeloGeral, modeloGenero, etc.) em UMA ÚNICA
@@ -152,7 +153,11 @@ index 2e5da77e056cde63d8032d5238e523889c4a8db1..07cd9d8b36766907ebb5f7846ead48cf
      abas = list(DESTINATION_SHEETS.values())
  
      # 1) Buscar todas as linhas de cada aba no fetcher (cada aba → Lista[List[str]])
-     raw_data = fetcher.get(abas, as_frame=False)
+-    raw_data = fetcher.get(abas, as_frame=False)
++    try:
++        raw_data = fetcher.get_cached(abas, as_frame=False)
++    except Exception:
++        raw_data = fetcher.get(abas, as_frame=False)
  
      # 2) Extrair cabeçalhos (linha 0 de cada aba) e armazenar em _HEADERS
      for tab, values in raw_data.items():
@@ -161,7 +166,45 @@ index 2e5da77e056cde63d8032d5238e523889c4a8db1..07cd9d8b36766907ebb5f7846ead48cf
          _HEADERS[tab] = header
  
      # 3) Identificar intervalos de ID para cada aba-modelo
-@@ -125,123 +123,200 @@ def _scalar(v):
+     id_ranges: List[Optional[str]] = []
+     for tab in abas:
+         header = _HEADERS.get(tab, [])
+         try:
+             idx_id = [h.lower() for h in header].index("id")
+             col_a1 = _idx_to_col(idx_id)
+             # range a partir da linha 2 (sem cabeçalho)
+             id_ranges.append(f"{tab}!{col_a1}2:{col_a1}")
+         except ValueError:
+             _EXISTING_IDS[tab] = set()
+             id_ranges.append(None)
+ 
+     # 4) Ler todas as colunas 'ID' de uma vez (quando existirem)
+     valid_tabs = []
+     for tab, rng in zip(abas, id_ranges):
+         if rng:
+             valid_tabs.append(tab)
+ 
+     if valid_tabs:
+-        raw_ids = fetcher.get(valid_tabs, as_frame=False)
++        try:
++            raw_ids = fetcher.get_cached(valid_tabs, as_frame=False)
++        except Exception:
++            raw_ids = fetcher.get(valid_tabs, as_frame=False)
+         for tab in valid_tabs:
+             listas = raw_ids.get(tab, [])
+             # cada linha em listas corresponde a uma célula ID
+             ids = [item for row in listas for item in row if str(item).strip()]
+             _EXISTING_IDS[tab] = set(ids)
+ 
+     log.info(
+         "📥 Prefetch destino concluído: %d abas com cabeçalho, total de IDs carregados=%d",
+         len(_HEADERS),
+         sum(len(s) for s in _EXISTING_IDS.values()),
+     )
+ 
+ 
+ def _scalar(v):
+     if isinstance(v, _dt.date):
          return v.isoformat()
      if v is None or (isinstance(v, float) and np.isnan(v)):
          return ""
@@ -172,257 +215,373 @@ index 2e5da77e056cde63d8032d5238e523889c4a8db1..07cd9d8b36766907ebb5f7846ead48cf
      """
      Dado nome de aba de origem (exemplo: 'metaGenero', 'tiktokIdade'), devolve
      o sufixo que mapeia para a aba-modelo correspondente. Ex.: 'genero', 'idade'.
-     """
-     lower = sheet_name.strip().lower()
-     if lower.startswith("ga"):
-         raise ValueError(
-             f"Aba '{sheet_name}' é do Google Analytics – não grava em abas-modelo."
-         )
-     m = re.search(r"(geral|genero|idade|alcance|regiao)$", lower)
-     if not m:
-         raise ValueError(
-             f"Não reconheço o tipo de dados da aba '{sheet_name}' "
-             "(esperava terminar em geral/genero/idade/alcance/regiao)."
-         )
-     return m.group(1)
+@@ -150,149 +156,183 @@ def _build_service(creds_path: str):
+     creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
+     return build("sheets", "v4", credentials=creds, cache_discovery=False)
  
  
--def write_back_destination(
--    df_model: pd.DataFrame,
--    data_type: str,
-+def _build_service(creds_path: str):
-+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-+    creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
-+    return build("sheets", "v4", credentials=creds, cache_discovery=False)
-+
-+
-+def _to_payload(df: pd.DataFrame, sheet_name: str) -> dict:
-+    values = [df.columns.tolist()] + df.values.tolist()
-+    return {
-+        "range": f"{sheet_name}!A1",
-+        "majorDimension": "ROWS",
-+        "values": values,
-+    }
-+
-+
-+def _prepare_df(df_model: pd.DataFrame, sheet_name: str) -> Optional[pd.DataFrame]:
-+    header = _HEADERS[sheet_name]
-+    df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
-+    validate_columns(df_out, header, stage=f"Destino {sheet_name}")
-+    if "ID" in df_out.columns:
-+        existing = _EXISTING_IDS.get(sheet_name, set())
-+        df_out = df_out.loc[~df_out["ID"].isin(existing)]
-+    if df_out.empty:
+ def _to_payload(df: pd.DataFrame, sheet_name: str) -> dict:
+     values = [df.columns.tolist()] + df.values.tolist()
+     return {
+         "range": f"{sheet_name}!A1",
+         "majorDimension": "ROWS",
+         "values": values,
+     }
+ 
+ 
+ def _prepare_df(df_model: pd.DataFrame, sheet_name: str) -> Optional[pd.DataFrame]:
+     header = _HEADERS[sheet_name]
+     df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+     validate_columns(df_out, header, stage=f"Destino {sheet_name}")
+     if "ID" in df_out.columns:
+         existing = _EXISTING_IDS.get(sheet_name, set())
+         df_out = df_out.loc[~df_out["ID"].isin(existing)]
+     if df_out.empty:
+         return None
+     return df_out
+ 
+ 
+-def write_back_batch(
+-    frames: Dict[str, pd.DataFrame],
++def collect_dest_payload(df_model: pd.DataFrame, sheet_name: str) -> Optional[dict]:
++    """Prepara payload para batchUpdate sem enviá-lo."""
++    if sheet_name not in _HEADERS:
++        raise RuntimeError(
++            "Caches destino não carregados – chame prefetch_meta() antes."
++        )
++    df_out = _prepare_df(df_model, sheet_name)
++    if df_out is None:
++        log.info("Destino '%s': nenhuma linha nova para gravar", sheet_name)
 +        return None
-+    return df_out
++    payload = _to_payload(df_out, sheet_name)
++    if "ID" in df_out.columns:
++        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].astype(str).tolist())
++    return payload
 +
 +
-+def write_back_batch(
-+    frames: Dict[str, pd.DataFrame],
++def flush_payloads(
      creds_path: str,
      spreadsheet_id: str,
++    payloads: Iterable[dict],
      *,
      write_back: bool = True,
      dry_run: bool = False,
--    a1_range: str = "A1",
      value_input_option: str = "USER_ENTERED",
--) -> Optional[pd.DataFrame]:
--    """
--    Grava `df_model` na aba-modelo correspondente, deduplicando por 'ID'.
-+    service: Optional = None,
-+) -> Dict[str, Optional[pd.DataFrame]]:
-+    """Grava várias abas-modelo em lote via batchUpdate."""
- 
--    Pré-requisito: `prefetch_meta(fetcher, spreadsheet_id)` já deve ter sido
--    invocado antes, para que _HEADERS e _EXISTING_IDS estejam preenchidos.
--    """
--    if df_model.empty:
--        log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
--        return None
-+    results: Dict[str, Optional[pd.DataFrame]] = {}
- 
--    sheet_name = DESTINATION_SHEETS[data_type]
--    if sheet_name not in _HEADERS:
--        raise RuntimeError("Caches destino não carregados – chame prefetch_meta() antes.")
-+    payloads: List[dict] = []
-+    total_cells = 0
- 
--    header = _HEADERS[sheet_name]
-+    for data_type, df_model in frames.items():
-+        if df_model.empty:
-+            log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
-+            results[data_type] = None
-+            continue
- 
--    # 1) Reindexa para o layout exato de colunas-modelo
--    df_out = (
--        df_model
--        .reindex(columns=header, fill_value="")
--        .applymap(_scalar)
--    )
-+        sheet_name = DESTINATION_SHEETS[data_type]
-+        if sheet_name not in _HEADERS:
-+            raise RuntimeError(
-+                "Caches destino não carregados – chame prefetch_meta() antes."
-+            )
- 
--    # 2) Validação de esquema pós-reindexação
--    validate_columns(df_out, header, stage=f"Destino {sheet_name}")
-+        df_out = _prepare_df(df_model, sheet_name)
-+        if df_out is None:
-+            log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
-+            results[data_type] = None
-+            continue
- 
--    # 3) Deduplicação por ID
--    if "ID" in df_out.columns:
--        existing = _EXISTING_IDS.get(sheet_name, set())
--        df_out = df_out.loc[~df_out["ID"].isin(existing)]
-+        payload = _to_payload(df_out, sheet_name)
-+        payloads.append(payload)
-+        total_cells += len(payload["values"]) * len(payload["values"][0])
-+        results[data_type] = df_out
- 
--    if df_out.empty:
--        log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
--        return None
-+    if not payloads:
-+        return results
- 
--    # 4) Se dry_run ou write_back=False, apenas logar e retornar
-     if dry_run or not write_back:
--        log.info("[Dry-run] %d linhas seriam gravadas em '%s'", len(df_out), sheet_name)
--        return df_out
+     service: Optional = None,
+-) -> Dict[str, Optional[pd.DataFrame]]:
+-    """Grava várias abas-modelo em lote via batchUpdate."""
 -
--    # 5) Gravação: APPEND em vez de overwrite
--    #    Usamos append_records_to_sheet, que faz append a partir da primeira linha vazia.
--    #    Caso append_records_to_sheet não retorne contagem, assumimos len(df_out).
--    try:
--        linhas_inseridas = append_records_to_sheet(
--            creds_path      = creds_path,
--            spreadsheet_id  = spreadsheet_id,
--            sheet_name      = sheet_name,
--            df              = df_out,
-+        log.info(
-+            "[Dry-run] batchUpdate enviaria %d ranges, total %s células",
-+            len(payloads),
-+            f"{total_cells:,}",
+-    results: Dict[str, Optional[pd.DataFrame]] = {}
+-
+-    payloads: List[dict] = []
+-    total_cells = 0
+-
+-    for data_type, df_model in frames.items():
+-        if df_model.empty:
+-            log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
+-            results[data_type] = None
+-            continue
+-
+-        sheet_name = DESTINATION_SHEETS[data_type]
+-        if sheet_name not in _HEADERS:
+-            raise RuntimeError(
+-                "Caches destino não carregados – chame prefetch_meta() antes."
+-            )
+-
+-        df_out = _prepare_df(df_model, sheet_name)
+-        if df_out is None:
+-            log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
+-            results[data_type] = None
+-            continue
+-
+-        payload = _to_payload(df_out, sheet_name)
+-        payloads.append(payload)
+-        total_cells += len(payload["values"]) * len(payload["values"][0])
+-        results[data_type] = df_out
++) -> None:
++    payload_list = [p for p in payloads if p]
++    if not payload_list:
++        return
+ 
+-    if not payloads:
+-        return results
++    total_cells = sum(len(p["values"]) * len(p["values"][0]) for p in payload_list)
+ 
+     if dry_run or not write_back:
+         log.info(
+             "[Dry-run] batchUpdate enviaria %d ranges, total %s células",
+-            len(payloads),
++            len(payload_list),
+             f"{total_cells:,}",
          )
--        if linhas_inseridas is None:
--            linhas_inseridas = len(df_out)
--    except Exception as e:
--        log.error("Erro ao gravar em '%s' via append: %s", sheet_name, e)
--        raise
-+        return results
-+
-+    service = service or _build_service(creds_path)
-+
-+    MAX_CELLS = 500_000
-+    MAX_BYTES = int(9.9 * 1024 * 1024)
-+
-+    batches: List[List[dict]] = []
-+    current: List[dict] = []
-+    cells = 0
-+    size = 0
-+
-+    for payload in payloads:
-+        payload_size = len(json.dumps(payload).encode("utf-8"))
-+        payload_cells = len(payload["values"]) * len(payload["values"][0])
-+        if current and (
-+            cells + payload_cells > MAX_CELLS or size + payload_size > MAX_BYTES
-+        ):
-+            batches.append(current)
-+            current = []
-+            cells = 0
-+            size = 0
-+
-+        current.append(payload)
-+        cells += payload_cells
-+        size += payload_size
-+
-+    if current:
-+        batches.append(current)
-+
-+    for batch in batches:
-+        body = {"valueInputOption": value_input_option, "data": batch}
-+        service.spreadsheets().values().batchUpdate(
-+            spreadsheetId=spreadsheet_id, body=body
-+        ).execute()
-+
-+    for payload, data_type in zip(payloads, results.keys()):
-+        df_out = results[data_type]
-+        if df_out is not None and "ID" in df_out.columns:
-+            sheet_name = DESTINATION_SHEETS[data_type]
-+            _EXISTING_IDS.setdefault(sheet_name, set()).update(
-+                df_out["ID"].astype(str).tolist()
-+            )
+-        return results
++        return
  
--    log.info("✅ Gravadas %d linha(s) em '%s'", linhas_inseridas, sheet_name)
-+    log.info(
-+        "batchUpdate enviou %d ranges, total %s células",
-+        len(payloads),
-+        f"{total_cells:,}",
-+    )
+     service = service or _build_service(creds_path)
  
--    # 6) Atualiza cache de IDs para futuras deduplicações
--    if "ID" in df_out.columns:
--        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].astype(str).tolist())
-+    return results
+     MAX_CELLS = 500_000
+     MAX_BYTES = int(9.9 * 1024 * 1024)
  
--    return df_out
+     batches: List[List[dict]] = []
+     current: List[dict] = []
+     cells = 0
+     size = 0
+ 
+-    for payload in payloads:
++    for payload in payload_list:
+         payload_size = len(json.dumps(payload).encode("utf-8"))
+         payload_cells = len(payload["values"]) * len(payload["values"][0])
+         if current and (
+             cells + payload_cells > MAX_CELLS or size + payload_size > MAX_BYTES
+         ):
+             batches.append(current)
+             current = []
+             cells = 0
+             size = 0
+ 
+         current.append(payload)
+         cells += payload_cells
+         size += payload_size
+ 
+     if current:
+         batches.append(current)
+ 
+     for batch in batches:
+         body = {"valueInputOption": value_input_option, "data": batch}
+         service.spreadsheets().values().batchUpdate(
+             spreadsheetId=spreadsheet_id, body=body
+         ).execute()
+ 
+-    for payload, data_type in zip(payloads, results.keys()):
+-        df_out = results[data_type]
+-        if df_out is not None and "ID" in df_out.columns:
+-            sheet_name = DESTINATION_SHEETS[data_type]
+-            _EXISTING_IDS.setdefault(sheet_name, set()).update(
+-                df_out["ID"].astype(str).tolist()
+-            )
+-
+     log.info(
+         "batchUpdate enviou %d ranges, total %s células",
+-        len(payloads),
++        len(payload_list),
+         f"{total_cells:,}",
+     )
+ 
 +
-+def write_back_destination(
-+    df_model: pd.DataFrame,
-+    data_type: str,
++def write_back_batch(
++    frames: Dict[str, pd.DataFrame],
 +    creds_path: str,
 +    spreadsheet_id: str,
 +    *,
 +    write_back: bool = True,
 +    dry_run: bool = False,
-+    a1_range: str = "A1",
 +    value_input_option: str = "USER_ENTERED",
-+) -> Optional[pd.DataFrame]:
-+    """Wrapper para gravar apenas uma aba-modelo."""
++    service: Optional = None,
++) -> Dict[str, Optional[pd.DataFrame]]:
++    """Grava várias abas-modelo em lote via batchUpdate."""
 +
-+    result = write_back_batch(
-+        {data_type: df_model},
-+        creds_path=creds_path,
-+        spreadsheet_id=spreadsheet_id,
-+        write_back=write_back,
-+        dry_run=dry_run,
-+        value_input_option=value_input_option,
-+    )
-+    return result.get(data_type)
++    results: Dict[str, Optional[pd.DataFrame]] = {}
++
++    payloads: List[dict] = []
++
++    for data_type, df_model in frames.items():
++        if df_model.empty:
++            log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
++            results[data_type] = None
++            continue
++
++        sheet_name = DESTINATION_SHEETS[data_type]
++        if sheet_name not in _HEADERS:
++            raise RuntimeError(
++                "Caches destino não carregados – chame prefetch_meta() antes."
++            )
++
++        df_out = _prepare_df(df_model, sheet_name)
++        if df_out is None:
++            log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
++            results[data_type] = None
++            continue
++
++        payload = collect_dest_payload(df_model, sheet_name)
++        if payload is not None:
++            payloads.append(payload)
++            results[data_type] = df_out
++        else:
++            results[data_type] = None
++
++    if payloads:
++        flush_payloads(
++            creds_path=creds_path,
++            spreadsheet_id=spreadsheet_id,
++            payloads=payloads,
++            write_back=write_back,
++            dry_run=dry_run,
++            value_input_option=value_input_option,
++            service=service,
++        )
++
+     return results
  
  
- def write_back_for_sheet(
+ def write_back_destination(
      df_model: pd.DataFrame,
-     sheet_name: str,
+     data_type: str,
      creds_path: str,
      spreadsheet_id: str,
      *,
      write_back: bool = True,
      dry_run: bool = False,
+     a1_range: str = "A1",
+     value_input_option: str = "USER_ENTERED",
  ) -> Optional[pd.DataFrame]:
-     """
-     Wrapper: infere `data_type` a partir do nome da aba de origem
-     e chama write_back_destination.
-     """
-     data_type = _infer_data_type(sheet_name)
-     return write_back_destination(
-         df_model=df_model,
-         data_type=data_type,
+     """Wrapper para gravar apenas uma aba-modelo."""
+ 
+     result = write_back_batch(
+         {data_type: df_model},
          creds_path=creds_path,
          spreadsheet_id=spreadsheet_id,
          write_back=write_back,
          dry_run=dry_run,
+         value_input_option=value_input_option,
      )
-diff --git a/tests/test_dest_writer_batch.py b/tests/test_dest_writer_batch.py
+     return result.get(data_type)
+diff --git a/load/origin_writer.py b/load/origin_writer.py
+index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..cf4a05e00292c104e2657d7e6d68f890768fe8b2 100644
+--- a/load/origin_writer.py
++++ b/load/origin_writer.py
+@@ -2,50 +2,51 @@
+ 
+ import logging
+ from typing import Optional
+ 
+ import pandas as pd
+ from gspread import Worksheet
+ 
+ from treat.utils.sheets_cache import get_worksheet
+ from treat.utils.write_back import write_back_df  # faz o batch_update
+ 
+ log = logging.getLogger(__name__)
+ 
+ 
+ def write_back_origin(
+     df_raw: pd.DataFrame,
+     df_ok: pd.DataFrame,
+     creds_path: str,
+     spreadsheet_id: str,
+     *,
+     write_back: bool,
+     dry_run: bool = False,
+     a1_range: str = "A1",
+     value_input_option: str = "RAW",
+     worksheet: Optional[Worksheet] = None,
+     sheet_name: Optional[str] = None,
++    skip_if_written: bool = False,
+ ) -> pd.DataFrame:
+     """
+     Grava correções de `df_ok` de volta na aba de origem, ajustando o tamanho da planilha
+     e escrevendo apenas uma vez via batch_update. Usa `worksheet` fornecido, se houver,
+     para evitar reabrir a conexão. Caso contrário, abre via `sheet_name`.
+ 
+     Parâmetros
+     ----------
+     df_raw : pd.DataFrame
+         DataFrame original lido da aba.
+     df_ok : pd.DataFrame
+         DataFrame com valores corrigidos (apenas colunas originais de df_raw).
+     creds_path : str
+         Caminho para o JSON de credenciais.
+     spreadsheet_id : str
+         ID da planilha Google.
+     write_back : bool
+         Se False, a função retorna imediatamente sem gravar nada.
+     dry_run : bool, default=False
+         Se True, simula o write-back (faz cálculos mas não chama batch_update).
+     a1_range : str, default="A1"
+         Intervalo inicial onde começa a escrita (por padrão, "A1").
+     value_input_option : str, default="RAW"
+         Opção de input para a API ao escrever (ex.: "RAW" ou "USER_ENTERED").
+     worksheet : Optional[gspread.Worksheet], default=None
+@@ -74,66 +75,74 @@ def write_back_origin(
+         )
+ 
+     # 2) Se write_back estiver desligado, não grava nada
+     if not write_back:
+         log.info("🔸 Write-back de origem desativado")
+         return df_ok
+ 
+     # 3) Prepara DataFrame para gravação (apenas colunas originais)
+     df_wb = df_ok[df_raw.columns].copy()
+     n_linhas, n_colunas = df_wb.shape
+ 
+     # 4) Calcula dimensões desejadas (incluindo cabeçalho)
+     desired_rows = n_linhas + 1  # +1 para a linha de cabeçalho
+     desired_cols = n_colunas
+ 
+     # 5) Obtém o Worksheet (se não foi fornecido)
+     if worksheet is None:
+         if sheet_name is None:
+             raise ValueError("Quando `worksheet=None`, `sheet_name` deve ser fornecido.")
+         ws = get_worksheet(creds_path, spreadsheet_id, sheet_name)
+         actual_sheet_name = sheet_name
+     else:
+         ws = worksheet
+         actual_sheet_name = worksheet.title
+ 
++    done: set = getattr(builtins, "_wb_origin_done", set())
++    if skip_if_written and actual_sheet_name in done:
++        log.info("🔸 %s: pulando write-back de origem (já feito dentro de pipeline)", actual_sheet_name)
++        return df_ok
++
+     # 6) Redimensionamento seguro:
+     frozen = ws._properties.get("gridProperties", {}).get("frozenRowCount", 0)
+     min_rows = max(frozen + 1, 2)
+     desired_rows = max(desired_rows, min_rows)
+ 
+     if ws.row_count != desired_rows or ws.col_count != desired_cols:
+         ws.resize(rows=desired_rows, cols=desired_cols)
+ 
+     # 7) Logging de instrumentação
+     total_cells = desired_rows * desired_cols
+     log.info(
+         "ℹ️  Preparando write-back origin para '%s': %d linhas × %d colunas (com cabeçalho) = %s células",
+         actual_sheet_name,
+         n_linhas,
+         n_colunas,
+         f"{total_cells:,}",
+     )
+ 
+     # 8) Se dry_run, não grava de fato
+     if dry_run:
+         log.info("🔸 Dry-run ativo: não gravando '%s'", actual_sheet_name)
+         return df_wb
+ 
+     # 9) Grava em batch usando write_back_df
+     #    `write_back_df` ainda precisa receber o sheet_name (a string)
+     write_back_df(
+         df=df_wb,
+         creds_path=creds_path,
+         spreadsheet_id=spreadsheet_id,
+         sheet_name=actual_sheet_name,
+         a1_range=a1_range,
+         value_input_option=value_input_option,
+     )
+     log.info(
+         "✅ Write-back concluído para '%s' (%d linhas × %d colunas)",
+         actual_sheet_name,
+         n_linhas,
+         n_colunas,
+     )
+ 
++    done.add(actual_sheet_name)
++    builtins._wb_origin_done = done
++
+     return df_wb
+diff --git a/tests/test_single_batch.py b/tests/test_single_batch.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..8fe305caf82780a759f9d1393f4ac53488fd3307
+index 0000000000000000000000000000000000000000..68f4a95a057364559f0125adb921fdcea0785a31
 --- /dev/null
-+++ b/tests/test_dest_writer_batch.py
-@@ -0,0 +1,47 @@
++++ b/tests/test_single_batch.py
+@@ -0,0 +1,48 @@
 +import os
 +import sys
 +from unittest.mock import MagicMock
@@ -432,44 +591,219 @@ index 0000000000000000000000000000000000000000..8fe305caf82780a759f9d1393f4ac534
 +
 +sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 +
-+from load.dest_writer import (
-+    _EXISTING_IDS,
-+    _HEADERS,
-+    DESTINATION_SHEETS,
-+    write_back_batch,
-+)
++from treat.treat_pipeline import execute_pipeline, TreatPipeline
++from load import dest_writer
++import treat.treat_pipeline as pipeline
++
++class DummyFetcher:
++    def __init__(self):
++        self.calls = 0
++        self.cache = {}
++    def get(self, names, as_frame=True):
++        self.calls += 1
++        result = {}
++        for n in names:
++            df = self.cache.get(n)
++            if df is None:
++                df = pd.DataFrame({"ID": [1]})
++                self.cache[n] = df
++            result[n] = df
++        return result
++    def get_cached(self, names, as_frame=True):
++        return {n: self.cache[n] for n in names}
++    def open_worksheet(self, name):
++        return MagicMock(title=name)
 +
 +
 +@pytest.mark.unit
-+def test_batch_update_single_call_multiple_tabs():
++def test_single_batch_get_and_update(monkeypatch):
 +    service = MagicMock()
 +    batch_call = service.spreadsheets.return_value.values.return_value.batchUpdate
 +    batch_call.return_value.execute.return_value = {}
++    monkeypatch.setattr(dest_writer, "_build_service", lambda c: service)
 +
-+    _HEADERS.clear()
-+    _EXISTING_IDS.clear()
-+    for sheet in (
-+        DESTINATION_SHEETS["idade"],
-+        DESTINATION_SHEETS["genero"],
-+        DESTINATION_SHEETS["regiao"],
-+    ):
-+        _HEADERS[sheet] = ["ID", "valor"]
-+        _EXISTING_IDS[sheet] = set()
++    monkeypatch.setattr(TreatPipeline, "run", lambda self, df: df)
++    monkeypatch.setattr(pipeline, "prefetch_meta", lambda f, s: dest_writer._HEADERS.update({dest_writer.DESTINATION_SHEETS["geral"]: ["ID"]}))
 +
-+    df = pd.DataFrame({"ID": [1], "valor": [42]})
-+    frames = {"idade": df, "genero": df, "regiao": df}
++    fetcher = DummyFetcher()
++    execute_pipeline(["metaGeral"], "creds.json", "xyz", write_back_origin=False, fetcher=fetcher)
 +
-+    write_back_batch(
-+        frames,
-+        creds_path="creds.json",
-+        spreadsheet_id="xyz",
-+        service=service,
++    assert fetcher.calls == 1
++    assert batch_call.call_count == 1
+diff --git a/treat/treat_pipeline.py b/treat/treat_pipeline.py
+index bd8e3419524ddf1bc5f05009968619e2b2b29e78..11aa44c6a511725dc078ee96f50c1798e2449f0c 100644
+--- a/treat/treat_pipeline.py
++++ b/treat/treat_pipeline.py
+@@ -30,52 +30,62 @@ from gspread import Worksheet
+ from extract.sheets_fetcher import SheetsFetcher
+ from load.origin_writer import write_back_origin
+ from treat.utils.sheets_cache import get_worksheet
+ from treat.utils.datas import (
+     converter_data,
+     fill_missing_start_end_from_params,
+ )
+ from treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge import (
+     merge_pinterest_dimension as pin_merge,
+ )
+ from treat.platforms import dispatch
+ from treat.utils.preprocess_utils import (
+     preprocess_origin,
+     assign_vehicle_and_id,
+     get_sibling_sheet,
+ )
+ from treat.utils.atribuicoes_via_lookup import SourceLookup
+ from treat.bi_param_utils import (
+     BIParamLookup,
+     enrich_with_bi_parametrizacao,
+     fill_objective_from_bi,
+ )
+ from treat.utils.renomeacoes import (
+     renomear_colunas_origem_para_modelo,
+     aplicar_substituicoes_objetivo,
++    renomeacao_geral,
++    renomeacao_metaGenero,
++    renomeacao_metaIdade,
+ )
+ from treat.utils.campos_calculados import gerar_id, calcular_engajamento_total
++from load.dest_writer import (
++    DESTINATION_SHEETS,
++    _infer_data_type,
++    collect_dest_payload,
++    flush_payloads,
++    prefetch_meta,
++)
+ from treat.utils.validations import (
+     check_required_columns,
+     validate_aggregates,
+     validate_columns,
+     validate_utm_content_in_bi,
+     validate_taxonomy_consistency,
+ )
+ 
+ log = logging.getLogger(__name__)
+ 
+ 
+ class TreatPipeline:
+     """Pipeline genérico que normaliza, enriquece, valida e grava uma aba."""
+ 
+     def __init__(
+         self,
+         creds_path: str,
+         spreadsheet_id: str,
+         sheet_name: str,
+         mapping_renomeacao: Dict[str, str],
+         *,
+         write_back: bool = True,
+         subs_objetivo_fn: Callable[[pd.DataFrame], pd.DataFrame] = aplicar_substituicoes_objetivo,
+     ) -> None:
+         self.creds_path = creds_path
+@@ -257,25 +267,106 @@ class TreatPipeline:
+         # 14) Renomeia colunas para o modelo destino + cálculos finais
+         # ───────────────────────────────────────────────────────────────
+         df = renomear_colunas_origem_para_modelo(df, self.mapping)
+         if "age" in df.columns:                                
+             df["age"] = df["age"].apply(normalize_age)
+                 # ➡︎ Normaliza somente se a coluna estiver presente
+         if "gender" in df.columns:
+             df["gender"] = df["gender"].apply(normalize_gender)
+         df = calcular_engajamento_total(df)
+         df["ID"] = df.apply(gerar_id, axis=1)
+ 
+         # ───────────────────────────────────────────────────────────────
+         # 15) Logs de verificação
+         # ───────────────────────────────────────────────────────────────
+         if not df[df["Veiculo"].fillna("") == ""].empty:
+             log.warning("[%s] linhas sem Veiculo: %s",
+                         self.sheet_name,
+                         df.index[df["Veiculo"].fillna('') == ""].tolist())
+         if not df[df["objective"].fillna("") == ""].empty:
+             log.warning("[%s] linhas sem objective: %s",
+                         self.sheet_name,
+                         df.index[df["objective"].fillna('') == ""].tolist())
+ 
+         return df
+ 
++
++def run_etl_for_sheet(
++    *,
++    sheet: str,
++    creds_path: str,
++    spreadsheet_id: str,
++    df_raw: pd.DataFrame,
++    wb_origin_flag: bool = True,
++    wb_dest_flag: bool = True,
++    dry_run_dest: bool = False,
++    fetcher: SheetsFetcher,
++    dest_payloads: List[dict],
++) -> dict:
++    mapping_lookup = {
++        "metageral": renomeacao_geral,
++        "metagenero": renomeacao_metaGenero,
++        "metaidade": renomeacao_metaIdade,
++    }
++    mapping = mapping_lookup.get(sheet.lower(), renomeacao_geral)
++    pipeline = TreatPipeline(
++        creds_path=creds_path,
++        spreadsheet_id=spreadsheet_id,
++        sheet_name=sheet,
++        mapping_renomeacao=mapping,
++        write_back=wb_origin_flag,
++    )
++    df_model = pipeline.run(df_raw)
++    if wb_dest_flag:
++        dest_sheet = DESTINATION_SHEETS[_infer_data_type(sheet)]
++        payload = collect_dest_payload(df_model, dest_sheet)
++        if payload is not None:
++            dest_payloads.append(payload)
++    return {"dest": df_model, "taxo": getattr(pipeline, "_last_taxo_report", None)}
++
++
++def execute_pipeline(
++    sheet_names: List[str],
++    creds_path: str,
++    spreadsheet_id: str,
++    *,
++    write_back_origin: bool = True,
++    write_back_dest: bool = True,
++    dry_run_dest: bool = False,
++    fetcher: SheetsFetcher | None = None,
++) -> Dict[str, dict]:
++    fetcher = fetcher or SheetsFetcher(spreadsheet_id, creds_path)
++    builtins.fetcher = fetcher
++    all_tabs = list(sheet_names) + list(DESTINATION_SHEETS.values()) + ["SOURCE"]
++    all_raw = fetcher.get(all_tabs)
++
++    prefetch_meta(fetcher, spreadsheet_id)
++
++    dest_payloads: List[dict] = []
++    builtins._wb_origin_done = set()
++    results: Dict[str, dict] = {}
++
++    for name in sheet_names:
++        df_raw = all_raw[name]
++        out = run_etl_for_sheet(
++            sheet=name,
++            creds_path=creds_path,
++            spreadsheet_id=spreadsheet_id,
++            df_raw=df_raw,
++            wb_origin_flag=write_back_origin,
++            wb_dest_flag=write_back_dest,
++            dry_run_dest=dry_run_dest,
++            fetcher=fetcher,
++            dest_payloads=dest_payloads,
++        )
++        results[name] = out
++
++    flush_payloads(
++        creds_path=creds_path,
++        spreadsheet_id=spreadsheet_id,
++        payloads=dest_payloads,
++        write_back=write_back_dest,
++        dry_run=dry_run_dest,
 +    )
 +
-+    assert batch_call.call_count == 1
-+    body = batch_call.call_args.kwargs["body"]
-+    assert "data" in body
-+    assert len(body["data"]) >= 3
++    return results
++
  
 EOF
 )

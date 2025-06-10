@@ -66,6 +66,9 @@ for sheet, df_raw in all_raw.items():
 
 O loop garante execução modular para cada aba, respeitando configurações específicas.
 
+Todo o conjunto de abas é carregado em memória via **uma única chamada** `batchGet`,
+e os resultados de destino são enviados em um único `batchUpdate` ao final.
+
 Controle de Flags
 
 WRITE_BACK_ORIGIN: habilita/desabilita gravação in-place das correções na aba de origem (via write_back_origin).

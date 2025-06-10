@@ -1,6 +1,8 @@
 # load/origin_writer.py
 
 import logging
+import builtins
+
 from typing import Optional
 
 import pandas as pd
@@ -24,6 +26,7 @@ def write_back_origin(
     value_input_option: str = "RAW",
     worksheet: Optional[Worksheet] = None,
     sheet_name: Optional[str] = None,
+    skip_if_written: bool = False,
 ) -> pd.DataFrame:
     """
     Grava correções de `df_ok` de volta na aba de origem, ajustando o tamanho da planilha
@@ -96,6 +99,11 @@ def write_back_origin(
         ws = worksheet
         actual_sheet_name = worksheet.title
 
+    done: set = getattr(builtins, "_wb_origin_done", set())
+    if skip_if_written and actual_sheet_name in done:
+        log.info("🔸 %s: pulando write-back de origem (já feito dentro de pipeline)", actual_sheet_name)
+        return df_ok
+
     # 6) Redimensionamento seguro:
     frozen = ws._properties.get("gridProperties", {}).get("frozenRowCount", 0)
     min_rows = max(frozen + 1, 2)
@@ -135,5 +143,8 @@ def write_back_origin(
         n_linhas,
         n_colunas,
     )
+
+    done.add(actual_sheet_name)
+    builtins._wb_origin_done = done
 
     return df_wb

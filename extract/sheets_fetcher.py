@@ -143,6 +143,17 @@ class SheetsFetcher:
 
         return {n: self._as_dataframe(raw.get(n, [])) for n in names}
 
+    def get_cached(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
+        """Retorna dados do cache sem acionar a API."""
+        names = [n.strip() for n in dict.fromkeys(sheet_names)]
+        key = tuple(sorted(names))
+        if key not in self._cache:
+            raise KeyError(f"Cache miss para {names}")
+        raw = self._cache[key][1]
+        if not as_frame:
+            return {n: raw.get(n, []) for n in names}
+        return {n: self._as_dataframe(raw.get(n, [])) for n in names}
+
     def refresh(self, sheet_names: Iterable[str]):
         """
         Invalida o cache para as abas listadas e força recarregamento.

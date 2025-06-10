@@ -52,8 +52,18 @@ from treat.bi_param_utils import (
 from treat.utils.renomeacoes import (
     renomear_colunas_origem_para_modelo,
     aplicar_substituicoes_objetivo,
+    renomeacao_geral,
+    renomeacao_metaGenero,
+    renomeacao_metaIdade,
 )
 from treat.utils.campos_calculados import gerar_id, calcular_engajamento_total
+from load.dest_writer import (
+    DESTINATION_SHEETS,
+    _infer_data_type,
+    collect_dest_payload,
+    flush_payloads,
+    prefetch_meta,
+)
 from treat.utils.validations import (
     check_required_columns,
     validate_aggregates,
@@ -278,4 +288,85 @@ class TreatPipeline:
                         df.index[df["objective"].fillna('') == ""].tolist())
 
         return df
+
+
+def run_etl_for_sheet(
+    *,
+    sheet: str,
+    creds_path: str,
+    spreadsheet_id: str,
+    df_raw: pd.DataFrame,
+    wb_origin_flag: bool = True,
+    wb_dest_flag: bool = True,
+    dry_run_dest: bool = False,
+    fetcher: SheetsFetcher,
+    dest_payloads: List[dict],
+) -> dict:
+    mapping_lookup = {
+        "metageral": renomeacao_geral,
+        "metagenero": renomeacao_metaGenero,
+        "metaidade": renomeacao_metaIdade,
+    }
+    mapping = mapping_lookup.get(sheet.lower(), renomeacao_geral)
+    pipeline = TreatPipeline(
+        creds_path=creds_path,
+        spreadsheet_id=spreadsheet_id,
+        sheet_name=sheet,
+        mapping_renomeacao=mapping,
+        write_back=wb_origin_flag,
+    )
+    df_model = pipeline.run(df_raw)
+    if wb_dest_flag:
+        dest_sheet = DESTINATION_SHEETS[_infer_data_type(sheet)]
+        payload = collect_dest_payload(df_model, dest_sheet)
+        if payload is not None:
+            dest_payloads.append(payload)
+    return {"dest": df_model, "taxo": getattr(pipeline, "_last_taxo_report", None)}
+
+
+def execute_pipeline(
+    sheet_names: List[str],
+    creds_path: str,
+    spreadsheet_id: str,
+    *,
+    write_back_origin: bool = True,
+    write_back_dest: bool = True,
+    dry_run_dest: bool = False,
+    fetcher: SheetsFetcher | None = None,
+) -> Dict[str, dict]:
+    fetcher = fetcher or SheetsFetcher(spreadsheet_id, creds_path)
+    builtins.fetcher = fetcher
+    all_tabs = list(sheet_names) + list(DESTINATION_SHEETS.values()) + ["SOURCE"]
+    all_raw = fetcher.get(all_tabs)
+
+    prefetch_meta(fetcher, spreadsheet_id)
+
+    dest_payloads: List[dict] = []
+    builtins._wb_origin_done = set()
+    results: Dict[str, dict] = {}
+
+    for name in sheet_names:
+        df_raw = all_raw[name]
+        out = run_etl_for_sheet(
+            sheet=name,
+            creds_path=creds_path,
+            spreadsheet_id=spreadsheet_id,
+            df_raw=df_raw,
+            wb_origin_flag=write_back_origin,
+            wb_dest_flag=write_back_dest,
+            dry_run_dest=dry_run_dest,
+            fetcher=fetcher,
+            dest_payloads=dest_payloads,
+        )
+        results[name] = out
+
+    flush_payloads(
+        creds_path=creds_path,
+        spreadsheet_id=spreadsheet_id,
+        payloads=dest_payloads,
+        write_back=write_back_dest,
+        dry_run=dry_run_dest,
+    )
+
+    return results
 

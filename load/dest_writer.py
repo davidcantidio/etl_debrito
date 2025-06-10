@@ -76,7 +76,10 @@ def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
     abas = list(DESTINATION_SHEETS.values())
 
     # 1) Buscar todas as linhas de cada aba no fetcher (cada aba → Lista[List[str]])
-    raw_data = fetcher.get(abas, as_frame=False)
+    try:
+        raw_data = fetcher.get_cached(abas, as_frame=False)
+    except Exception:
+        raw_data = fetcher.get(abas, as_frame=False)
 
     # 2) Extrair cabeçalhos (linha 0 de cada aba) e armazenar em _HEADERS
     for tab, values in raw_data.items():
@@ -104,7 +107,10 @@ def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
             valid_tabs.append(tab)
 
     if valid_tabs:
-        raw_ids = fetcher.get(valid_tabs, as_frame=False)
+        try:
+            raw_ids = fetcher.get_cached(valid_tabs, as_frame=False)
+        except Exception:
+            raw_ids = fetcher.get(valid_tabs, as_frame=False)
         for tab in valid_tabs:
             listas = raw_ids.get(tab, [])
             # cada linha em listas corresponde a uma célula ID
@@ -172,56 +178,45 @@ def _prepare_df(df_model: pd.DataFrame, sheet_name: str) -> Optional[pd.DataFram
     return df_out
 
 
-def write_back_batch(
-    frames: Dict[str, pd.DataFrame],
+def collect_dest_payload(df_model: pd.DataFrame, sheet_name: str) -> Optional[dict]:
+    """Prepara payload para batchUpdate sem enviá-lo."""
+    if sheet_name not in _HEADERS:
+        raise RuntimeError(
+            "Caches destino não carregados – chame prefetch_meta() antes."
+        )
+    df_out = _prepare_df(df_model, sheet_name)
+    if df_out is None:
+        log.info("Destino '%s': nenhuma linha nova para gravar", sheet_name)
+        return None
+    payload = _to_payload(df_out, sheet_name)
+    if "ID" in df_out.columns:
+        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].astype(str).tolist())
+    return payload
+
+
+def flush_payloads(
     creds_path: str,
     spreadsheet_id: str,
+    payloads: Iterable[dict],
     *,
     write_back: bool = True,
     dry_run: bool = False,
     value_input_option: str = "USER_ENTERED",
     service: Optional = None,
-) -> Dict[str, Optional[pd.DataFrame]]:
-    """Grava várias abas-modelo em lote via batchUpdate."""
+) -> None:
+    payload_list = [p for p in payloads if p]
+    if not payload_list:
+        return
 
-    results: Dict[str, Optional[pd.DataFrame]] = {}
-
-    payloads: List[dict] = []
-    total_cells = 0
-
-    for data_type, df_model in frames.items():
-        if df_model.empty:
-            log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
-            results[data_type] = None
-            continue
-
-        sheet_name = DESTINATION_SHEETS[data_type]
-        if sheet_name not in _HEADERS:
-            raise RuntimeError(
-                "Caches destino não carregados – chame prefetch_meta() antes."
-            )
-
-        df_out = _prepare_df(df_model, sheet_name)
-        if df_out is None:
-            log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
-            results[data_type] = None
-            continue
-
-        payload = _to_payload(df_out, sheet_name)
-        payloads.append(payload)
-        total_cells += len(payload["values"]) * len(payload["values"][0])
-        results[data_type] = df_out
-
-    if not payloads:
-        return results
+    total_cells = sum(len(p["values"]) * len(p["values"][0]) for p in payload_list)
 
     if dry_run or not write_back:
         log.info(
             "[Dry-run] batchUpdate enviaria %d ranges, total %s células",
-            len(payloads),
+            len(payload_list),
             f"{total_cells:,}",
         )
-        return results
+        return
 
     service = service or _build_service(creds_path)
 
@@ -233,7 +228,7 @@ def write_back_batch(
     cells = 0
     size = 0
 
-    for payload in payloads:
+    for payload in payload_list:
         payload_size = len(json.dumps(payload).encode("utf-8"))
         payload_cells = len(payload["values"]) * len(payload["values"][0])
         if current and (
@@ -257,19 +252,64 @@ def write_back_batch(
             spreadsheetId=spreadsheet_id, body=body
         ).execute()
 
-    for payload, data_type in zip(payloads, results.keys()):
-        df_out = results[data_type]
-        if df_out is not None and "ID" in df_out.columns:
-            sheet_name = DESTINATION_SHEETS[data_type]
-            _EXISTING_IDS.setdefault(sheet_name, set()).update(
-                df_out["ID"].astype(str).tolist()
-            )
-
     log.info(
         "batchUpdate enviou %d ranges, total %s células",
-        len(payloads),
+        len(payload_list),
         f"{total_cells:,}",
     )
+
+
+def write_back_batch(
+    frames: Dict[str, pd.DataFrame],
+    creds_path: str,
+    spreadsheet_id: str,
+    *,
+    write_back: bool = True,
+    dry_run: bool = False,
+    value_input_option: str = "USER_ENTERED",
+    service: Optional = None,
+) -> Dict[str, Optional[pd.DataFrame]]:
+    """Grava várias abas-modelo em lote via batchUpdate."""
+
+    results: Dict[str, Optional[pd.DataFrame]] = {}
+
+    payloads: List[dict] = []
+
+    for data_type, df_model in frames.items():
+        if df_model.empty:
+            log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
+            results[data_type] = None
+            continue
+
+        sheet_name = DESTINATION_SHEETS[data_type]
+        if sheet_name not in _HEADERS:
+            raise RuntimeError(
+                "Caches destino não carregados – chame prefetch_meta() antes."
+            )
+
+        df_out = _prepare_df(df_model, sheet_name)
+        if df_out is None:
+            log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
+            results[data_type] = None
+            continue
+
+        payload = collect_dest_payload(df_model, sheet_name)
+        if payload is not None:
+            payloads.append(payload)
+            results[data_type] = df_out
+        else:
+            results[data_type] = None
+
+    if payloads:
+        flush_payloads(
+            creds_path=creds_path,
+            spreadsheet_id=spreadsheet_id,
+            payloads=payloads,
+            write_back=write_back,
+            dry_run=dry_run,
+            value_input_option=value_input_option,
+            service=service,
+        )
 
     return results
 
