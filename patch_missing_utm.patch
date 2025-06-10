@@ -1164,10 +1164,24 @@ index bd8e3419524ddf1bc5f05009968619e2b2b29e78..52539906bf9765e379d0ed8f1852ecee
 +    return results
 +
 diff --git a/treat/utils/preprocess_utils.py b/treat/utils/preprocess_utils.py
-index 9fa1f0c7cc48843210e55c2b76feddbba1187daa..80ac4f5924195f2ad81939bc87fd34da9e8ae80f 100644
+index 9fa1f0c7cc48843210e55c2b76feddbba1187daa..e5f850ac0e37cbb6e0319d39cada17e02ec8eb79 100644
 --- a/treat/utils/preprocess_utils.py
 +++ b/treat/utils/preprocess_utils.py
-@@ -73,50 +73,51 @@ def _extract_platform(sheet_name: str) -> str:
+@@ -59,64 +59,72 @@ def normalize_region_column(
+ 
+ 
+ def _extract_platform(sheet_name: str) -> str:
+     """
+     Extrai o prefixo da plataforma a partir do *nome da aba*.
+ 
+     ```
+     'tiktokGeral'   -> 'tiktok'
+     'metaRegiao'    -> 'meta'
+     'linkedinIdade' -> 'linkedin'
+     ```
+ 
+     A regex ``^[a-z]+`` casa apenas a sequência inicial de minúsculas
+     **antes** do primeiro caractere maiúsculo – evitando o erro
      “tiktokgeral” que ocorria anteriormente.
      """
      m = re.match(r"^[a-z]+", sheet_name)
@@ -1179,13 +1193,21 @@ index 9fa1f0c7cc48843210e55c2b76feddbba1187daa..80ac4f5924195f2ad81939bc87fd34da
      *,
      worksheet: Optional[Worksheet] = None,
      write_back: bool = True,
++    header: Optional[list[str]] = None,
  ) -> pd.DataFrame:
      """
-     1. Executa substituições de texto (apply_all_origin_substitutions).  
+-    1. Executa substituições de texto (apply_all_origin_substitutions).  
++    1. Executa substituições de texto (apply_all_origin_substitutions).
         – Se *write_back* for ``True``, grava no próprio *worksheet*.
  
      2. Normaliza a coluna ``region`` (se existir) via geo-normalize.
  
++    Parâmetros
++    ----------
++    header : list[str] | None
++        Cabeçalho da aba já em memória. Evita leituras ``A1:1``
++        quando fornecido.
++
      Retorna um **novo** DataFrame com as alterações.
      """
      df2 = apply_all_origin_substitutions(
@@ -1193,7 +1215,7 @@ index 9fa1f0c7cc48843210e55c2b76feddbba1187daa..80ac4f5924195f2ad81939bc87fd34da
          worksheet=worksheet,
          write_back=write_back,
          inplace=True,
-+        header=df.columns.tolist(),
++        header=header or df.columns.tolist(),
      )
      df2 = normalize_region_column(df2, col_name="region")
      return df2
