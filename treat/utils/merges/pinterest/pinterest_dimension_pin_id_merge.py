@@ -143,6 +143,10 @@ def _prepare_general(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = df.columns.str.strip()
     df = df[[c for c in df.columns if c in keep]]
+
+    # Garante coluna 'utm_content' vazia se inexistente na origem
+    if "utm_content" not in df.columns:
+        df["utm_content"] = ""
     
 
     # 🔑 normaliza chaves antes do dropna
@@ -234,7 +238,16 @@ def merge_pinterest_dimension(
     df_dim, dim_col = _prepare_dimension(df_dimension)
     # 2) metadados por pin e por campanha
     meta_pin = (
-        df_gen[["pin_id", "campaign_id", "campaign_name", "ad_group_name", "ad_name"]]
+        df_gen[
+            [
+                "pin_id",
+                "campaign_id",
+                "campaign_name",
+                "ad_group_name",
+                "ad_name",
+                "utm_content",
+            ]
+        ]
         .drop_duplicates("pin_id")
         .set_index("pin_id")
     )
@@ -283,6 +296,7 @@ def merge_pinterest_dimension(
                     "campaign_name": pin_meta.get("campaign_name", ""),
                     "ad_group_name": pin_meta.get("ad_group_name", ""),
                     "ad_name": pin_meta.get("ad_name", ""),
+                    "utm_content": pin_meta.get("utm_content", ""),
                     "impressions": dist_ints["impressions"][pin_id],
                     "cost": dist_cost[pin_id],
                     "link_clicks": dist_ints["link_clicks"][pin_id],
@@ -342,7 +356,12 @@ def merge_pinterest_dimension(
     # 8) region → Numero
     if dim_col == "region":
         df.insert(0, "Numero", range(1, len(df) + 1))
+
+    # garantia final de que 'utm_content' exista para evitar warnings no pipeline
+    if "utm_content" not in df.columns:
+        df["utm_content"] = ""
+
     log.info("✅ merge_pinterest_dimension – %d linhas (%s)", len(df), dim_col)
     return df
-    
+
 __all__ = ["merge_pinterest_dimension"]

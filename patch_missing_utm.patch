@@ -142,7 +142,7 @@ index 5c3511c79e213cc99e18a91c51716f0e80d8a4c5..ca7cd4336d4697a868079ee11e9377a2
          return df
  
 diff --git a/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py b/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py
-index a02031a98fc10124437ff75ee053fb6f84d5dce2..7d32d83a30c55f50ea2e561b778a4c918215ec8e 100644
+index a02031a98fc10124437ff75ee053fb6f84d5dce2..5b148e296754030ef2077c95eb6b43d9f6d9b9e4 100644
 --- a/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py
 +++ b/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py
 @@ -1,40 +1,39 @@
@@ -352,7 +352,7 @@ index a02031a98fc10124437ff75ee053fb6f84d5dce2..7d32d83a30c55f50ea2e561b778a4c91
      for c in meta_campaign.columns:
          if c in df.columns:
              if pd.api.types.is_numeric_dtype(meta_campaign[c]):
-@@ -319,42 +332,29 @@ def merge_pinterest_dimension(
+@@ -319,42 +332,33 @@ def merge_pinterest_dimension(
          orig_tot = df_gen.groupby(["campaign_id", "date"])[list(_METRICS)].sum()
          new_tot = df.groupby(["campaign_id", "date"])[list(_METRICS)].sum()
          for idx, row in orig_tot.iterrows():
@@ -390,7 +390,10 @@ index a02031a98fc10124437ff75ee053fb6f84d5dce2..7d32d83a30c55f50ea2e561b778a4c91
 -
 -    # 11) ordena
 -    df_final = df.reindex(columns=_FINAL_ORDER[dim_col], fill_value="")
--
++    # garantia final de que 'utm_content' exista para evitar warnings no pipeline
++    if "utm_content" not in df.columns:
++        df["utm_content"] = ""
+ 
 -    log.info("✅ merge_pinterest_dimension – %d linhas (%s)", len(df_final), dim_col)
 -    return df_final
 +    log.info("✅ merge_pinterest_dimension – %d linhas (%s)", len(df), dim_col)
