@@ -1,0 +1,61 @@
+16:14:48 DEBUG __main__ › Logger configurado para o notebook (RichHandler + FileHandler ativos)
+16:14:48 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+16:14:48 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['metaGeral!A:ZZ', 'metaIdade!A:ZZ', 'metaGenero!A:ZZ', 'metaRegiao!A:ZZ', 'metaAlcance!A:ZZ', 'tiktokGeral!A:ZZ', 'tiktokIdade!A:ZZ', 'tiktokGenero!A:ZZ', 'tiktokRegiao!A:ZZ', 'tiktokAlcance!A:ZZ', 'pinterestGeral!A:ZZ', 'pinterestGenero!A:ZZ', 'pinterestIdade!A:ZZ', 'pinterestRegiao!A:ZZ', 'pinterestAlcance!A:ZZ', 'linkedinGeral!A:ZZ', 'linkedinRegiao!A:ZZ', 'linkedinAlcance!A:ZZ', 'GAGeral!A:ZZ']
+16:14:49 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=metaGeral%21A%3AZZ&ranges=metaIdade%21A%3AZZ&ranges=metaGenero%21A%3AZZ&ranges=metaRegiao%21A%3AZZ&ranges=metaAlcance%21A%3AZZ&ranges=tiktokGeral%21A%3AZZ&ranges=tiktokIdade%21A%3AZZ&ranges=tiktokGenero%21A%3AZZ&ranges=tiktokRegiao%21A%3AZZ&ranges=tiktokAlcance%21A%3AZZ&ranges=pinterestGeral%21A%3AZZ&ranges=pinterestGenero%21A%3AZZ&ranges=pinterestIdade%21A%3AZZ&ranges=pinterestRegiao%21A%3AZZ&ranges=pinterestAlcance%21A%3AZZ&ranges=linkedinGeral%21A%3AZZ&ranges=linkedinRegiao%21A%3AZZ&ranges=linkedinAlcance%21A%3AZZ&ranges=GAGeral%21A%3AZZ&alt=json
+16:14:49 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGeral!A1:AB641
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaIdade!A1:Q4283
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGenero!A1:T914
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaRegiao!A1:Q10251
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaAlcance!A1:N1205
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGeral!A1:W168
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokIdade!A1:O764
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGenero!A1:O267
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokRegiao!A1:O3137
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokAlcance!A1:L139
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGeral!A1:U990
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGenero!A1:M266
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestIdade!A1:M1121
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestRegiao!A1:M2521
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestAlcance!A1:K990
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinGeral!A1:U528
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinRegiao!A1:M2
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinAlcance!A1:J2
+16:14:51 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: GAGeral!A1:X4693
+16:14:51 INFO extract.sheets_fetcher › 📡 batchGet 19 ranges
+16:14:51 DEBUG __main__ › Aba 'metaGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'utm_content', 'ad_id', 'campaign_id', 'start', 'end', 'objective', 'preview_link_ig', 'preview_link_fb', 'placement', 'campaign_daily_budget', 'campaign_lifetime_budget', 'campaign_remaining_budget', 'impressions', 'cost', 'link_clicks', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments', 'video_play']
+16:14:51 DEBUG __main__ › Aba 'metaIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'utm_content', 'ad_id', 'start', 'end', 'placement', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+16:14:51 DEBUG __main__ › Aba 'metaGenero' colunas originais: ['date', 'gender', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'placement', 'ad_id', 'utm_content', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'post_shares', 'post_comments', 'post_reactions']
+16:14:51 DEBUG __main__ › Aba 'metaRegiao' colunas originais: ['date', 'region', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'placement', 'ad_id', 'utm_content', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+16:14:51 DEBUG __main__ › Aba 'metaAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'utm_content', 'ad_id', 'start', 'end', 'placement', 'reach', 'impressions']
+16:14:51 DEBUG __main__ › Aba 'tiktokGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'ad_preview_link', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments']
+16:14:51 DEBUG __main__ › Aba 'tiktokIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'ad_group_name', 'ad_name', 'objective', 'start', 'end', 'utm_content', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+16:14:51 DEBUG __main__ › Aba 'tiktokGenero' colunas originais: ['date', 'account_name', 'campaign_id', 'campaign_name', 'ad_group_name', 'ad_name', 'objective', 'gender', 'utm_content', 'start', 'end', 'impressions', 'cost', 'link_clicks', 'video_watched_100']
+16:14:51 DEBUG __main__ › Aba 'tiktokRegiao' colunas originais: ['date', 'region', 'campaign_name', 'account_name', 'ad_name', 'campaign_id', 'ad_group_name', 'objective', 'utm_content', 'start', 'end', 'impressions', 'link_clicks', 'cost', 'video_watched_100']
+16:14:51 DEBUG __main__ › Aba 'tiktokAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'placement', 'ad_group_name', 'ad_name', 'objective', 'start', 'end', 'utm_content', 'reach', 'impressions']
+16:14:51 DEBUG __main__ › Aba 'pinterestGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'pin_id', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions']
+16:14:51 DEBUG __main__ › Aba 'pinterestGenero' colunas originais: ['date', 'gender', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'utm_content']
+16:14:51 DEBUG __main__ › Aba 'pinterestIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'utm_content']
+16:14:51 DEBUG __main__ › Aba 'pinterestRegiao' colunas originais: ['date', 'region', 'campaign_name', 'account_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'link_clicks', 'cost', 'video_watched_100', 'utm_content']
+16:14:51 DEBUG __main__ › Aba 'pinterestAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'objective', 'utm_content', 'start', 'end', 'reach', 'imrpessions']
+16:14:51 DEBUG __main__ › Aba 'linkedinGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments']
+16:14:51 DEBUG __main__ › Aba 'linkedinRegiao' colunas originais: ['date', 'account_name', 'campaign_id', 'campaign_name', 'objective', 'region', 'start', 'end', 'impressions', 'cost', 'link_clicks', 'video_watched_100', 'utm_content']
+16:14:51 DEBUG __main__ › Aba 'linkedinAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'utm_content', 'start', 'end', 'reach', 'impressions']
+16:14:51 DEBUG __main__ › Aba 'GAGeral' colunas originais: ['date', 'campaign_name', 'sessionSourceMedium', 'utm_content', 'region', 'totalUsers', 'sessions', 'averageSessionDuration', 'screenPageViews', 'engagedSessions', 'objective', 'Campanha', 'ID_Campanha', 'start', 'end', 'Veiculo', 'ID_Veiculo', 'ad_group_name', 'ad_name', 'post_shares', 'post_comments', 'post_reactions', 'Engajamento_Total', 'ID']
+16:14:51 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['modeloGeral!A:ZZ', 'modeloGenero!A:ZZ', 'modeloIdade!A:ZZ', 'modeloAlcance!A:ZZ', 'modeloRegiao!A:ZZ']
+16:14:52 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=modeloGeral%21A%3AZZ&ranges=modeloGenero%21A%3AZZ&ranges=modeloIdade%21A%3AZZ&ranges=modeloAlcance%21A%3AZZ&ranges=modeloRegiao%21A%3AZZ&alt=json
+16:14:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloGeral!A1:Z13484
+16:14:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloGenero!A1:O12919
+16:14:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloIdade!A1:O71495
+16:14:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloAlcance!A1:L17287
+16:14:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloRegiao!A1:O207213
+16:14:54 INFO extract.sheets_fetcher › 📡 batchGet 5 ranges
+16:14:54 INFO load.dest_writer › 📥 Prefetch destino concluído: 5 abas com cabeçalho, total de IDs carregados=28062
+16:14:54 INFO __main__ › 📥 Prefetch meta concluído – começando processamento das abas
+16:14:54 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+16:14:54 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+16:14:54 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+16:14:54 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+16:14:54 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+16:14:55 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+16:14:55 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
