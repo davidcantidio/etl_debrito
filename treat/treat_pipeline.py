@@ -23,7 +23,7 @@ from __future__ import annotations
 import builtins
 import logging
 from typing import Callable, Dict, List, Optional
-from treat.utils.normalize import normalize_age        # novo import
+from treat.utils.normalize import normalize_age, normalize_gender       # novo import
 import pandas as pd
 from gspread import Worksheet
 
@@ -259,6 +259,9 @@ class TreatPipeline:
         df = renomear_colunas_origem_para_modelo(df, self.mapping)
         if "age" in df.columns:                                
             df["age"] = df["age"].apply(normalize_age)
+                # ➡︎ Normaliza somente se a coluna estiver presente
+        if "gender" in df.columns:
+            df["gender"] = df["gender"].apply(normalize_gender)
         df = calcular_engajamento_total(df)
         df["ID"] = df.apply(gerar_id, axis=1)
 
