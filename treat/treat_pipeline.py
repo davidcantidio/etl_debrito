@@ -118,6 +118,7 @@ class TreatPipeline:
             df,
             worksheet=self.worksheet_origem,
             write_back=self.write_back,
+            header=self.fetcher.header_cache.get(self.sheet_name, df.columns.tolist()),
         )
 
         # Remove linhas onde date/account_name/campaign_name estão vazias
@@ -162,7 +163,7 @@ class TreatPipeline:
                 dry_run       = False,
                 worksheet     = self.worksheet_origem,
                 skip_if_written=True,
-                header=df_raw.columns.tolist(),
+                header=self.fetcher.header_cache.get(self.sheet_name, df_raw.columns.tolist()),
             )
 
             # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache global)
@@ -264,7 +265,7 @@ class TreatPipeline:
                 write_back=self.write_back,
                 dry_run=False,
                 skip_if_written=True,
-                header=df_raw.columns.tolist(),
+                header=self.fetcher.header_cache.get(self.sheet_name, df_raw.columns.tolist()),
             )
 
         # ───────────────────────────────────────────────────────────────

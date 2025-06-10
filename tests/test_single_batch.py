@@ -11,6 +11,10 @@ from treat.treat_pipeline import execute_pipeline, TreatPipeline
 from load import dest_writer
 import treat.treat_pipeline as pipeline
 <<<<<<< ours
+<<<<<<< ours
+=======
+from googleapiclient import discovery
+>>>>>>> theirs
 =======
 from googleapiclient import discovery
 >>>>>>> theirs
@@ -41,6 +45,10 @@ def test_single_batch_get_and_update(monkeypatch):
     batch_call = service.spreadsheets.return_value.values.return_value.batchUpdate
     batch_call.return_value.execute.return_value = {}
 <<<<<<< ours
+<<<<<<< ours
+=======
+    monkeypatch.setattr(discovery, "build", lambda *a, **k: service)
+>>>>>>> theirs
 =======
     monkeypatch.setattr(discovery, "build", lambda *a, **k: service)
 >>>>>>> theirs
@@ -55,6 +63,10 @@ def test_single_batch_get_and_update(monkeypatch):
     assert fetcher.calls == 1
     assert batch_call.call_count == 1
 <<<<<<< ours
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
 =======
 
 >>>>>>> theirs

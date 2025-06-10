@@ -2,7 +2,6 @@
 
 import logging
 import builtins
-
 from typing import Optional
 
 import pandas as pd
@@ -104,7 +103,7 @@ def write_back_origin(
 
     done: set = getattr(builtins, "_wb_origin_done", set())
     if skip_if_written and actual_sheet_name in done:
-        log.info("🔸 %s: pulando write-back de origem (já feito dentro de pipeline)", actual_sheet_name)
+        log.info("🔸 %s: write-back já realizado; pulando", actual_sheet_name)
         return df_ok
 
     # 6) Redimensionamento seguro:

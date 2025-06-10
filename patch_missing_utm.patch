@@ -1,9 +1,9 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/README.md b/README.md
-index 76f74a9c3e916772814b3401768bde1df83d605e..eceb2131d04a0c57cd457cfd2fd11102fb945558 100644
+index 76f74a9c3e916772814b3401768bde1df83d605e..3f1ee36d0eefb269579fed4bf50a8b0e3a070e1a 100644
 --- a/README.md
 +++ b/README.md
-@@ -44,50 +44,60 @@ Quando dry_run_flag=True, valida apenas a estrutura (colunas e tipos) sem sobres
+@@ -44,50 +44,62 @@ Quando dry_run_flag=True, valida apenas a estrutura (colunas e tipos) sem sobres
  
  Quando write_back_flag=True, grava os dados transformados in-place na planilha, preservando fórmulas e formatações definidas pelo usuário.
  
@@ -36,7 +36,9 @@ index 76f74a9c3e916772814b3401768bde1df83d605e..eceb2131d04a0c57cd457cfd2fd11102
 +
 +1. `SheetsFetcher.batch_get()` carrega todas as abas de uma só vez e mantém cabeçalhos em cache.
 +2. `run_etl_for_sheet` processa cada DataFrame já em memória.
-+3. `write_back_origin` grava no máximo uma vez por aba, reutilizando o cabeçalho em memória.
++3. `write_back_origin` grava no máximo uma vez por aba e é idempotente.
++   Os cabeçalhos já carregados no `batch_get` inicial evitam leituras
++   extras de `A1:1`.
 +4. Todos os resultados destino são acumulados e enviados por `flush_payloads`, fazendo no máximo dois `batchUpdate` quando o payload excede 500 k células.
 +
  Controle de Flags
@@ -551,12 +553,14 @@ index 07cd9d8b36766907ebb5f7846ead48cfe3398a6c..fe7c20136e5f15f6be34cca22f983358
      )
      return result.get(data_type)
 diff --git a/load/origin_writer.py b/load/origin_writer.py
-index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..4e12cb1fe0520396da216825cc9152a722f5c605 100644
+index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..79fa179949c0940e3ee75b72cf2a6d75b5f647f9 100644
 --- a/load/origin_writer.py
 +++ b/load/origin_writer.py
-@@ -2,138 +2,150 @@
+@@ -1,139 +1,152 @@
+ # load/origin_writer.py
  
  import logging
++import builtins
  from typing import Optional
  
  import pandas as pd
@@ -661,7 +665,7 @@ index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..4e12cb1fe0520396da216825cc9152a7
  
 +    done: set = getattr(builtins, "_wb_origin_done", set())
 +    if skip_if_written and actual_sheet_name in done:
-+        log.info("🔸 %s: pulando write-back de origem (já feito dentro de pipeline)", actual_sheet_name)
++        log.info("🔸 %s: write-back já realizado; pulando", actual_sheet_name)
 +        return df_ok
 +
      # 6) Redimensionamento seguro:
@@ -708,6 +712,99 @@ index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..4e12cb1fe0520396da216825cc9152a7
 +    builtins._wb_origin_done = done
 +
      return df_wb
+diff --git a/tests/test_no_extra_gets.py b/tests/test_no_extra_gets.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..43c27e4952d4c7b21a72f779ad94b9c362ab1935
+--- /dev/null
++++ b/tests/test_no_extra_gets.py
+@@ -0,0 +1,87 @@
++import os
++import sys
++from unittest.mock import MagicMock
++
++import pandas as pd
++import pytest
++
++sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
++
++from treat.treat_pipeline import execute_pipeline, TreatPipeline, get_worksheet
++from treat.utils.preprocess_utils import preprocess_origin
++from load import dest_writer, origin_writer
++import treat.treat_pipeline as pipeline
++from googleapiclient import discovery
++
++
++class DummyFetcher:
++    def __init__(self):
++        self.calls = 0
++        self.cache = {}
++        self.header_cache = {}
++
++    def get(self, names, as_frame=True):
++        self.calls += 1
++        result = {}
++        for n in names:
++            df = self.cache.get(n)
++            if df is None:
++                df = pd.DataFrame({"ID": [1]})
++                self.cache[n] = df
++            result[n] = df
++            self.header_cache[n] = df.columns.tolist()
++        return result
++
++    def get_cached(self, names, as_frame=True):
++        return {n: self.cache[n] for n in names}
++
++    def open_worksheet(self, name):
++        return ws
++
++
++@pytest.mark.unit
++def test_no_extra_header_get(monkeypatch):
++    service = MagicMock()
++    monkeypatch.setattr(discovery, "build", lambda *a, **k: service)
++    monkeypatch.setattr(dest_writer, "_build_service", lambda c: service)
++
++    # worksheet mock to capture row_values calls
++    global ws
++    ws = MagicMock()
++    ws.row_values = MagicMock(return_value=["ID"])
++    ws.batch_update = MagicMock()
++    ws._properties = {"gridProperties": {"frozenRowCount": 0}}
++    ws.title = "metaGeral"
++    monkeypatch.setattr(pipeline, "get_worksheet", lambda *a, **k: ws)
++    monkeypatch.setattr(origin_writer, "write_back_df", lambda **k: None)
++
++    # minimal run just preprocess + write_back_origin
++    def simple_run(self, df_raw):
++        df_prep = preprocess_origin(
++            df_raw,
++            worksheet=self.worksheet_origem,
++            write_back=self.write_back,
++        )
++        origin_writer.write_back_origin(
++            df_raw=df_raw,
++            df_ok=df_prep,
++            creds_path=self.creds_path,
++            spreadsheet_id=self.spreadsheet_id,
++            worksheet=self.worksheet_origem,
++            write_back=self.write_back,
++            skip_if_written=True,
++            header=self.fetcher.header_cache[self.sheet_name],
++            dry_run=False,
++        )
++        return df_prep
++
++    monkeypatch.setattr(TreatPipeline, "run", simple_run)
++    monkeypatch.setattr(pipeline, "prefetch_meta", lambda f, s: dest_writer._HEADERS.update({dest_writer.DESTINATION_SHEETS["geral"]: ["ID"]}))
++
++    fetcher = DummyFetcher()
++    execute_pipeline(["metaGeral"], "creds.json", "xyz", fetcher=fetcher)
++
++    assert fetcher.calls == 1
++    assert ws.row_values.call_count == 0
++    import builtins
++    assert getattr(builtins, "_wb_origin_done") == {"metaGeral"}
 diff --git a/tests/test_single_batch.py b/tests/test_single_batch.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..b0bd09c3c7a187f50b32f1bfd234a779e479f8b1
@@ -766,7 +863,7 @@ index 0000000000000000000000000000000000000000..b0bd09c3c7a187f50b32f1bfd234a779
 +    assert batch_call.call_count == 1
 +
 diff --git a/treat/treat_pipeline.py b/treat/treat_pipeline.py
-index bd8e3419524ddf1bc5f05009968619e2b2b29e78..c91276c14ddc86fc0aa11c23710a4a223b751f99 100644
+index bd8e3419524ddf1bc5f05009968619e2b2b29e78..52539906bf9765e379d0ed8f1852ecee98dfb0a9 100644
 --- a/treat/treat_pipeline.py
 +++ b/treat/treat_pipeline.py
 @@ -30,52 +30,62 @@ from gspread import Worksheet
@@ -832,7 +929,51 @@ index bd8e3419524ddf1bc5f05009968619e2b2b29e78..c91276c14ddc86fc0aa11c23710a4a22
          subs_objetivo_fn: Callable[[pd.DataFrame], pd.DataFrame] = aplicar_substituicoes_objetivo,
      ) -> None:
          self.creds_path = creds_path
-@@ -129,50 +139,52 @@ class TreatPipeline:
+@@ -86,93 +96,96 @@ class TreatPipeline:
+         self.subs_obj_fn = subs_objetivo_fn
+ 
+         # BI lookup (cache + TTL)
+         self.bi_lookup = BIParamLookup(creds_path, spreadsheet_id)
+ 
+         # Fetcher único (reaproveita se já existir em builtins)
+         self.fetcher: SheetsFetcher = getattr(builtins, "fetcher", None)  # type: ignore
+         if self.fetcher is None:
+             self.fetcher = SheetsFetcher(spreadsheet_id, creds_path)
+             builtins.fetcher = self.fetcher
+ 
+         # Worksheet de origem (apenas se vamos fazer write-back)
+         self.worksheet_origem: Optional[Worksheet] = (
+             get_worksheet(creds_path, spreadsheet_id, sheet_name) if write_back else None
+         )
+ 
+         # Cache interno para “abas irmãs” (ex.: pinterestGeral)
+         self._sibling_cache: dict[str, pd.DataFrame] = {}
+ 
+     def _preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
+         """Sanitiza dados brutos antes de qualquer tratamento específico."""
+         df = preprocess_origin(
+             df,
+             worksheet=self.worksheet_origem,
+             write_back=self.write_back,
++            header=self.fetcher.header_cache.get(self.sheet_name, df.columns.tolist()),
+         )
+ 
+         # Remove linhas onde date/account_name/campaign_name estão vazias
+         mandatory = ["date", "account_name", "campaign_name"]
+         cols = [c for c in mandatory if c in df.columns]
+         if cols:
+             empty = df[cols].apply(
+                 lambda s: s.astype(str).str.strip().str.lower().isin(["", "nan"])
+             )
+             df = df.loc[~empty.all(axis=1)].reset_index(drop=True)
+ 
+         return df
+ 
+     def run(self, df_raw: pd.DataFrame) -> pd.DataFrame:
+         """
+         Executa o fluxo completo e devolve DataFrame já no layout destino.
+         """
+         lower = self.sheet_name.lower()
  
          # 1) Snapshot das colunas originais
          orig_cols: List[str] = df_raw.columns.tolist()
@@ -859,7 +1000,7 @@ index bd8e3419524ddf1bc5f05009968619e2b2b29e78..c91276c14ddc86fc0aa11c23710a4a22
                  dry_run       = False,
                  worksheet     = self.worksheet_origem,
 +                skip_if_written=True,
-+                header=df_raw.columns.tolist(),
++                header=self.fetcher.header_cache.get(self.sheet_name, df_raw.columns.tolist()),
              )
  
              # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache global)
@@ -885,7 +1026,7 @@ index bd8e3419524ddf1bc5f05009968619e2b2b29e78..c91276c14ddc86fc0aa11c23710a4a22
          # 5) Enriquecimento BI + preenchimento de ‘objective’
          # ───────────────────────────────────────────────────────────────
          df = enrich_with_bi_parametrizacao(
-@@ -229,53 +241,136 @@ class TreatPipeline:
+@@ -229,53 +242,136 @@ class TreatPipeline:
              "impressions", "cost", "link_clicks", "video_play",
              "video_watches_25", "video_watches_50", "video_watches_75",
              "video_watched_100", "post_reactions", "post_shares", "post_comments",
@@ -912,7 +1053,7 @@ index bd8e3419524ddf1bc5f05009968619e2b2b29e78..c91276c14ddc86fc0aa11c23710a4a22
                  write_back=self.write_back,
                  dry_run=False,
 +                skip_if_written=True,
-+                header=df_raw.columns.tolist(),
++                header=self.fetcher.header_cache.get(self.sheet_name, df_raw.columns.tolist()),
              )
  
          # ───────────────────────────────────────────────────────────────

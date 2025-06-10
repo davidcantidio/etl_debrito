@@ -70,12 +70,23 @@ Todo o conjunto de abas é carregado em memória via **uma única chamada** `bat
 e os resultados de destino são enviados em um único `batchUpdate` ao final.
 
 <<<<<<< ours
+<<<<<<< ours
 =======
+=======
+>>>>>>> theirs
 ### Arquitetura de chamadas
 
 1. `SheetsFetcher.batch_get()` carrega todas as abas de uma só vez e mantém cabeçalhos em cache.
 2. `run_etl_for_sheet` processa cada DataFrame já em memória.
+<<<<<<< ours
 3. `write_back_origin` grava no máximo uma vez por aba, reutilizando o cabeçalho em memória.
+4. Todos os resultados destino são acumulados e enviados por `flush_payloads`, fazendo no máximo dois `batchUpdate` quando o payload excede 500 k células.
+
+>>>>>>> theirs
+=======
+3. `write_back_origin` grava no máximo uma vez por aba e é idempotente.
+   Os cabeçalhos já carregados no `batch_get` inicial evitam leituras
+   extras de `A1:1`.
 4. Todos os resultados destino são acumulados e enviados por `flush_payloads`, fazendo no máximo dois `batchUpdate` quando o payload excede 500 k células.
 
 >>>>>>> theirs
