@@ -62,6 +62,7 @@ def apply_all_origin_substitutions(
     worksheet: Worksheet | None = None,
     write_back: bool = True,
     inplace: bool = True,
+    header: List[str] | None = None,
 ) -> pd.DataFrame:
     """
     Aplica substituições nas colunas de origem.
@@ -87,7 +88,10 @@ def apply_all_origin_substitutions(
 
     header_lc: List[str] = []
     if write_back:
-        header_lc = [h.strip().lower() for h in worksheet.row_values(1)]
+        if header is not None:
+            header_lc = [h.strip().lower() for h in header]
+        else:
+            header_lc = [h.strip().lower() for h in worksheet.row_values(1)]
 
     # Mantém index estável → mapeia linha → célula
     df.reset_index(drop=True, inplace=True)

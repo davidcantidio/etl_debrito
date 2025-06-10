@@ -27,6 +27,7 @@ def write_back_origin(
     worksheet: Optional[Worksheet] = None,
     sheet_name: Optional[str] = None,
     skip_if_written: bool = False,
+    header: Optional[list[str]] = None,
 ) -> pd.DataFrame:
     """
     Grava correções de `df_ok` de volta na aba de origem, ajustando o tamanho da planilha
@@ -63,9 +64,11 @@ def write_back_origin(
         O DataFrame efetivamente gravado (ou df_ok, no caso de dry_run ou write_back=False).
     """
 
+    header_cols = header or df_raw.columns.tolist()
+
     # 1) Garante que todas as colunas originais estão presentes em df_ok
-    extras = set(df_ok.columns) - set(df_raw.columns)
-    missing = set(df_raw.columns) - set(df_ok.columns)
+    extras = set(df_ok.columns) - set(header_cols)
+    missing = set(header_cols) - set(df_ok.columns)
     if extras:
          log.warning(
             "[write_back_origin] Ignorando colunas extras: %s",
@@ -82,7 +85,7 @@ def write_back_origin(
         return df_ok
 
     # 3) Prepara DataFrame para gravação (apenas colunas originais)
-    df_wb = df_ok[df_raw.columns].copy()
+    df_wb = df_ok[header_cols].copy()
     n_linhas, n_colunas = df_wb.shape
 
     # 4) Calcula dimensões desejadas (incluindo cabeçalho)

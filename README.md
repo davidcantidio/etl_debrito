@@ -69,6 +69,16 @@ O loop garante execução modular para cada aba, respeitando configurações esp
 Todo o conjunto de abas é carregado em memória via **uma única chamada** `batchGet`,
 e os resultados de destino são enviados em um único `batchUpdate` ao final.
 
+<<<<<<< ours
+=======
+### Arquitetura de chamadas
+
+1. `SheetsFetcher.batch_get()` carrega todas as abas de uma só vez e mantém cabeçalhos em cache.
+2. `run_etl_for_sheet` processa cada DataFrame já em memória.
+3. `write_back_origin` grava no máximo uma vez por aba, reutilizando o cabeçalho em memória.
+4. Todos os resultados destino são acumulados e enviados por `flush_payloads`, fazendo no máximo dois `batchUpdate` quando o payload excede 500 k células.
+
+>>>>>>> theirs
 Controle de Flags
 
 WRITE_BACK_ORIGIN: habilita/desabilita gravação in-place das correções na aba de origem (via write_back_origin).

@@ -10,6 +10,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from treat.treat_pipeline import execute_pipeline, TreatPipeline
 from load import dest_writer
 import treat.treat_pipeline as pipeline
+<<<<<<< ours
+=======
+from googleapiclient import discovery
+>>>>>>> theirs
 
 class DummyFetcher:
     def __init__(self):
@@ -36,6 +40,10 @@ def test_single_batch_get_and_update(monkeypatch):
     service = MagicMock()
     batch_call = service.spreadsheets.return_value.values.return_value.batchUpdate
     batch_call.return_value.execute.return_value = {}
+<<<<<<< ours
+=======
+    monkeypatch.setattr(discovery, "build", lambda *a, **k: service)
+>>>>>>> theirs
     monkeypatch.setattr(dest_writer, "_build_service", lambda c: service)
 
     monkeypatch.setattr(TreatPipeline, "run", lambda self, df: df)
@@ -46,3 +54,7 @@ def test_single_batch_get_and_update(monkeypatch):
 
     assert fetcher.calls == 1
     assert batch_call.call_count == 1
+<<<<<<< ours
+=======
+
+>>>>>>> theirs

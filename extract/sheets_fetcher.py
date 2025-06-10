@@ -60,6 +60,9 @@ class SheetsFetcher:
         self._cache_ttl = cache_ttl
         self._spreadsheet_meta: dict | None = None
 
+        # Cache de headers por aba (preenchido em _fetch_and_cache)
+        self._headers: Dict[str, List[str]] = {}
+
         # Cliente gspread para operações de open_worksheet (write-back, etc.)
         self._gclient = get_google_client(creds_path)
 
@@ -117,7 +120,10 @@ class SheetsFetcher:
                     original_key,
                     returned_key,
                 )
-            payload[original_key] = vr.get("values", [])
+            values = vr.get("values", [])
+            payload[original_key] = values
+            if values:
+                self._headers[original_key] = [c.strip() for c in values[0]]
         return payload
 
     def get(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
@@ -137,6 +143,10 @@ class SheetsFetcher:
             raw = self._fetch_and_cache(names)
             self._cache[key] = (now, raw)
             log.info("📡 batchGet %d ranges", len(names))
+
+        for tab, values in raw.items():
+            if tab not in self._headers and values:
+                self._headers[tab] = [c.strip() for c in values[0]]
 
         if not as_frame:
             return {n: raw.get(n, []) for n in names}
@@ -161,6 +171,11 @@ class SheetsFetcher:
         key = tuple(sorted(sheet_names))
         self._cache.pop(key, None)
         _ = self.get(sheet_names, as_frame=False)  # força reload
+
+    @property
+    def header_cache(self) -> Dict[str, List[str]]:
+        """Retorna cabeçalhos já carregados em memória."""
+        return dict(self._headers)
 
     @staticmethod
     def _as_dataframe(raw: List[List[str]]) -> pd.DataFrame:

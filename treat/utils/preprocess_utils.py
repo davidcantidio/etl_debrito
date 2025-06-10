@@ -95,6 +95,7 @@ def preprocess_origin(
         worksheet=worksheet,
         write_back=write_back,
         inplace=True,
+        header=df.columns.tolist(),
     )
     df2 = normalize_region_column(df2, col_name="region")
     return df2

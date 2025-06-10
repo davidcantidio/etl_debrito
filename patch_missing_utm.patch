@@ -1,9 +1,9 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/README.md b/README.md
-index 76f74a9c3e916772814b3401768bde1df83d605e..fd65aff0e3a79c8e15ee3c91d01c122630aad6e0 100644
+index 76f74a9c3e916772814b3401768bde1df83d605e..eceb2131d04a0c57cd457cfd2fd11102fb945558 100644
 --- a/README.md
 +++ b/README.md
-@@ -44,50 +44,53 @@ Quando dry_run_flag=True, valida apenas a estrutura (colunas e tipos) sem sobres
+@@ -44,50 +44,60 @@ Quando dry_run_flag=True, valida apenas a estrutura (colunas e tipos) sem sobres
  
  Quando write_back_flag=True, grava os dados transformados in-place na planilha, preservando fórmulas e formatações definidas pelo usuário.
  
@@ -32,6 +32,13 @@ index 76f74a9c3e916772814b3401768bde1df83d605e..fd65aff0e3a79c8e15ee3c91d01c1226
 +Todo o conjunto de abas é carregado em memória via **uma única chamada** `batchGet`,
 +e os resultados de destino são enviados em um único `batchUpdate` ao final.
 +
++### Arquitetura de chamadas
++
++1. `SheetsFetcher.batch_get()` carrega todas as abas de uma só vez e mantém cabeçalhos em cache.
++2. `run_etl_for_sheet` processa cada DataFrame já em memória.
++3. `write_back_origin` grava no máximo uma vez por aba, reutilizando o cabeçalho em memória.
++4. Todos os resultados destino são acumulados e enviados por `flush_payloads`, fazendo no máximo dois `batchUpdate` quando o payload excede 500 k células.
++
  Controle de Flags
  
  WRITE_BACK_ORIGIN: habilita/desabilita gravação in-place das correções na aba de origem (via write_back_origin).
@@ -58,10 +65,94 @@ index 76f74a9c3e916772814b3401768bde1df83d605e..fd65aff0e3a79c8e15ee3c91d01c1226
  
  Retorno da Função
 diff --git a/extract/sheets_fetcher.py b/extract/sheets_fetcher.py
-index f77f8d9c2199a28ce8c3f43ca831d09ba0198126..d66da714cfd1a86250b35324348d42309c2f3bc5 100644
+index f77f8d9c2199a28ce8c3f43ca831d09ba0198126..323eb3b7174a1baa62af439f0f5079616dcc079f 100644
 --- a/extract/sheets_fetcher.py
 +++ b/extract/sheets_fetcher.py
-@@ -121,50 +121,61 @@ class SheetsFetcher:
+@@ -38,50 +38,53 @@ class SheetsFetcher:
+         creds_path: str,
+         header_row: int = 0,
+         col_range: str = "A:ZZ",
+         cache_ttl: int = 300,
+          
+     ):
+         """
+         Inicializa o fetcher.
+ 
+         Parâmetros:
+         - spreadsheet_id: ID da planilha Google.
+         - creds_path: caminho para o JSON de credenciais de serviço.
+         - header_row: índice da linha de cabeçalho ao ler como DataFrame (padrão: 0).
+         - col_range: faixa de colunas a ser usada em cada leitura (padrão: "A:ZZ").
+         - cache_ttl: tempo (em segundos) de validade do cache em memória (padrão: 300).
+         """
+         self.spreadsheet_id = spreadsheet_id
+         self.creds_path = creds_path
+         self.header_row = header_row
+         self.col_range = col_range
+         self._service = _build_sheets_service(creds_path)
+         self._cache: Dict[Tuple[str, ...], Tuple[float, Dict[str, List[List[str]]]]] = {}
+         self._cache_ttl = cache_ttl
+         self._spreadsheet_meta: dict | None = None
+ 
++        # Cache de headers por aba (preenchido em _fetch_and_cache)
++        self._headers: Dict[str, List[str]] = {}
++
+         # Cliente gspread para operações de open_worksheet (write-back, etc.)
+         self._gclient = get_google_client(creds_path)
+ 
+     @retry(
+         retry=retry_if_exception_type(TooManyRequests),
+         stop=stop_after_attempt(6),                  # 1 + 2 + 4 + 8 + 16 + 32 ≈ 63 s
+         wait=wait_exponential(multiplier=1, min=1, max=32),
+         reraise=True,
+     )
+ 
+ 
+     def _get_meta(self):
+         if self._spreadsheet_meta is None:
+             self._spreadsheet_meta = (
+                 self._service.spreadsheets().get(
+                     spreadsheetId=self.spreadsheet_id,
+                     includeGridData=False,
+                 ).execute()
+             )
+         return self._spreadsheet_meta
+     
+ 
+     def _batch_get(self, ranges: List[str]) -> Dict[str, Any]:
+         """Executa batchGet com retry/back-off para código 429."""
+         log.info("🔄 batchGet tentativa para ranges: %s", ranges)
+@@ -95,81 +98,104 @@ class SheetsFetcher:
+         except HttpError as e:
+             log.error("Sheets API HttpError: %s", e)
+             raise
+ 
+     def _fetch_and_cache(self, sheet_names: List[str]) -> Dict[str, List[List[str]]]:
+         """
+         Constrói ranges a partir dos nomes de abas e realiza batchGet,
+         retornando o payload em raw lists e atualizando o cache interno.
+         """
+         ranges = [f"{name}!{self.col_range}" for name in sheet_names]
+         resp = self._batch_get(ranges)
+         if not resp.get("valueRanges"):
+             raise RuntimeError("Sheets API retornou valueRanges vazio – quota ou planilha vazia?")
+ 
+         payload: Dict[str, List[List[str]]] = {}
+         for name, vr in zip(sheet_names, resp["valueRanges"]):
+             log.info("🔍 range completo retornado pela API: %s", vr.get("range"))
+             original_key = name.strip()
+             returned_key = vr["range"].split("!", 1)[0].strip()
+             if returned_key != original_key:
+                 log.warning(
+                     "Nome retornado pela API difere do solicitado: '%s' → '%s'",
+                     original_key,
+                     returned_key,
+                 )
+-            payload[original_key] = vr.get("values", [])
++            values = vr.get("values", [])
++            payload[original_key] = values
++            if values:
++                self._headers[original_key] = [c.strip() for c in values[0]]
          return payload
  
      def get(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
@@ -82,6 +173,10 @@ index f77f8d9c2199a28ce8c3f43ca831d09ba0198126..d66da714cfd1a86250b35324348d4230
              self._cache[key] = (now, raw)
              log.info("📡 batchGet %d ranges", len(names))
  
++        for tab, values in raw.items():
++            if tab not in self._headers and values:
++                self._headers[tab] = [c.strip() for c in values[0]]
++
          if not as_frame:
              return {n: raw.get(n, []) for n in names}
  
@@ -106,6 +201,11 @@ index f77f8d9c2199a28ce8c3f43ca831d09ba0198126..d66da714cfd1a86250b35324348d4230
          self._cache.pop(key, None)
          _ = self.get(sheet_names, as_frame=False)  # força reload
  
++    @property
++    def header_cache(self) -> Dict[str, List[str]]:
++        """Retorna cabeçalhos já carregados em memória."""
++        return dict(self._headers)
++
      @staticmethod
      def _as_dataframe(raw: List[List[str]]) -> pd.DataFrame:
          """
@@ -123,6 +223,11 @@ index f77f8d9c2199a28ce8c3f43ca831d09ba0198126..d66da714cfd1a86250b35324348d4230
          return pd.DataFrame(normalized, columns=[c.strip() for c in header])
  
      def open_worksheet(self, sheet_name: str):
+         """
+         Retorna objeto gspread.Worksheet para a aba informada,
+         usando o cliente gspread inicializado em __init__.
+         """
+         return self._gclient.open_by_key(self.spreadsheet_id).worksheet(sheet_name)
 diff --git a/load/dest_writer.py b/load/dest_writer.py
 index 07cd9d8b36766907ebb5f7846ead48cfe3398a6c..fe7c20136e5f15f6be34cca22f98335878a43dc0 100644
 --- a/load/dest_writer.py
@@ -446,10 +551,10 @@ index 07cd9d8b36766907ebb5f7846ead48cfe3398a6c..fe7c20136e5f15f6be34cca22f983358
      )
      return result.get(data_type)
 diff --git a/load/origin_writer.py b/load/origin_writer.py
-index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..cf4a05e00292c104e2657d7e6d68f890768fe8b2 100644
+index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..4e12cb1fe0520396da216825cc9152a722f5c605 100644
 --- a/load/origin_writer.py
 +++ b/load/origin_writer.py
-@@ -2,50 +2,51 @@
+@@ -2,138 +2,150 @@
  
  import logging
  from typing import Optional
@@ -476,6 +581,7 @@ index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..cf4a05e00292c104e2657d7e6d68f890
      worksheet: Optional[Worksheet] = None,
      sheet_name: Optional[str] = None,
 +    skip_if_written: bool = False,
++    header: Optional[list[str]] = None,
  ) -> pd.DataFrame:
      """
      Grava correções de `df_ok` de volta na aba de origem, ajustando o tamanho da planilha
@@ -501,7 +607,32 @@ index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..cf4a05e00292c104e2657d7e6d68f890
      value_input_option : str, default="RAW"
          Opção de input para a API ao escrever (ex.: "RAW" ou "USER_ENTERED").
      worksheet : Optional[gspread.Worksheet], default=None
-@@ -74,66 +75,74 @@ def write_back_origin(
+         Se fornecido, usa este objeto Worksheet para resize e batch_update, sem nova
+         chamada à API. Se None, `sheet_name` precisa estar definido e será usado para abrir.
+     sheet_name : Optional[str], default=None
+         Nome da aba de destino (somente usado se `worksheet` for None).
+ 
+     Retorna
+     -------
+     pd.DataFrame
+         O DataFrame efetivamente gravado (ou df_ok, no caso de dry_run ou write_back=False).
+     """
+ 
++    header_cols = header or df_raw.columns.tolist()
++
+     # 1) Garante que todas as colunas originais estão presentes em df_ok
+-    extras = set(df_ok.columns) - set(df_raw.columns)
+-    missing = set(df_raw.columns) - set(df_ok.columns)
++    extras = set(df_ok.columns) - set(header_cols)
++    missing = set(header_cols) - set(df_ok.columns)
+     if extras:
+          log.warning(
+             "[write_back_origin] Ignorando colunas extras: %s",
+             sorted(extras),
+         )
+     if missing:
+         raise ValueError(
+             f"[write_back_origin] Colunas faltando: {sorted(missing)}"
          )
  
      # 2) Se write_back estiver desligado, não grava nada
@@ -510,7 +641,8 @@ index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..cf4a05e00292c104e2657d7e6d68f890
          return df_ok
  
      # 3) Prepara DataFrame para gravação (apenas colunas originais)
-     df_wb = df_ok[df_raw.columns].copy()
+-    df_wb = df_ok[df_raw.columns].copy()
++    df_wb = df_ok[header_cols].copy()
      n_linhas, n_colunas = df_wb.shape
  
      # 4) Calcula dimensões desejadas (incluindo cabeçalho)
@@ -578,10 +710,10 @@ index 9f4f673b58ced2f53357a5c6eaf2d67dff8bc994..cf4a05e00292c104e2657d7e6d68f890
      return df_wb
 diff --git a/tests/test_single_batch.py b/tests/test_single_batch.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..68f4a95a057364559f0125adb921fdcea0785a31
+index 0000000000000000000000000000000000000000..b0bd09c3c7a187f50b32f1bfd234a779e479f8b1
 --- /dev/null
 +++ b/tests/test_single_batch.py
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,51 @@
 +import os
 +import sys
 +from unittest.mock import MagicMock
@@ -594,6 +726,7 @@ index 0000000000000000000000000000000000000000..68f4a95a057364559f0125adb921fdce
 +from treat.treat_pipeline import execute_pipeline, TreatPipeline
 +from load import dest_writer
 +import treat.treat_pipeline as pipeline
++from googleapiclient import discovery
 +
 +class DummyFetcher:
 +    def __init__(self):
@@ -620,6 +753,7 @@ index 0000000000000000000000000000000000000000..68f4a95a057364559f0125adb921fdce
 +    service = MagicMock()
 +    batch_call = service.spreadsheets.return_value.values.return_value.batchUpdate
 +    batch_call.return_value.execute.return_value = {}
++    monkeypatch.setattr(discovery, "build", lambda *a, **k: service)
 +    monkeypatch.setattr(dest_writer, "_build_service", lambda c: service)
 +
 +    monkeypatch.setattr(TreatPipeline, "run", lambda self, df: df)
@@ -630,8 +764,9 @@ index 0000000000000000000000000000000000000000..68f4a95a057364559f0125adb921fdce
 +
 +    assert fetcher.calls == 1
 +    assert batch_call.call_count == 1
++
 diff --git a/treat/treat_pipeline.py b/treat/treat_pipeline.py
-index bd8e3419524ddf1bc5f05009968619e2b2b29e78..11aa44c6a511725dc078ee96f50c1798e2449f0c 100644
+index bd8e3419524ddf1bc5f05009968619e2b2b29e78..c91276c14ddc86fc0aa11c23710a4a223b751f99 100644
 --- a/treat/treat_pipeline.py
 +++ b/treat/treat_pipeline.py
 @@ -30,52 +30,62 @@ from gspread import Worksheet
@@ -697,7 +832,90 @@ index bd8e3419524ddf1bc5f05009968619e2b2b29e78..11aa44c6a511725dc078ee96f50c1798
          subs_objetivo_fn: Callable[[pd.DataFrame], pd.DataFrame] = aplicar_substituicoes_objetivo,
      ) -> None:
          self.creds_path = creds_path
-@@ -257,25 +267,106 @@ class TreatPipeline:
+@@ -129,50 +139,52 @@ class TreatPipeline:
+ 
+         # 1) Snapshot das colunas originais
+         orig_cols: List[str] = df_raw.columns.tolist()
+         df = df_raw.copy()
+ 
+         # 2) Pré-processamento genérico (substituições + normalize_region)
+         df = self._preprocess(df)
+ 
+         # ───────────────────────────────────────────────────────────────
+         # 3) Tratamento EXCLUSIVO das abas demográficas do Pinterest
+         #    (pinterestIdade / pinterestGenero / pinterestRegiao)
+         # ───────────────────────────────────────────────────────────────
+         if lower in {"pinterestidade", "pinterestgenero", "pinterestregiao"}:
+             # 3a) grava correções na própria aba-origem
+             df_orig_to_write = df[orig_cols]
+             validate_columns(df_orig_to_write, orig_cols,
+                             stage=f"Origem {self.sheet_name}")
+             write_back_origin(
+                 df_raw        = df_raw,
+                 df_ok         = df_orig_to_write,
+                 creds_path    = self.creds_path,
+                 spreadsheet_id= self.spreadsheet_id,
+                 write_back    = self.write_back,
+                 dry_run       = False,
+                 worksheet     = self.worksheet_origem,
++                skip_if_written=True,
++                header=df_raw.columns.tolist(),
+             )
+ 
+             # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache global)
+             import builtins
+             df_geral = getattr(builtins, "_pinterest_geral_tratado", None)
+             if df_geral is None:
+                 raise RuntimeError("pinterestGeral não foi processado antes da dimensão.")
+ 
+             # 3c) merge demográfico (gera modeloIdade/Genero/Regiao)
+             df = pin_merge(df_general=df_geral, df_dimension=df)
+             log.info(
+                 "merge_pinterest_dimension concluído – retornando ao pipeline genérico"
+             )
+ 
+         # ───────────────────────────────────────────────────────────────
+         # 4) Validações iniciais contra BI
+         # ───────────────────────────────────────────────────────────────
+         df_bi = self.bi_lookup.df()
+         validate_utm_content_in_bi(df, df_bi)
+         self._last_taxo_report = validate_taxonomy_consistency(df, df_bi)
+ 
+         # ───────────────────────────────────────────────────────────────
+         # 5) Enriquecimento BI + preenchimento de ‘objective’
+         # ───────────────────────────────────────────────────────────────
+         df = enrich_with_bi_parametrizacao(
+@@ -229,53 +241,136 @@ class TreatPipeline:
+             "impressions", "cost", "link_clicks", "video_play",
+             "video_watches_25", "video_watches_50", "video_watches_75",
+             "video_watched_100", "post_reactions", "post_shares", "post_comments",
+         ]
+         check_required_columns(df, optional_cols=["URL_do_Anúncio"], zero_valid_cols=ZERO_OK)
+ 
+         # ───────────────────────────────────────────────────────────────
+         # 13) Write-back das correções na aba-origem (padrão)
+         #     Para as dimensões do Pinterest já gravamos no passo 3a.
+         # ───────────────────────────────────────────────────────────────
+         if lower not in {"pinterestidade", "pinterestgenero", "pinterestregiao"}:
+             df_orig_to_write = df[orig_cols]
+             validate_columns(
+                 df_orig_to_write,
+                 orig_cols,
+                 stage=f"Origem {self.sheet_name}",
+             )
+             write_back_origin(
+                 df_raw=df_raw,
+                 df_ok=df_orig_to_write,
+                 creds_path=self.creds_path,
+                 spreadsheet_id=self.spreadsheet_id,
+                 sheet_name=self.sheet_name,
+                 write_back=self.write_back,
+                 dry_run=False,
++                skip_if_written=True,
++                header=df_raw.columns.tolist(),
+             )
+ 
+         # ───────────────────────────────────────────────────────────────
          # 14) Renomeia colunas para o modelo destino + cálculos finais
          # ───────────────────────────────────────────────────────────────
          df = renomear_colunas_origem_para_modelo(df, self.mapping)
@@ -804,6 +1022,148 @@ index bd8e3419524ddf1bc5f05009968619e2b2b29e78..11aa44c6a511725dc078ee96f50c1798
 +
 +    return results
 +
+diff --git a/treat/utils/preprocess_utils.py b/treat/utils/preprocess_utils.py
+index 9fa1f0c7cc48843210e55c2b76feddbba1187daa..80ac4f5924195f2ad81939bc87fd34da9e8ae80f 100644
+--- a/treat/utils/preprocess_utils.py
++++ b/treat/utils/preprocess_utils.py
+@@ -73,50 +73,51 @@ def _extract_platform(sheet_name: str) -> str:
+     “tiktokgeral” que ocorria anteriormente.
+     """
+     m = re.match(r"^[a-z]+", sheet_name)
+     return m.group(0).lower() if m else sheet_name.lower()
+ 
+ 
+ def preprocess_origin(
+     df: pd.DataFrame,
+     *,
+     worksheet: Optional[Worksheet] = None,
+     write_back: bool = True,
+ ) -> pd.DataFrame:
+     """
+     1. Executa substituições de texto (apply_all_origin_substitutions).  
+        – Se *write_back* for ``True``, grava no próprio *worksheet*.
+ 
+     2. Normaliza a coluna ``region`` (se existir) via geo-normalize.
+ 
+     Retorna um **novo** DataFrame com as alterações.
+     """
+     df2 = apply_all_origin_substitutions(
+         df,
+         worksheet=worksheet,
+         write_back=write_back,
+         inplace=True,
++        header=df.columns.tolist(),
+     )
+     df2 = normalize_region_column(df2, col_name="region")
+     return df2
+ 
+ 
+ def assign_vehicle_and_id(
+     df: pd.DataFrame,
+     *,
+     sheet_name: str,
+     fetcher: SheetsFetcher,
+     bi_lookup: BIParamLookup,
+ ) -> pd.DataFrame:
+     """
+     Preenche as colunas **Veiculo** e **ID_Veiculo** sem abrir novas
+     conexões ao Google Sheets.
+ 
+     Parâmetros
+     ----------
+     df : pd.DataFrame
+         DataFrame a enriquecer.
+     sheet_name : str
+         Nome completo da aba (ex.: ``"tiktokGeral"``).
+     fetcher : SheetsFetcher
+         Instância única reutilizada no pipeline.
+     bi_lookup : BIParamLookup
+diff --git a/treat/utils/substitute_origin_values.py b/treat/utils/substitute_origin_values.py
+index 0211e4204da4dedb8c3aeee1c672536e515d1719..d8aa806f23e7e0ab748b3542577b1224e5e6e286 100644
+--- a/treat/utils/substitute_origin_values.py
++++ b/treat/utils/substitute_origin_values.py
+@@ -40,76 +40,80 @@ def _normalize_series(s: pd.Series) -> pd.Series:
+     """strip + lower; preserva NaN como string vazia."""
+     return s.fillna("").astype(str).str.strip().str.lower()
+ 
+ 
+ def _chunk(it: Iterable, n: int):
+     """Yield blocos de tamanho n."""
+     it = iter(it)
+     while True:
+         block = list(itertools.islice(it, n))
+         if not block:
+             break
+         yield block
+ 
+ 
+ # ---------------------------------------------------------------------------
+ # Função pública
+ # ---------------------------------------------------------------------------
+ 
+ 
+ def apply_all_origin_substitutions(
+     df: pd.DataFrame,
+     *,
+     worksheet: Worksheet | None = None,
+     write_back: bool = True,
+     inplace: bool = True,
++    header: List[str] | None = None,
+ ) -> pd.DataFrame:
+     """
+     Aplica substituições nas colunas de origem.
+ 
+     Parâmetros
+     ----------
+     df         : DataFrame de origem.
+     worksheet  : Worksheet já aberta pelo pipeline (obrigatório se write_back=True).
+     write_back : Se True, atualiza apenas as células modificadas.
+     inplace    : Se False, opera sobre uma cópia de *df*.
+ 
+     Retorna
+     -------
+     DataFrame resultante (cópia ou referência, conforme *inplace*).
+     """
+     log = logging.getLogger(__name__)
+ 
+     if write_back and worksheet is None:
+         raise ValueError("`worksheet` deve ser fornecido se write_back=True.")
+ 
+     if not inplace:
+         df = df.copy()
+ 
+     header_lc: List[str] = []
+     if write_back:
+-        header_lc = [h.strip().lower() for h in worksheet.row_values(1)]
++        if header is not None:
++            header_lc = [h.strip().lower() for h in header]
++        else:
++            header_lc = [h.strip().lower() for h in worksheet.row_values(1)]
+ 
+     # Mantém index estável → mapeia linha → célula
+     df.reset_index(drop=True, inplace=True)
+ 
+     updates: List[Dict[str, object]] = []
+ 
+     for col_name, mapping in _REPLACEMENT_SPECS:
+         if col_name not in df.columns or not mapping:
+             continue
+ 
+         # normaliza dicionário
+         mapping_norm = {k.strip().lower(): v for k, v in mapping.items()}
+ 
+         s_norm = _normalize_series(df[col_name])
+         mask = s_norm.isin(mapping_norm)
+         n_changes = int(mask.sum())
+         if n_changes == 0:
+             continue
+ 
+         # log de amostra
+         sample_before = df.loc[mask, col_name].head(3).to_list()
+         sample_after = [mapping_norm[_normalize_series(pd.Series([v]))[0]] for v in sample_before]
+         log.debug("[%s] %d alterações. Ex.: %s → %s", col_name, n_changes, sample_before, sample_after)
+ 
+         # aplica no DataFrame
  
 EOF
 )
