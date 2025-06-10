@@ -81,12 +81,19 @@ def preprocess_origin(
     *,
     worksheet: Optional[Worksheet] = None,
     write_back: bool = True,
+    header: Optional[list[str]] = None,
 ) -> pd.DataFrame:
     """
-    1. Executa substituições de texto (apply_all_origin_substitutions).  
+    1. Executa substituições de texto (apply_all_origin_substitutions).
        – Se *write_back* for ``True``, grava no próprio *worksheet*.
 
     2. Normaliza a coluna ``region`` (se existir) via geo-normalize.
+
+    Parâmetros
+    ----------
+    header : list[str] | None
+        Cabeçalho da aba já em memória. Evita leituras ``A1:1``
+        quando fornecido.
 
     Retorna um **novo** DataFrame com as alterações.
     """
@@ -95,7 +102,11 @@ def preprocess_origin(
         worksheet=worksheet,
         write_back=write_back,
         inplace=True,
+<<<<<<< ours
         header=df.columns.tolist(),
+=======
+        header=header or df.columns.tolist(),
+>>>>>>> theirs
     )
     df2 = normalize_region_column(df2, col_name="region")
     return df2
