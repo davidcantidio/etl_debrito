@@ -72,6 +72,8 @@ WRITE_BACK_ORIGIN: habilita/desabilita gravação in-place das correções na ab
 
 WRITE_BACK_DEST: habilita/desabilita gravação dos resultados nas abas de modelo de destino (via write_back_destiny).
 
+Gravação em lote usando `batchUpdate` garante apenas uma chamada POST mesmo para várias abas de modelo.
+
 DRY_RUN_DEST: quando True, valida apenas estrutura e ordenação de colunas sem sobrescrever dados existentes.
 
 Geração de Logs

@@ -1,405 +1,475 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
-diff --git a/treat/treat_pipeline.py b/treat/treat_pipeline.py
-index 5c3511c79e213cc99e18a91c51716f0e80d8a4c5..ca7cd4336d4697a868079ee11e9377a27af2ba48 100644
---- a/treat/treat_pipeline.py
-+++ b/treat/treat_pipeline.py
-@@ -138,51 +138,54 @@ class TreatPipeline:
-         # 3) Tratamento EXCLUSIVO das abas demográficas do Pinterest
-         #    (pinterestIdade / pinterestGenero / pinterestRegiao)
-         # ───────────────────────────────────────────────────────────────
-         if lower in {"pinterestidade", "pinterestgenero", "pinterestregiao"}:
-             # 3a) grava correções na própria aba-origem
-             df_orig_to_write = df[orig_cols]
-             validate_columns(df_orig_to_write, orig_cols,
-                             stage=f"Origem {self.sheet_name}")
-             write_back_origin(
-                 df_raw        = df_raw,
-                 df_ok         = df_orig_to_write,
-                 creds_path    = self.creds_path,
-                 spreadsheet_id= self.spreadsheet_id,
-                 write_back    = self.write_back,
-                 dry_run       = False,
-                 worksheet     = self.worksheet_origem,
-             )
+diff --git a/README.md b/README.md
+index bcd3d7cd92b4200e91991bbbc986fbc20384c017..76f74a9c3e916772814b3401768bde1df83d605e 100644
+--- a/README.md
++++ b/README.md
+@@ -50,50 +50,52 @@ Gera logs detalhados informando quantidade de linhas e colunas atualizadas, e em
  
-             # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache global)
-             import builtins
-             df_geral = getattr(builtins, "_pinterest_geral_tratado", None)
-             if df_geral is None:
-                 raise RuntimeError("pinterestGeral não foi processado antes da dimensão.")
+ 🔄 Etapa 4 – Mecanismo de Controle, Logs, Execução Modular e Flags
  
-             # 3c) merge demográfico (gera modeloIdade/Genero/Regiao)
--            return pin_merge(df_general=df_geral, df_dimension=df)
-+            df = pin_merge(df_general=df_geral, df_dimension=df)
-+            log.info(
-+                "merge_pinterest_dimension concluído – retornando ao pipeline genérico"
-+            )
+ Iteração Principal
  
-         # ───────────────────────────────────────────────────────────────
-         # 4) Validações iniciais contra BI
-         # ───────────────────────────────────────────────────────────────
-         df_bi = self.bi_lookup.df()
-         validate_utm_content_in_bi(df, df_bi)
-         self._last_taxo_report = validate_taxonomy_consistency(df, df_bi)
+ Percorre cada folha em all_raw via:
  
-         # ───────────────────────────────────────────────────────────────
-         # 5) Enriquecimento BI + preenchimento de ‘objective’
-         # ───────────────────────────────────────────────────────────────
-         df = enrich_with_bi_parametrizacao(
-             df, self.creds_path, self.spreadsheet_id, sheet_name=self.sheet_name
-         )
-         df = fill_objective_from_bi(df, self.bi_lookup)
+ for sheet, df_raw in all_raw.items():
+     out = run_etl_for_sheet(
+         sheet=sheet,
+         wb_origin_flag=WRITE_BACK_ORIGIN,
+         wb_dest_flag=WRITE_BACK_DEST,
+         dry_run_dest=DRY_RUN_DEST,
+         preloaded_raw=df_raw
+     )
+     results[sheet] = {"dest": out["dest"], "taxo": out.get("taxo")}
  
-         # ───────────────────────────────────────────────────────────────
-         # 6) Conversão de colunas datetime → date / start / end
-         # ───────────────────────────────────────────────────────────────
-         for col in ("date", "start", "end"):
-             if col in df.columns:
-                 df = converter_data(df, col)
+ O loop garante execução modular para cada aba, respeitando configurações específicas.
  
-         # ───────────────────────────────────────────────────────────────
-         # 7) Preenche start/end em memória
-@@ -208,63 +211,68 @@ class TreatPipeline:
+ Controle de Flags
  
-         # ───────────────────────────────────────────────────────────────
-         # 10a)  Se for pinterestGeral, guarda VERSÃO ENRIQUECIDA no cache
-         #       (antes de renomear colunas → usada no merge demográfico)
-         # ───────────────────────────────────────────────────────────────
-         if lower == "pinterestgeral":
-             import builtins
-             builtins._pinterest_geral_tratado = df.copy()
+ WRITE_BACK_ORIGIN: habilita/desabilita gravação in-place das correções na aba de origem (via write_back_origin).
  
-         # ───────────────────────────────────────────────────────────────
-         # 11) Validação de agregados
-         # ───────────────────────────────────────────────────────────────
-         validate_aggregates(df_raw, df)
+ WRITE_BACK_DEST: habilita/desabilita gravação dos resultados nas abas de modelo de destino (via write_back_destiny).
  
-         # ───────────────────────────────────────────────────────────────
-         # 12) Checagem de colunas obrigatórias
-         # ───────────────────────────────────────────────────────────────
-         ZERO_OK = [
-             "impressions", "cost", "link_clicks", "video_play",
-             "video_watches_25", "video_watches_50", "video_watches_75",
-             "video_watched_100", "post_reactions", "post_shares", "post_comments",
-         ]
-         check_required_columns(df, optional_cols=["URL_do_Anúncio"], zero_valid_cols=ZERO_OK)
++Gravação em lote usando `batchUpdate` garante apenas uma chamada POST mesmo para várias abas de modelo.
++
+ DRY_RUN_DEST: quando True, valida apenas estrutura e ordenação de colunas sem sobrescrever dados existentes.
  
-         # ───────────────────────────────────────────────────────────────
--        # 13) Write-back das correções na aba-origem (todas as demais)
-+        # 13) Write-back das correções na aba-origem (padrão)
-+        #     Para as dimensões do Pinterest já gravamos no passo 3a.
-         # ───────────────────────────────────────────────────────────────
--        df_orig_to_write = df[orig_cols]
--        validate_columns(df_orig_to_write, orig_cols,
--                        stage=f"Origem {self.sheet_name}")
--        write_back_origin(
--            df_raw        = df_raw,
--            df_ok         = df_orig_to_write,
--            creds_path    = self.creds_path,
--            spreadsheet_id= self.spreadsheet_id,
--            sheet_name    = self.sheet_name,
--            write_back    = self.write_back,
--            dry_run       = False,
--        )
-+        if lower not in {"pinterestidade", "pinterestgenero", "pinterestregiao"}:
-+            df_orig_to_write = df[orig_cols]
-+            validate_columns(
-+                df_orig_to_write,
-+                orig_cols,
-+                stage=f"Origem {self.sheet_name}",
-+            )
-+            write_back_origin(
-+                df_raw=df_raw,
-+                df_ok=df_orig_to_write,
-+                creds_path=self.creds_path,
-+                spreadsheet_id=self.spreadsheet_id,
-+                sheet_name=self.sheet_name,
-+                write_back=self.write_back,
-+                dry_run=False,
-+            )
+ Geração de Logs
  
-         # ───────────────────────────────────────────────────────────────
-         # 14) Renomeia colunas para o modelo destino + cálculos finais
-         # ───────────────────────────────────────────────────────────────
-         df = renomear_colunas_origem_para_modelo(df, self.mapping)
-         if "age" in df.columns:                                
-             df["age"] = df["age"].apply(normalize_age)
-         df = calcular_engajamento_total(df)
-         df["ID"] = df.apply(gerar_id, axis=1)
+ Nível DEBUG: registra início e fim de cada sheet, parâmetros utilizados e contagem de linhas e colunas antes e depois.
  
-         # ───────────────────────────────────────────────────────────────
-         # 15) Logs de verificação
-         # ───────────────────────────────────────────────────────────────
-         if not df[df["Veiculo"].fillna("") == ""].empty:
-             log.warning("[%s] linhas sem Veiculo: %s",
-                         self.sheet_name,
-                         df.index[df["Veiculo"].fillna('') == ""].tolist())
-         if not df[df["objective"].fillna("") == ""].empty:
-             log.warning("[%s] linhas sem objective: %s",
-                         self.sheet_name,
-                         df.index[df["objective"].fillna('') == ""].tolist())
+ Nível INFO: highlights de sucesso na execução e escrita de cada aba destino, ex.: "Aba 'modeloIdade' atualizada com 1.200 registros".
  
-         return df
+ Nível WARNING: dispara quando a ordem de colunas difere de _FINAL_ORDER, ou quando colunas inesperadas são encontradas (mas não falha a execução para destino).
  
-diff --git a/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py b/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py
-index a02031a98fc10124437ff75ee053fb6f84d5dce2..5b148e296754030ef2077c95eb6b43d9f6d9b9e4 100644
---- a/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py
-+++ b/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py
-@@ -1,40 +1,39 @@
- from __future__ import annotations
+ Tratamento de Erros e Exceções
  
- """Pinterest demographic merge (Idade/Gênero/Região) — versão corrigida
- ------------------------------------------------------------------------
- Une pinterestGeral (métricas por pin) com pinterestIdade / pinterestGenero /
- pinterestRegiao (métricas demográficas por campanha), redistribuindo
- proporcionalmente as métricas aos pins e PRESERVANDO colunas de contexto.
+ Bloqueia falha total se uma sheet específica falhar; coleta exceções e continua a próxima sheet.
+ 
+ As exceções e stacks são logadas para auditoria posterior.
+ 
+ Retorno da Função
+ 
+ Ao fim do loop, execute_pipeline() retorna o dicionário results com detalhes de destino (dest) e eventuais dados de taxonomia (taxo).
+ 
+ Esta arquitetura garante separação clara entre a lógica de ETL para cada aba e o controle central de execução, permitindo ajustes via flags sem alterar o fluxo principal.
+ 
+ [...] (mesmo conteúdo anterior)
+ 
+ ✅ Considerações Finais
+diff --git a/load/dest_writer.py b/load/dest_writer.py
+index 2e5da77e056cde63d8032d5238e523889c4a8db1..07cd9d8b36766907ebb5f7846ead48cfe3398a6c 100644
+--- a/load/dest_writer.py
++++ b/load/dest_writer.py
+@@ -1,89 +1,87 @@
+ # load/dest_writer.py
+ 
+ """
+ Write-back otimizado para as abas **modelo***
+ 
+ Principais características
+ -------------------------
+ * 01 leitura para cabeçalhos e IDs: usamos SheetsFetcher para recuperar todas
+   as abas-modelo de uma só vez (batchGet), poupando quota.
+ * Zero leituras extras durante o loop de ETL; somente gravação (via write_back_df ou append).
+ * Deduplicação: grava apenas registros cujo "ID" ainda não existe.
+ * Compatível com dry-run e com execução em paralelo.
  """
  
+ import datetime as _dt
++import json
  import logging
- from math import floor
- from typing import Dict, List, Tuple
+ import re
+-from typing import Dict, List, Optional, Set
++from typing import Dict, Iterable, List, Optional, Set
  
+ import numpy as np
  import pandas as pd
--from treat.utils.campos_calculados import calcular_engajamento_total, gerar_id
- from treat.utils.normalize import convert_numeric_columns
++from google.oauth2.service_account import Credentials
++from googleapiclient.discovery import build
+ from tenacity import (
+     retry,
+     retry_if_exception_type,
+     stop_after_attempt,
+     wait_exponential,
+ )
+ 
+ from extract.sheets_fetcher import SheetsFetcher
+-from treat.utils.write_back import write_back_df
+-from load.utils.append_records_to_sheet import append_records_to_sheet
+ from treat.utils.validations import validate_columns
  
  log = logging.getLogger(__name__)
  
- # --------------------------------------------------------------------- #
- #  Constantes                                                           #
- # --------------------------------------------------------------------- #
- _METRICS: Tuple[str, ...] = (
-     "impressions",
-     "link_clicks",
-     "cost",
-     "video_watched_100",
- )
+ # ───────────────────────────── mapeamento origem → destino ──────────────────
+ DESTINATION_SHEETS: Dict[str, str] = {
+-    "geral":   "modeloGeral",
+-    "genero":  "modeloGenero",
+-    "idade":   "modeloIdade",
++    "geral": "modeloGeral",
++    "genero": "modeloGenero",
++    "idade": "modeloIdade",
+     "alcance": "modeloAlcance",
+-    "regiao":  "modeloRegiao",
++    "regiao": "modeloRegiao",
+ }
  
- # Campos que queremos manter no resultado final
- _DESIRED_BASE: Tuple[str, ...] = (
-     "pin_id",
-     "campaign_id",
-     "campaign_name",
-     "account_name",
-     "ID_Veiculo",
-     "Veiculo",
-     "ID_Campanha",
-     "Campanha",
-     "ad_group_name",
-@@ -122,50 +121,54 @@ def _dist_float_total(valor: float, pesos: Dict[str, float]) -> Dict[str, float]
+ # ───────────────────────────── caches globais em memória ────────────────────
+-_HEADERS: Dict[str, List[str]] = {}        # aba-destino → header completo
+-_EXISTING_IDS: Dict[str, Set[str]] = {}    # aba-destino → set(ID)
++_HEADERS: Dict[str, List[str]] = {}  # aba-destino → header completo
++_EXISTING_IDS: Dict[str, Set[str]] = {}  # aba-destino → set(ID)
  
  
- def _dist_int_total(valor: int, pesos: Dict[str, float]) -> Dict[str, int]:
-     """Distribui inteiros preservando soma."""
-     if valor == 0 or not any(pesos.values()):
-         return {k: 0 for k in pesos}
-     total = sum(pesos.values())
-     bruto = {k: v / total * valor for k, v in pesos.items()}
-     base = {k: int(floor(x)) for k, x in bruto.items()}
-     resto = valor - sum(base.values())
-     if resto:
-         frac = {k: bruto[k] - base[k] for k in pesos}
-         for k in sorted(frac, key=frac.get, reverse=True)[: resto]:
-             base[k] += 1
-     return base
+ def _idx_to_col(idx: int) -> str:
+     """Converte índice 0-based em letras de coluna estilo A1 (A, B, …, AA…)."""
+     out = ""
+     while True:
+         idx, rem = divmod(idx, 26)
+         out = chr(65 + rem) + out
+         if idx == 0:
+             return out
+         idx -= 1
  
  
- # --------------------------------------------------------------------- #
- #  Preparação das abas                                                  #
- # --------------------------------------------------------------------- #
- def _prepare_general(df: pd.DataFrame) -> pd.DataFrame:
-     keep = set(_DESIRED_BASE) | {"date", *_METRICS}
-     df = df.copy()
-     df.columns = df.columns.str.strip()
-     df = df[[c for c in df.columns if c in keep]]
+-def prefetch_meta(
+-    fetcher: SheetsFetcher,
+-    spreadsheet_id: str
+-) -> None:
++def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
+     """
+     Carrega cabeçalhos (linha 1) e IDs (coluna 'ID' a partir da linha 2)
+     de todas as abas-modelo (modeloGeral, modeloGenero, etc.) em UMA ÚNICA
+     operação, poupando leitura repetida da API.
+ 
+     Depois disso, os caches globais _HEADERS e _EXISTING_IDS estão prontos
+     para uso em write_back_destination, sem novas leituras.
+     """
+     global _HEADERS, _EXISTING_IDS
+     if _HEADERS:
+         # já realizou prefetch nesta sessão
+         return
+ 
+     abas = list(DESTINATION_SHEETS.values())
+ 
+     # 1) Buscar todas as linhas de cada aba no fetcher (cada aba → Lista[List[str]])
+     raw_data = fetcher.get(abas, as_frame=False)
+ 
+     # 2) Extrair cabeçalhos (linha 0 de cada aba) e armazenar em _HEADERS
+     for tab, values in raw_data.items():
+         primeira_linha = values[0] if values else []
+         header = [c.strip() for c in primeira_linha if c.strip()]
+         _HEADERS[tab] = header
+ 
+     # 3) Identificar intervalos de ID para cada aba-modelo
+@@ -125,123 +123,200 @@ def _scalar(v):
+         return v.isoformat()
+     if v is None or (isinstance(v, float) and np.isnan(v)):
+         return ""
+     return v
+ 
+ 
+ def _infer_data_type(sheet_name: str) -> str:
+     """
+     Dado nome de aba de origem (exemplo: 'metaGenero', 'tiktokIdade'), devolve
+     o sufixo que mapeia para a aba-modelo correspondente. Ex.: 'genero', 'idade'.
+     """
+     lower = sheet_name.strip().lower()
+     if lower.startswith("ga"):
+         raise ValueError(
+             f"Aba '{sheet_name}' é do Google Analytics – não grava em abas-modelo."
+         )
+     m = re.search(r"(geral|genero|idade|alcance|regiao)$", lower)
+     if not m:
+         raise ValueError(
+             f"Não reconheço o tipo de dados da aba '{sheet_name}' "
+             "(esperava terminar em geral/genero/idade/alcance/regiao)."
+         )
+     return m.group(1)
+ 
+ 
+-def write_back_destination(
+-    df_model: pd.DataFrame,
+-    data_type: str,
++def _build_service(creds_path: str):
++    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
++    creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
++    return build("sheets", "v4", credentials=creds, cache_discovery=False)
 +
-+    # Garante coluna 'utm_content' vazia se inexistente na origem
-+    if "utm_content" not in df.columns:
-+        df["utm_content"] = ""
-     
++
++def _to_payload(df: pd.DataFrame, sheet_name: str) -> dict:
++    values = [df.columns.tolist()] + df.values.tolist()
++    return {
++        "range": f"{sheet_name}!A1",
++        "majorDimension": "ROWS",
++        "values": values,
++    }
++
++
++def _prepare_df(df_model: pd.DataFrame, sheet_name: str) -> Optional[pd.DataFrame]:
++    header = _HEADERS[sheet_name]
++    df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
++    validate_columns(df_out, header, stage=f"Destino {sheet_name}")
++    if "ID" in df_out.columns:
++        existing = _EXISTING_IDS.get(sheet_name, set())
++        df_out = df_out.loc[~df_out["ID"].isin(existing)]
++    if df_out.empty:
++        return None
++    return df_out
++
++
++def write_back_batch(
++    frames: Dict[str, pd.DataFrame],
+     creds_path: str,
+     spreadsheet_id: str,
+     *,
+     write_back: bool = True,
+     dry_run: bool = False,
+-    a1_range: str = "A1",
+     value_input_option: str = "USER_ENTERED",
+-) -> Optional[pd.DataFrame]:
+-    """
+-    Grava `df_model` na aba-modelo correspondente, deduplicando por 'ID'.
++    service: Optional = None,
++) -> Dict[str, Optional[pd.DataFrame]]:
++    """Grava várias abas-modelo em lote via batchUpdate."""
  
-     # 🔑 normaliza chaves antes do dropna
-     for c in ("campaign_id", "date"):
-         if c in df.columns:
-             s = df[c].astype(str).str.strip()
-             s = s.str.replace(r"\.0+$", "", regex=True)
-             df[c] = s.replace({"": pd.NA})
+-    Pré-requisito: `prefetch_meta(fetcher, spreadsheet_id)` já deve ter sido
+-    invocado antes, para que _HEADERS e _EXISTING_IDS estejam preenchidos.
+-    """
+-    if df_model.empty:
+-        log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
+-        return None
++    results: Dict[str, Optional[pd.DataFrame]] = {}
  
-     if "date" in df.columns:
-         df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
-     df = df.dropna(subset=["pin_id", "campaign_id", "date"]).reset_index(drop=True)
-     return _coerce_numeric(df, _METRICS)
+-    sheet_name = DESTINATION_SHEETS[data_type]
+-    if sheet_name not in _HEADERS:
+-        raise RuntimeError("Caches destino não carregados – chame prefetch_meta() antes.")
++    payloads: List[dict] = []
++    total_cells = 0
  
+-    header = _HEADERS[sheet_name]
++    for data_type, df_model in frames.items():
++        if df_model.empty:
++            log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
++            results[data_type] = None
++            continue
  
- def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
-     """Normaliza aba demográfica sem descartar linhas com métricas zeradas."""
-     dim_col = next((c for c in ("age", "gender", "region") if c in df.columns), None)
-     if dim_col is None:
-         raise KeyError("Dimensão sem coluna age/gender/region.")
+-    # 1) Reindexa para o layout exato de colunas-modelo
+-    df_out = (
+-        df_model
+-        .reindex(columns=header, fill_value="")
+-        .applymap(_scalar)
+-    )
++        sheet_name = DESTINATION_SHEETS[data_type]
++        if sheet_name not in _HEADERS:
++            raise RuntimeError(
++                "Caches destino não carregados – chame prefetch_meta() antes."
++            )
  
-     df = df.copy()
-     df.columns = df.columns.str.strip()
+-    # 2) Validação de esquema pós-reindexação
+-    validate_columns(df_out, header, stage=f"Destino {sheet_name}")
++        df_out = _prepare_df(df_model, sheet_name)
++        if df_out is None:
++            log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
++            results[data_type] = None
++            continue
  
-     # ── 1) Converter strings vazias em NaN para evitar dropna indevido ────
-@@ -210,99 +213,109 @@ def _build_weights(df_gen: pd.DataFrame) -> Dict[Tuple[str, str], Dict[str, floa
-     weights: Dict[Tuple[str, str], Dict[str, float]] = {}
-     for (cid, dt), grp in df_gen.groupby(["campaign_id", "date"]):
-         total_imp = grp["impressions"].sum()
-         if total_imp > 0:
-             base = grp.set_index("pin_id")["impressions"].astype(float)
-         else:
-             total_cost = grp["cost"].sum()
-             if total_cost > 0:
-                 base = grp.set_index("pin_id")["cost"].astype(float)
-             else:
-                 base = pd.Series(0.0, index=grp["pin_id"])
-         weights[(cid, dt)] = base.to_dict()
-     return weights
- # --------------------------------------------------------------------- #
- #  Merge principal                                                      #
- # --------------------------------------------------------------------- #
- def merge_pinterest_dimension(
-     *, df_general: pd.DataFrame, df_dimension: pd.DataFrame
- ) -> pd.DataFrame:
-     
-     # 1) normalização
-     df_gen = _prepare_general(df_general)
-     df_dim, dim_col = _prepare_dimension(df_dimension)
-     # 2) metadados por pin e por campanha
-     meta_pin = (
--        df_gen[["pin_id", "campaign_id", "campaign_name", "ad_group_name", "ad_name"]]
-+        df_gen[
-+            [
-+                "pin_id",
-+                "campaign_id",
-+                "campaign_name",
-+                "ad_group_name",
-+                "ad_name",
-+                "utm_content",
-+            ]
-+        ]
-         .drop_duplicates("pin_id")
-         .set_index("pin_id")
-     )
-     meta_campaign = (
-         df_gen[[
-             "campaign_id",
-             "account_name",
-             "Veiculo",
-             "ID_Veiculo",
-             "ID_Campanha",
-             "Campanha",
-             "objective",
-         ]]
-         .drop_duplicates("campaign_id")
-         .set_index("campaign_id")
+-    # 3) Deduplicação por ID
+-    if "ID" in df_out.columns:
+-        existing = _EXISTING_IDS.get(sheet_name, set())
+-        df_out = df_out.loc[~df_out["ID"].isin(existing)]
++        payload = _to_payload(df_out, sheet_name)
++        payloads.append(payload)
++        total_cells += len(payload["values"]) * len(payload["values"][0])
++        results[data_type] = df_out
  
-     )
+-    if df_out.empty:
+-        log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
+-        return None
++    if not payloads:
++        return results
  
-     # 3) pesos por pin
-     weights = _build_weights(df_gen)
- 
-     out_rows: List[dict] = []
- 
-     for row in df_dim.itertuples(index=False):
-         key = (row.campaign_id, row.date)
-         if key not in weights:
-             continue
-         w_pins = weights[key]
- 
-         dist_cost = _dist_float_total(float(row.cost), w_pins)
-         dist_ints = {
-             "impressions": _dist_int_total(int(row.impressions), w_pins),
-             "link_clicks": _dist_int_total(int(row.link_clicks), w_pins),
-             "video_watched_100": _dist_int_total(int(row.video_watched_100), w_pins),
-         }
- 
-         for pin_id in w_pins:
-             pin_meta = meta_pin.loc[pin_id] if pin_id in meta_pin.index else {}
- 
-             out_rows.append(
-                 {
-                     "campaign_id": row.campaign_id,
-                     "date": row.date,
-                     dim_col: getattr(row, dim_col),
-                     "pin_id": pin_id,
-                     "campaign_name": pin_meta.get("campaign_name", ""),
-                     "ad_group_name": pin_meta.get("ad_group_name", ""),
-                     "ad_name": pin_meta.get("ad_name", ""),
-+                    "utm_content": pin_meta.get("utm_content", ""),
-                     "impressions": dist_ints["impressions"][pin_id],
-                     "cost": dist_cost[pin_id],
-                     "link_clicks": dist_ints["link_clicks"][pin_id],
-                     "video_watched_100": dist_ints["video_watched_100"][pin_id],
-                 }
-             )
- 
-     df_temp = pd.DataFrame(out_rows)
-     if df_temp.empty:
-         log.warning("Demographic sheet produced no usable rows.")
-         return pd.DataFrame(columns=_FINAL_ORDER[dim_col])
- 
-     # 4) junta metadados de campanha
-     df = df_temp.merge(
-         meta_campaign,
-         left_on="campaign_id",
-         right_index=True,
-         how="left",
-         validate="many_to_one",
-     )
- 
-      # preenche valores ausentes das colunas BI
-     for c in meta_campaign.columns:
-         if c in df.columns:
-             if pd.api.types.is_numeric_dtype(meta_campaign[c]):
-@@ -319,42 +332,33 @@ def merge_pinterest_dimension(
-         orig_tot = df_gen.groupby(["campaign_id", "date"])[list(_METRICS)].sum()
-         new_tot = df.groupby(["campaign_id", "date"])[list(_METRICS)].sum()
-         for idx, row in orig_tot.iterrows():
-             if idx not in new_tot.index:
-                 continue
-             for m in _METRICS:
-                 o = row[m]
-                 d = new_tot.loc[idx, m]
-                 if o == 0:
-                     continue
-                 if abs(o - d) / o > 0.001:
-                     log.warning(
-                         "Divergência %s em %s: %s vs %s", m, idx, o, d
-                     )
-         log.info("Validação de soma concluída para %d grupos", len(orig_tot))
-     except Exception as exc:
-         log.warning("Validação de soma falhou: %s", exc)
- 
-     # remove linhas sem métricas
-     df = df[df[list(_METRICS)].sum(axis=1) > 0].copy()
- 
-     # 8) region → Numero
-     if dim_col == "region":
-         df.insert(0, "Numero", range(1, len(df) + 1))
- 
--    # 9) engajamento + ID sintético
--    df = calcular_engajamento_total(df)
--    df["ID"] = df.apply(gerar_id, axis=1)
+-    # 4) Se dry_run ou write_back=False, apenas logar e retornar
+     if dry_run or not write_back:
+-        log.info("[Dry-run] %d linhas seriam gravadas em '%s'", len(df_out), sheet_name)
+-        return df_out
 -
--    # 10) garante campos obrigatórios
--
--    for col in _MANDATORY:
--        if col not in df.columns:
--            df[col] = ""
--
--    # 11) ordena
--    df_final = df.reindex(columns=_FINAL_ORDER[dim_col], fill_value="")
-+    # garantia final de que 'utm_content' exista para evitar warnings no pipeline
-+    if "utm_content" not in df.columns:
-+        df["utm_content"] = ""
+-    # 5) Gravação: APPEND em vez de overwrite
+-    #    Usamos append_records_to_sheet, que faz append a partir da primeira linha vazia.
+-    #    Caso append_records_to_sheet não retorne contagem, assumimos len(df_out).
+-    try:
+-        linhas_inseridas = append_records_to_sheet(
+-            creds_path      = creds_path,
+-            spreadsheet_id  = spreadsheet_id,
+-            sheet_name      = sheet_name,
+-            df              = df_out,
++        log.info(
++            "[Dry-run] batchUpdate enviaria %d ranges, total %s células",
++            len(payloads),
++            f"{total_cells:,}",
+         )
+-        if linhas_inseridas is None:
+-            linhas_inseridas = len(df_out)
+-    except Exception as e:
+-        log.error("Erro ao gravar em '%s' via append: %s", sheet_name, e)
+-        raise
++        return results
++
++    service = service or _build_service(creds_path)
++
++    MAX_CELLS = 500_000
++    MAX_BYTES = int(9.9 * 1024 * 1024)
++
++    batches: List[List[dict]] = []
++    current: List[dict] = []
++    cells = 0
++    size = 0
++
++    for payload in payloads:
++        payload_size = len(json.dumps(payload).encode("utf-8"))
++        payload_cells = len(payload["values"]) * len(payload["values"][0])
++        if current and (
++            cells + payload_cells > MAX_CELLS or size + payload_size > MAX_BYTES
++        ):
++            batches.append(current)
++            current = []
++            cells = 0
++            size = 0
++
++        current.append(payload)
++        cells += payload_cells
++        size += payload_size
++
++    if current:
++        batches.append(current)
++
++    for batch in batches:
++        body = {"valueInputOption": value_input_option, "data": batch}
++        service.spreadsheets().values().batchUpdate(
++            spreadsheetId=spreadsheet_id, body=body
++        ).execute()
++
++    for payload, data_type in zip(payloads, results.keys()):
++        df_out = results[data_type]
++        if df_out is not None and "ID" in df_out.columns:
++            sheet_name = DESTINATION_SHEETS[data_type]
++            _EXISTING_IDS.setdefault(sheet_name, set()).update(
++                df_out["ID"].astype(str).tolist()
++            )
  
--    log.info("✅ merge_pinterest_dimension – %d linhas (%s)", len(df_final), dim_col)
--    return df_final
-+    log.info("✅ merge_pinterest_dimension – %d linhas (%s)", len(df), dim_col)
-+    return df
+-    log.info("✅ Gravadas %d linha(s) em '%s'", linhas_inseridas, sheet_name)
++    log.info(
++        "batchUpdate enviou %d ranges, total %s células",
++        len(payloads),
++        f"{total_cells:,}",
++    )
  
- __all__ = ["merge_pinterest_dimension"]
+-    # 6) Atualiza cache de IDs para futuras deduplicações
+-    if "ID" in df_out.columns:
+-        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].astype(str).tolist())
++    return results
+ 
+-    return df_out
++
++def write_back_destination(
++    df_model: pd.DataFrame,
++    data_type: str,
++    creds_path: str,
++    spreadsheet_id: str,
++    *,
++    write_back: bool = True,
++    dry_run: bool = False,
++    a1_range: str = "A1",
++    value_input_option: str = "USER_ENTERED",
++) -> Optional[pd.DataFrame]:
++    """Wrapper para gravar apenas uma aba-modelo."""
++
++    result = write_back_batch(
++        {data_type: df_model},
++        creds_path=creds_path,
++        spreadsheet_id=spreadsheet_id,
++        write_back=write_back,
++        dry_run=dry_run,
++        value_input_option=value_input_option,
++    )
++    return result.get(data_type)
+ 
+ 
+ def write_back_for_sheet(
+     df_model: pd.DataFrame,
+     sheet_name: str,
+     creds_path: str,
+     spreadsheet_id: str,
+     *,
+     write_back: bool = True,
+     dry_run: bool = False,
+ ) -> Optional[pd.DataFrame]:
+     """
+     Wrapper: infere `data_type` a partir do nome da aba de origem
+     e chama write_back_destination.
+     """
+     data_type = _infer_data_type(sheet_name)
+     return write_back_destination(
+         df_model=df_model,
+         data_type=data_type,
+         creds_path=creds_path,
+         spreadsheet_id=spreadsheet_id,
+         write_back=write_back,
+         dry_run=dry_run,
+     )
+diff --git a/tests/test_dest_writer_batch.py b/tests/test_dest_writer_batch.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8fe305caf82780a759f9d1393f4ac53488fd3307
+--- /dev/null
++++ b/tests/test_dest_writer_batch.py
+@@ -0,0 +1,47 @@
++import os
++import sys
++from unittest.mock import MagicMock
++
++import pandas as pd
++import pytest
++
++sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
++
++from load.dest_writer import (
++    _EXISTING_IDS,
++    _HEADERS,
++    DESTINATION_SHEETS,
++    write_back_batch,
++)
++
++
++@pytest.mark.unit
++def test_batch_update_single_call_multiple_tabs():
++    service = MagicMock()
++    batch_call = service.spreadsheets.return_value.values.return_value.batchUpdate
++    batch_call.return_value.execute.return_value = {}
++
++    _HEADERS.clear()
++    _EXISTING_IDS.clear()
++    for sheet in (
++        DESTINATION_SHEETS["idade"],
++        DESTINATION_SHEETS["genero"],
++        DESTINATION_SHEETS["regiao"],
++    ):
++        _HEADERS[sheet] = ["ID", "valor"]
++        _EXISTING_IDS[sheet] = set()
++
++    df = pd.DataFrame({"ID": [1], "valor": [42]})
++    frames = {"idade": df, "genero": df, "regiao": df}
++
++    write_back_batch(
++        frames,
++        creds_path="creds.json",
++        spreadsheet_id="xyz",
++        service=service,
++    )
++
++    assert batch_call.call_count == 1
++    body = batch_call.call_args.kwargs["body"]
++    assert "data" in body
++    assert len(body["data"]) >= 3
  
 EOF
 )

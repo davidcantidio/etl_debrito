@@ -13,12 +13,15 @@ Principais características
 """
 
 import datetime as _dt
+import json
 import logging
 import re
-from typing import Dict, List, Optional, Set
+from typing import Dict, Iterable, List, Optional, Set
 
 import numpy as np
 import pandas as pd
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -27,24 +30,22 @@ from tenacity import (
 )
 
 from extract.sheets_fetcher import SheetsFetcher
-from treat.utils.write_back import write_back_df
-from load.utils.append_records_to_sheet import append_records_to_sheet
 from treat.utils.validations import validate_columns
 
 log = logging.getLogger(__name__)
 
 # ───────────────────────────── mapeamento origem → destino ──────────────────
 DESTINATION_SHEETS: Dict[str, str] = {
-    "geral":   "modeloGeral",
-    "genero":  "modeloGenero",
-    "idade":   "modeloIdade",
+    "geral": "modeloGeral",
+    "genero": "modeloGenero",
+    "idade": "modeloIdade",
     "alcance": "modeloAlcance",
-    "regiao":  "modeloRegiao",
+    "regiao": "modeloRegiao",
 }
 
 # ───────────────────────────── caches globais em memória ────────────────────
-_HEADERS: Dict[str, List[str]] = {}        # aba-destino → header completo
-_EXISTING_IDS: Dict[str, Set[str]] = {}    # aba-destino → set(ID)
+_HEADERS: Dict[str, List[str]] = {}  # aba-destino → header completo
+_EXISTING_IDS: Dict[str, Set[str]] = {}  # aba-destino → set(ID)
 
 
 def _idx_to_col(idx: int) -> str:
@@ -58,10 +59,7 @@ def _idx_to_col(idx: int) -> str:
         idx -= 1
 
 
-def prefetch_meta(
-    fetcher: SheetsFetcher,
-    spreadsheet_id: str
-) -> None:
+def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
     """
     Carrega cabeçalhos (linha 1) e IDs (coluna 'ID' a partir da linha 2)
     de todas as abas-modelo (modeloGeral, modeloGenero, etc.) em UMA ÚNICA
@@ -147,6 +145,135 @@ def _infer_data_type(sheet_name: str) -> str:
     return m.group(1)
 
 
+def _build_service(creds_path: str):
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
+    return build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+
+def _to_payload(df: pd.DataFrame, sheet_name: str) -> dict:
+    values = [df.columns.tolist()] + df.values.tolist()
+    return {
+        "range": f"{sheet_name}!A1",
+        "majorDimension": "ROWS",
+        "values": values,
+    }
+
+
+def _prepare_df(df_model: pd.DataFrame, sheet_name: str) -> Optional[pd.DataFrame]:
+    header = _HEADERS[sheet_name]
+    df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+    validate_columns(df_out, header, stage=f"Destino {sheet_name}")
+    if "ID" in df_out.columns:
+        existing = _EXISTING_IDS.get(sheet_name, set())
+        df_out = df_out.loc[~df_out["ID"].isin(existing)]
+    if df_out.empty:
+        return None
+    return df_out
+
+
+def write_back_batch(
+    frames: Dict[str, pd.DataFrame],
+    creds_path: str,
+    spreadsheet_id: str,
+    *,
+    write_back: bool = True,
+    dry_run: bool = False,
+    value_input_option: str = "USER_ENTERED",
+    service: Optional = None,
+) -> Dict[str, Optional[pd.DataFrame]]:
+    """Grava várias abas-modelo em lote via batchUpdate."""
+
+    results: Dict[str, Optional[pd.DataFrame]] = {}
+
+    payloads: List[dict] = []
+    total_cells = 0
+
+    for data_type, df_model in frames.items():
+        if df_model.empty:
+            log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
+            results[data_type] = None
+            continue
+
+        sheet_name = DESTINATION_SHEETS[data_type]
+        if sheet_name not in _HEADERS:
+            raise RuntimeError(
+                "Caches destino não carregados – chame prefetch_meta() antes."
+            )
+
+        df_out = _prepare_df(df_model, sheet_name)
+        if df_out is None:
+            log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
+            results[data_type] = None
+            continue
+
+        payload = _to_payload(df_out, sheet_name)
+        payloads.append(payload)
+        total_cells += len(payload["values"]) * len(payload["values"][0])
+        results[data_type] = df_out
+
+    if not payloads:
+        return results
+
+    if dry_run or not write_back:
+        log.info(
+            "[Dry-run] batchUpdate enviaria %d ranges, total %s células",
+            len(payloads),
+            f"{total_cells:,}",
+        )
+        return results
+
+    service = service or _build_service(creds_path)
+
+    MAX_CELLS = 500_000
+    MAX_BYTES = int(9.9 * 1024 * 1024)
+
+    batches: List[List[dict]] = []
+    current: List[dict] = []
+    cells = 0
+    size = 0
+
+    for payload in payloads:
+        payload_size = len(json.dumps(payload).encode("utf-8"))
+        payload_cells = len(payload["values"]) * len(payload["values"][0])
+        if current and (
+            cells + payload_cells > MAX_CELLS or size + payload_size > MAX_BYTES
+        ):
+            batches.append(current)
+            current = []
+            cells = 0
+            size = 0
+
+        current.append(payload)
+        cells += payload_cells
+        size += payload_size
+
+    if current:
+        batches.append(current)
+
+    for batch in batches:
+        body = {"valueInputOption": value_input_option, "data": batch}
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=spreadsheet_id, body=body
+        ).execute()
+
+    for payload, data_type in zip(payloads, results.keys()):
+        df_out = results[data_type]
+        if df_out is not None and "ID" in df_out.columns:
+            sheet_name = DESTINATION_SHEETS[data_type]
+            _EXISTING_IDS.setdefault(sheet_name, set()).update(
+                df_out["ID"].astype(str).tolist()
+            )
+
+    log.info(
+        "batchUpdate enviou %d ranges, total %s células",
+        len(payloads),
+        f"{total_cells:,}",
+    )
+
+    return results
+
+
 def write_back_destination(
     df_model: pd.DataFrame,
     data_type: str,
@@ -158,69 +285,17 @@ def write_back_destination(
     a1_range: str = "A1",
     value_input_option: str = "USER_ENTERED",
 ) -> Optional[pd.DataFrame]:
-    """
-    Grava `df_model` na aba-modelo correspondente, deduplicando por 'ID'.
+    """Wrapper para gravar apenas uma aba-modelo."""
 
-    Pré-requisito: `prefetch_meta(fetcher, spreadsheet_id)` já deve ter sido
-    invocado antes, para que _HEADERS e _EXISTING_IDS estejam preenchidos.
-    """
-    if df_model.empty:
-        log.info("Destino '%s': DataFrame vazio – nada a gravar", data_type)
-        return None
-
-    sheet_name = DESTINATION_SHEETS[data_type]
-    if sheet_name not in _HEADERS:
-        raise RuntimeError("Caches destino não carregados – chame prefetch_meta() antes.")
-
-    header = _HEADERS[sheet_name]
-
-    # 1) Reindexa para o layout exato de colunas-modelo
-    df_out = (
-        df_model
-        .reindex(columns=header, fill_value="")
-        .applymap(_scalar)
+    result = write_back_batch(
+        {data_type: df_model},
+        creds_path=creds_path,
+        spreadsheet_id=spreadsheet_id,
+        write_back=write_back,
+        dry_run=dry_run,
+        value_input_option=value_input_option,
     )
-
-    # 2) Validação de esquema pós-reindexação
-    validate_columns(df_out, header, stage=f"Destino {sheet_name}")
-
-    # 3) Deduplicação por ID
-    if "ID" in df_out.columns:
-        existing = _EXISTING_IDS.get(sheet_name, set())
-        df_out = df_out.loc[~df_out["ID"].isin(existing)]
-
-    if df_out.empty:
-        log.info("Destino '%s': nenhuma linha nova para gravar", data_type)
-        return None
-
-    # 4) Se dry_run ou write_back=False, apenas logar e retornar
-    if dry_run or not write_back:
-        log.info("[Dry-run] %d linhas seriam gravadas em '%s'", len(df_out), sheet_name)
-        return df_out
-
-    # 5) Gravação: APPEND em vez de overwrite
-    #    Usamos append_records_to_sheet, que faz append a partir da primeira linha vazia.
-    #    Caso append_records_to_sheet não retorne contagem, assumimos len(df_out).
-    try:
-        linhas_inseridas = append_records_to_sheet(
-            creds_path      = creds_path,
-            spreadsheet_id  = spreadsheet_id,
-            sheet_name      = sheet_name,
-            df              = df_out,
-        )
-        if linhas_inseridas is None:
-            linhas_inseridas = len(df_out)
-    except Exception as e:
-        log.error("Erro ao gravar em '%s' via append: %s", sheet_name, e)
-        raise
-
-    log.info("✅ Gravadas %d linha(s) em '%s'", linhas_inseridas, sheet_name)
-
-    # 6) Atualiza cache de IDs para futuras deduplicações
-    if "ID" in df_out.columns:
-        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].astype(str).tolist())
-
-    return df_out
+    return result.get(data_type)
 
 
 def write_back_for_sheet(
