@@ -101,20 +101,22 @@ def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
             id_ranges.append(None)
 
     # 4) Ler todas as colunas 'ID' de uma vez (quando existirem)
-    valid_tabs = []
+    valid_ranges: List[str] = []
+    tabs_for_range: List[str] = []
     for tab, rng in zip(abas, id_ranges):
         if rng:
-            valid_tabs.append(tab)
+            valid_ranges.append(rng)
+            tabs_for_range.append(tab)
 
-    if valid_tabs:
+    if valid_ranges:
         try:
-            raw_ids = fetcher.get_cached(valid_tabs, as_frame=False)
+            raw_ids = fetcher.get_cached(valid_ranges, as_frame=False)
         except Exception:
-            raw_ids = fetcher.get(valid_tabs, as_frame=False)
-        for tab in valid_tabs:
-            listas = raw_ids.get(tab, [])
+            raw_ids = fetcher.get(valid_ranges, as_frame=False)
+        for tab, rng in zip(tabs_for_range, valid_ranges):
+            listas = raw_ids.get(rng, [])
             # cada linha em listas corresponde a uma célula ID
-            ids = [item for row in listas for item in row if str(item).strip()]
+            ids = [row[0] for row in listas if row and str(row[0]).strip()]
             _EXISTING_IDS[tab] = set(ids)
 
     log.info(
@@ -158,9 +160,11 @@ def _build_service(creds_path: str):
 
 
 def _to_payload(df: pd.DataFrame, sheet_name: str) -> dict:
-    values = [df.columns.tolist()] + df.values.tolist()
+    existing = _EXISTING_IDS.get(sheet_name, set())
+    start_row = len(existing) + 2  # 1 = header
+    values = df.values.tolist()
     return {
-        "range": f"{sheet_name}!A1",
+        "range": f"{sheet_name}!A{start_row}",
         "majorDimension": "ROWS",
         "values": values,
     }
