@@ -422,3 +422,72 @@ def validate_consistent_dates_across_models(
     if check.empty:
         log.info("✅ Nenhuma divergência de start/end entre modelos.")
     return check
+
+def validate_impressions_by_platform(
+    df_origin: pd.DataFrame,
+    df_dest: pd.DataFrame,
+    platform_col: str = "Veiculo",
+    impressions_col: str = "impressions",
+    *,
+    tol: float = 1e-6,
+) -> Dict[str, Dict[str, float]]:
+    """Compara, por plataforma, as impressões no destino e na origem.
+
+    Registra no log divergências e retorna dicionário com os totais
+    calculados para cada plataforma.
+    """
+    if platform_col not in df_origin.columns or platform_col not in df_dest.columns:
+        log.warning(
+            "[Validação] Coluna '%s' ausente em df_origin ou df_dest; pulando validação",
+            platform_col,
+        )
+        return {}
+
+    if impressions_col not in df_origin.columns or impressions_col not in df_dest.columns:
+        log.warning(
+            "[Validação] Coluna '%s' ausente em df_origin ou df_dest; pulando validação",
+            impressions_col,
+        )
+        return {}
+
+    def _to_num(s: pd.Series) -> pd.Series:
+        return pd.to_numeric(
+            s.astype(str).str.replace(",", ".", regex=False),
+            errors="coerce",
+        ).fillna(0)
+
+    origin_imp = (
+        df_origin.assign(_imp=_to_num(df_origin[impressions_col]))
+        .groupby(df_origin[platform_col].astype(str))
+        ["_imp"].sum()
+    )
+    dest_imp = (
+        df_dest.assign(_imp=_to_num(df_dest[impressions_col]))
+        .groupby(df_dest[platform_col].astype(str))
+        ["_imp"].sum()
+    )
+
+    platforms = sorted(set(origin_imp.index) | set(dest_imp.index))
+    report: Dict[str, Dict[str, float]] = {}
+
+    for plat in platforms:
+        orig_val = float(origin_imp.get(plat, 0))
+        dest_val = float(dest_imp.get(plat, 0))
+        diff = dest_val - orig_val
+        report[plat] = {"origin": orig_val, "dest": dest_val, "diff": diff}
+
+        if math.isclose(orig_val, dest_val, rel_tol=tol, abs_tol=tol):
+            log.info(
+                "[Validação] %s: impressões conferem (%d)",
+                plat,
+                dest_val,
+            )
+        else:
+            log.warning(
+                "[Validação] %s: impressões divergem – origem=%d vs destino=%d",
+                plat,
+                orig_val,
+                dest_val,
+            )
+
+    return _json_ready(report)
