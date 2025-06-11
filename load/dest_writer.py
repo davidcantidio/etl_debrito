@@ -21,6 +21,7 @@ from typing import Dict, Iterable, List, Optional, Set
 import numpy as np
 import pandas as pd
 from google.oauth2.service_account import Credentials
+from treat.utils.sheets_cache import get_worksheet as _get_worksheet
 from googleapiclient.discovery import build
 from tenacity import (
     retry,
@@ -33,6 +34,8 @@ from extract.sheets_fetcher import SheetsFetcher
 from treat.utils.validations import validate_columns
 
 log = logging.getLogger(__name__)
+
+get_worksheet = _get_worksheet  # enable monkeypatch in tests
 
 # ───────────────────────────── mapeamento origem → destino ──────────────────
 DESTINATION_SHEETS: Dict[str, str] = {
@@ -87,37 +90,22 @@ def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
         header = [c.strip() for c in primeira_linha if c.strip()]
         _HEADERS[tab] = header
 
-    # 3) Identificar intervalos de ID para cada aba-modelo
-    id_ranges: List[Optional[str]] = []
-    for tab in abas:
+    # 3) A partir dos dados lidos, preencher _EXISTING_IDS somente com a coluna ID
+    for tab, values in raw_data.items():
         header = _HEADERS.get(tab, [])
         try:
             idx_id = [h.lower() for h in header].index("id")
-            col_a1 = _idx_to_col(idx_id)
-            # range a partir da linha 2 (sem cabeçalho)
-            id_ranges.append(f"{tab}!{col_a1}2:{col_a1}")
         except ValueError:
             _EXISTING_IDS[tab] = set()
-            id_ranges.append(None)
+            continue
 
-    # 4) Ler todas as colunas 'ID' de uma vez (quando existirem)
-    valid_ranges: List[str] = []
-    tabs_for_range: List[str] = []
-    for tab, rng in zip(abas, id_ranges):
-        if rng:
-            valid_ranges.append(rng)
-            tabs_for_range.append(tab)
-
-    if valid_ranges:
-        try:
-            raw_ids = fetcher.get_cached(valid_ranges, as_frame=False)
-        except Exception:
-            raw_ids = fetcher.get(valid_ranges, as_frame=False)
-        for tab, rng in zip(tabs_for_range, valid_ranges):
-            listas = raw_ids.get(rng, [])
-            # cada linha em listas corresponde a uma célula ID
-            ids = [row[0] for row in listas if row and str(row[0]).strip()]
-            _EXISTING_IDS[tab] = set(ids)
+        ids: List[str] = []
+        for row in values[1:]:
+            if len(row) > idx_id:
+                val = str(row[idx_id]).strip()
+                if val:
+                    ids.append(val)
+        _EXISTING_IDS[tab] = set(ids)
 
     log.info(
         "📥 Prefetch destino concluído: %d abas com cabeçalho, total de IDs carregados=%d",
@@ -157,6 +145,35 @@ def _build_service(creds_path: str):
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
     return build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+
+def _ensure_rows(
+    creds_path: str, spreadsheet_id: str, sheet_name: str, end_row: int
+) -> None:
+    """Expande a planilha se `end_row` exceder o tamanho atual."""
+    import sys
+
+    pipeline = sys.modules.get("treat.treat_pipeline")
+    ws_getter = getattr(pipeline, "get_worksheet", get_worksheet)
+    try:
+        ws = ws_getter(creds_path, spreadsheet_id, sheet_name)
+    except Exception:
+        return
+
+    frozen = getattr(ws, "_properties", {}).get("gridProperties", {}).get("frozenRowCount", 0)
+    min_rows = max(frozen + 1, 2)
+    desired = max(end_row, min_rows)
+
+    try:
+        current = int(getattr(ws, "row_count", 0))
+    except Exception:
+        current = desired
+
+    if current < desired:
+        try:
+            ws.resize(rows=desired)
+        except Exception:
+            pass
 
 
 def _to_payload(df: pd.DataFrame, sheet_name: str) -> dict:
@@ -222,7 +239,16 @@ def flush_payloads(
         )
         return
 
-    service = service or _build_service(creds_path)
+    if service is None:
+        for p in payload_list:
+            sheet, start = p["range"].split("!")
+            m = re.search(r"\d+", start)
+            start_row = int(m.group()) if m else 1
+            end_row = start_row + len(p["values"]) - 1
+            _ensure_rows(creds_path, spreadsheet_id, sheet, end_row)
+        service = _build_service(creds_path)
+    else:
+        service = service
 
     MAX_CELLS = 500_000
     MAX_BYTES = int(9.9 * 1024 * 1024)
