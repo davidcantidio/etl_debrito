@@ -1,133 +1,103 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
-diff --git a/load/dest_writer.py b/load/dest_writer.py
-index fe7c20136e5f15f6be34cca22f98335878a43dc0..9dc5b244482227f052e9104d3b7aa4d7e72b0665 100644
---- a/load/dest_writer.py
-+++ b/load/dest_writer.py
-@@ -79,110 +79,114 @@ def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
-     try:
-         raw_data = fetcher.get_cached(abas, as_frame=False)
-     except Exception:
-         raw_data = fetcher.get(abas, as_frame=False)
+diff --git a/treat/utils/validations.py b/treat/utils/validations.py
+index fe95cd503b5732ad3bf2d11b4dda5d44be95ea59..4235c8c4ec2b25a196e831aa1f0ba546a3422b4f 100644
+--- a/treat/utils/validations.py
++++ b/treat/utils/validations.py
+@@ -400,25 +400,94 @@ def validate_consistent_dates_across_models(
+                 )
+                 prob.append(("aba", aba, camp, veic, set(), valid))
  
-     # 2) Extrair cabeçalhos (linha 0 de cada aba) e armazenar em _HEADERS
-     for tab, values in raw_data.items():
-         primeira_linha = values[0] if values else []
-         header = [c.strip() for c in primeira_linha if c.strip()]
-         _HEADERS[tab] = header
+     # 3) valida entre abas
+     for key in set(starts) | set(ends):
+         camp, veic = key
+         all_starts = {v for per in starts[key].values() for v in per if pd.notna(v) and str(v).strip()}
+         all_ends   = {v for per in ends[key].values()   for v in per if pd.notna(v) and str(v).strip()}
+         if len(all_starts) > 1 or len(all_ends) > 1:
+             aba_str = ",".join(sorted(starts[key].keys() | ends[key].keys()))
+             log.warning(
+                 "[Consistência Datas] Entre abas: campanha=%r, veículo=%r tem inconsistência start/end em %s",
+                 camp, veic, aba_str
+             )
+             prob.append(("entre-abas", aba_str, camp, veic, all_starts, all_ends))
  
-     # 3) Identificar intervalos de ID para cada aba-modelo
-     id_ranges: List[Optional[str]] = []
-     for tab in abas:
-         header = _HEADERS.get(tab, [])
-         try:
-             idx_id = [h.lower() for h in header].index("id")
-             col_a1 = _idx_to_col(idx_id)
-             # range a partir da linha 2 (sem cabeçalho)
-             id_ranges.append(f"{tab}!{col_a1}2:{col_a1}")
-         except ValueError:
-             _EXISTING_IDS[tab] = set()
-             id_ranges.append(None)
- 
-     # 4) Ler todas as colunas 'ID' de uma vez (quando existirem)
--    valid_tabs = []
-+    valid_ranges: List[str] = []
-+    tabs_for_range: List[str] = []
-     for tab, rng in zip(abas, id_ranges):
-         if rng:
--            valid_tabs.append(tab)
-+            valid_ranges.append(rng)
-+            tabs_for_range.append(tab)
- 
--    if valid_tabs:
-+    if valid_ranges:
-         try:
--            raw_ids = fetcher.get_cached(valid_tabs, as_frame=False)
-+            raw_ids = fetcher.get_cached(valid_ranges, as_frame=False)
-         except Exception:
--            raw_ids = fetcher.get(valid_tabs, as_frame=False)
--        for tab in valid_tabs:
--            listas = raw_ids.get(tab, [])
-+            raw_ids = fetcher.get(valid_ranges, as_frame=False)
-+        for tab, rng in zip(tabs_for_range, valid_ranges):
-+            listas = raw_ids.get(rng, [])
-             # cada linha em listas corresponde a uma célula ID
--            ids = [item for row in listas for item in row if str(item).strip()]
-+            ids = [row[0] for row in listas if row and str(row[0]).strip()]
-             _EXISTING_IDS[tab] = set(ids)
- 
-     log.info(
-         "📥 Prefetch destino concluído: %d abas com cabeçalho, total de IDs carregados=%d",
-         len(_HEADERS),
-         sum(len(s) for s in _EXISTING_IDS.values()),
+     # monta DataFrame de problemas
+     check = pd.DataFrame(
+         prob,
+         columns=["nível", "aba", "Campanha", "Veiculo", "start", "end"]
      )
  
- 
- def _scalar(v):
-     if isinstance(v, _dt.date):
-         return v.isoformat()
-     if v is None or (isinstance(v, float) and np.isnan(v)):
-         return ""
-     return v
- 
- 
- def _infer_data_type(sheet_name: str) -> str:
-     """
-     Dado nome de aba de origem (exemplo: 'metaGenero', 'tiktokIdade'), devolve
-     o sufixo que mapeia para a aba-modelo correspondente. Ex.: 'genero', 'idade'.
-     """
-     lower = sheet_name.strip().lower()
-     if lower.startswith("ga"):
-         raise ValueError(
-             f"Aba '{sheet_name}' é do Google Analytics – não grava em abas-modelo."
-         )
-     m = re.search(r"(geral|genero|idade|alcance|regiao)$", lower)
-     if not m:
-         raise ValueError(
-             f"Não reconheço o tipo de dados da aba '{sheet_name}' "
-             "(esperava terminar em geral/genero/idade/alcance/regiao)."
-         )
-     return m.group(1)
- 
- 
- def _build_service(creds_path: str):
-     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-     creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
-     return build("sheets", "v4", credentials=creds, cache_discovery=False)
- 
- 
- def _to_payload(df: pd.DataFrame, sheet_name: str) -> dict:
--    values = [df.columns.tolist()] + df.values.tolist()
-+    existing = _EXISTING_IDS.get(sheet_name, set())
-+    start_row = len(existing) + 2  # 1 = header
-+    values = df.values.tolist()
-     return {
--        "range": f"{sheet_name}!A1",
-+        "range": f"{sheet_name}!A{start_row}",
-         "majorDimension": "ROWS",
-         "values": values,
-     }
- 
- 
- def _prepare_df(df_model: pd.DataFrame, sheet_name: str) -> Optional[pd.DataFrame]:
-     header = _HEADERS[sheet_name]
-     df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
-     validate_columns(df_out, header, stage=f"Destino {sheet_name}")
-     if "ID" in df_out.columns:
-         existing = _EXISTING_IDS.get(sheet_name, set())
-         df_out = df_out.loc[~df_out["ID"].isin(existing)]
-     if df_out.empty:
-         return None
-     return df_out
- 
- 
- def collect_dest_payload(df_model: pd.DataFrame, sheet_name: str) -> Optional[dict]:
-     """Prepara payload para batchUpdate sem enviá-lo."""
-     if sheet_name not in _HEADERS:
-         raise RuntimeError(
-             "Caches destino não carregados – chame prefetch_meta() antes."
-         )
-     df_out = _prepare_df(df_model, sheet_name)
-     if df_out is None:
+     if check.empty:
+         log.info("✅ Nenhuma divergência de start/end entre modelos.")
+     return check
++
++def validate_impressions_by_platform(
++    df_origin: pd.DataFrame,
++    df_dest: pd.DataFrame,
++    platform_col: str = "Veiculo",
++    impressions_col: str = "impressions",
++    *,
++    tol: float = 1e-6,
++) -> Dict[str, Dict[str, float]]:
++    """Compara, por plataforma, as impressões no destino e na origem.
++
++    Registra no log divergências e retorna dicionário com os totais
++    calculados para cada plataforma.
++    """
++    if platform_col not in df_origin.columns or platform_col not in df_dest.columns:
++        log.warning(
++            "[Validação] Coluna '%s' ausente em df_origin ou df_dest; pulando validação",
++            platform_col,
++        )
++        return {}
++
++    if impressions_col not in df_origin.columns or impressions_col not in df_dest.columns:
++        log.warning(
++            "[Validação] Coluna '%s' ausente em df_origin ou df_dest; pulando validação",
++            impressions_col,
++        )
++        return {}
++
++    def _to_num(s: pd.Series) -> pd.Series:
++        return pd.to_numeric(
++            s.astype(str).str.replace(",", ".", regex=False),
++            errors="coerce",
++        ).fillna(0)
++
++    origin_imp = (
++        df_origin.assign(_imp=_to_num(df_origin[impressions_col]))
++        .groupby(df_origin[platform_col].astype(str))
++        ["_imp"].sum()
++    )
++    dest_imp = (
++        df_dest.assign(_imp=_to_num(df_dest[impressions_col]))
++        .groupby(df_dest[platform_col].astype(str))
++        ["_imp"].sum()
++    )
++
++    platforms = sorted(set(origin_imp.index) | set(dest_imp.index))
++    report: Dict[str, Dict[str, float]] = {}
++
++    for plat in platforms:
++        orig_val = float(origin_imp.get(plat, 0))
++        dest_val = float(dest_imp.get(plat, 0))
++        diff = dest_val - orig_val
++        report[plat] = {"origin": orig_val, "dest": dest_val, "diff": diff}
++
++        if math.isclose(orig_val, dest_val, rel_tol=tol, abs_tol=tol):
++            log.info(
++                "[Validação] %s: impressões conferem (%d)",
++                plat,
++                dest_val,
++            )
++        else:
++            log.warning(
++                "[Validação] %s: impressões divergem – origem=%d vs destino=%d",
++                plat,
++                orig_val,
++                dest_val,
++            )
++
++    return _json_ready(report)
  
 EOF
 )
