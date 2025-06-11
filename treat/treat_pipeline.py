@@ -70,6 +70,7 @@ from treat.utils.validations import (
     validate_columns,
     validate_utm_content_in_bi,
     validate_taxonomy_consistency,
+    validate_impressions_by_platform,
 )
 
 log = logging.getLogger(__name__)
@@ -234,6 +235,9 @@ class TreatPipeline:
         # 11) Validação de agregados
         # ───────────────────────────────────────────────────────────────
         validate_aggregates(df_raw, df)
+        self._last_impressions_report = validate_impressions_by_platform(
+            df_raw, df
+        )
 
         # ───────────────────────────────────────────────────────────────
         # 12) Checagem de colunas obrigatórias
@@ -326,7 +330,11 @@ def run_etl_for_sheet(
         payload = collect_dest_payload(df_model, dest_sheet)
         if payload is not None:
             dest_payloads.append(payload)
-    return {"dest": df_model, "taxo": getattr(pipeline, "_last_taxo_report", None)}
+    return {
+        "dest": df_model,
+        "taxo": getattr(pipeline, "_last_taxo_report", None),
+        "impressions": getattr(pipeline, "_last_impressions_report", None),
+    }
 
 
 def execute_pipeline(
