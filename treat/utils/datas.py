@@ -93,3 +93,40 @@ def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
         df["Fim_da_Campanha"] = ""
 
     return df
+
+
+def unify_campaign_dates(
+    df: pd.DataFrame,
+    camp_col: str = "campaign_name",
+    start_col: str = "start",
+    end_col: str = "end",
+    *,
+    inplace: bool = True,
+) -> pd.DataFrame:
+    """Padroniza start/end por ``campaign_name`` usando menor/maior datas.
+
+    Para cada ``campaign_name`` presente em ``camp_col`` calcula a data mais
+    antiga encontrada em ``start_col`` e a mais recente em ``end_col``. Todas as
+    linhas daquela campanha recebem esses valores, mantendo vazios quando não
+    houver datas válidas.
+    """
+
+    if not inplace:
+        df = df.copy()
+
+    if camp_col not in df.columns:
+        return df
+
+    key = df[camp_col].astype(str).str.strip().str.lower()
+
+    if start_col in df.columns:
+        start_dates = pd.to_datetime(df[start_col], errors="coerce")
+        earliest = start_dates.groupby(key).transform("min")
+        df[start_col] = earliest.dt.date.where(~earliest.isna(), df[start_col])
+
+    if end_col in df.columns:
+        end_dates = pd.to_datetime(df[end_col], errors="coerce")
+        latest = end_dates.groupby(key).transform("max")
+        df[end_col] = latest.dt.date.where(~latest.isna(), df[end_col])
+
+    return df

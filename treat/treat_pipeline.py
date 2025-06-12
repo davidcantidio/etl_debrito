@@ -33,6 +33,7 @@ from treat.utils.sheets_cache import get_worksheet
 from treat.utils.datas import (
     converter_data,
     fill_missing_start_end_from_params,
+    unify_campaign_dates,
 )
 from treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge import (
     merge_pinterest_dimension as pin_merge,
@@ -205,6 +206,11 @@ class TreatPipeline:
         # 7) Preenche start/end em memória
         # ───────────────────────────────────────────────────────────────
         df = fill_missing_start_end_from_params(df, lookup=self.bi_lookup, inplace=False)
+
+        # ───────────────────────────────────────────────────────────────
+        # 7a) Uniformiza datas por campaign_name
+        # ───────────────────────────────────────────────────────────────
+        df = unify_campaign_dates(df)
 
         # ───────────────────────────────────────────────────────────────
         # 8) Atribuição de Veiculo + ID_Veiculo (lookup BI)
