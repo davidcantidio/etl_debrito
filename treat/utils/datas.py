@@ -122,11 +122,13 @@ def unify_campaign_dates(
     if start_col in df.columns:
         start_dates = pd.to_datetime(df[start_col], errors="coerce")
         earliest = start_dates.groupby(key).transform("min")
-        df[start_col] = earliest.dt.date.where(~earliest.isna(), df[start_col])
+        earliest_dates = earliest.dt.date
+        df[start_col] = df[start_col].where(earliest.isna(), earliest_dates)
 
     if end_col in df.columns:
         end_dates = pd.to_datetime(df[end_col], errors="coerce")
         latest = end_dates.groupby(key).transform("max")
-        df[end_col] = latest.dt.date.where(~latest.isna(), df[end_col])
+        latest_dates = latest.dt.date
+        df[end_col] = df[end_col].where(latest.isna(), latest_dates)
 
     return df

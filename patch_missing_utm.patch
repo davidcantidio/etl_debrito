@@ -1,30 +1,853 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
-diff --git a/tests/test_unify_campaign_dates.py b/tests/test_unify_campaign_dates.py
-new file mode 100644
-index 0000000000000000000000000000000000000000..e2d9bd1cb13215d6ec4e40aac9699c2bd7c47b2f
---- /dev/null
-+++ b/tests/test_unify_campaign_dates.py
-@@ -0,0 +1,15 @@
-+import pandas as pd
-+from treat.utils.datas import unify_campaign_dates
-+
-+
-+def test_unify_campaign_dates():
-+    df = pd.DataFrame({
-+        "campaign_name": ["A", "A", "B", "B", "B"],
-+        "start": ["2023-01-02", "2023-01-01", "2023-02-01", "", "2023-02-03"],
-+        "end": ["2023-01-10", "", "2023-02-10", "2023-02-09", "2023-02-08"],
-+    })
-+    result = unify_campaign_dates(df.copy())
-+    expected_start = [pd.to_datetime("2023-01-01").date()] * 2 + [pd.to_datetime("2023-02-01").date()] * 3
-+    expected_end = [pd.to_datetime("2023-01-10").date()] * 2 + [pd.to_datetime("2023-02-10").date()] * 3
-+    assert list(result["start"]) == expected_start
-+    assert list(result["end"]) == expected_end
+diff --git a/extract/sheets_fetcher.py b/extract/sheets_fetcher.py
+index 323eb3b7174a1baa62af439f0f5079616dcc079f..1cdeb890e08e99a6e665d5288eaccb1c89ce09f8 100644
+--- a/extract/sheets_fetcher.py
++++ b/extract/sheets_fetcher.py
+@@ -1,41 +1,41 @@
+ # File: extract/sheets_fetcher.py
+ 
+ import os
+ import time
+-import logging
++from logs.logging_setup import get_logger
+ from typing import Any, Dict, Iterable, List, Tuple
+ 
+ import pandas as pd
+ from google.api_core.exceptions import TooManyRequests
+ from googleapiclient.discovery import build
+ from googleapiclient.errors import HttpError
+ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+ 
+ from treat.utils.get_google_client import get_google_client  # retorna um cliente gspread
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+ 
+ 
+ def _build_sheets_service(creds_path: str):
+     """Constrói o serviço da Google Sheets API via google-api-python-client."""
+     import google.oauth2.service_account as sa
+ 
+     creds = sa.Credentials.from_service_account_file(creds_path, scopes=SCOPES)
+     return build("sheets", "v4", credentials=creds, cache_discovery=False)
+ 
+ 
+ class SheetsFetcher:
+     """
+     Lê múltiplas abas de um Google Sheets num único batchGet, com cache TTL,
+     e expõe método open_worksheet() para operações de write-back via gspread.
+     """
+ 
+     def __init__(
+         self,
+         spreadsheet_id: str,
+         creds_path: str,
+         header_row: int = 0,
+         col_range: str = "A:ZZ",
+         cache_ttl: int = 300,
+@@ -74,51 +74,51 @@ class SheetsFetcher:
+     )
+ 
+ 
+     def _get_meta(self):
+         if self._spreadsheet_meta is None:
+             self._spreadsheet_meta = (
+                 self._service.spreadsheets().get(
+                     spreadsheetId=self.spreadsheet_id,
+                     includeGridData=False,
+                 ).execute()
+             )
+         return self._spreadsheet_meta
+     
+ 
+     def _batch_get(self, ranges: List[str]) -> Dict[str, Any]:
+         """Executa batchGet com retry/back-off para código 429."""
+         log.info("🔄 batchGet tentativa para ranges: %s", ranges)
+         try:
+             return (
+                 self._service.spreadsheets()
+                 .values()
+                 .batchGet(spreadsheetId=self.spreadsheet_id, ranges=ranges)
+                 .execute()
+             )
+         except HttpError as e:
+-            log.error("Sheets API HttpError: %s", e)
++            log.error("Sheets API HttpError: %s", e, exc_info=True)
+             raise
+ 
+     def _fetch_and_cache(self, sheet_names: List[str]) -> Dict[str, List[List[str]]]:
+         """
+         Constrói ranges a partir dos nomes de abas e realiza batchGet,
+         retornando o payload em raw lists e atualizando o cache interno.
+         """
+         ranges = [f"{name}!{self.col_range}" for name in sheet_names]
+         resp = self._batch_get(ranges)
+         if not resp.get("valueRanges"):
+             raise RuntimeError("Sheets API retornou valueRanges vazio – quota ou planilha vazia?")
+ 
+         payload: Dict[str, List[List[str]]] = {}
+         for name, vr in zip(sheet_names, resp["valueRanges"]):
+             log.info("🔍 range completo retornado pela API: %s", vr.get("range"))
+             original_key = name.strip()
+             returned_key = vr["range"].split("!", 1)[0].strip()
+             if returned_key != original_key:
+                 log.warning(
+                     "Nome retornado pela API difere do solicitado: '%s' → '%s'",
+                     original_key,
+                     returned_key,
+                 )
+             values = vr.get("values", [])
+             payload[original_key] = values
+diff --git a/load/dest_writer.py b/load/dest_writer.py
+index d3142af2fb2040d8419933de807d3409c9199692..48fe8ed6cd28dcdaccb6c86ec03a53ded4217d7e 100644
+--- a/load/dest_writer.py
++++ b/load/dest_writer.py
+@@ -1,61 +1,61 @@
+ # load/dest_writer.py
+ 
+ """
+ Write-back otimizado para as abas **modelo***
+ 
+ Principais características
+ -------------------------
+ * 01 leitura para cabeçalhos e IDs: usamos SheetsFetcher para recuperar todas
+   as abas-modelo de uma só vez (batchGet), poupando quota.
+ * Zero leituras extras durante o loop de ETL; somente gravação (via write_back_df ou append).
+ * Deduplicação: grava apenas registros cujo "ID" ainda não existe.
+ * Compatível com dry-run e com execução em paralelo.
+ """
+ 
+ import datetime as _dt
+ import json
+-import logging
++from logs.logging_setup import get_logger
+ import re
+ from typing import Dict, Iterable, List, Optional, Set
+ 
+ import numpy as np
+ import pandas as pd
+ from google.oauth2.service_account import Credentials
+ from treat.utils.sheets_cache import get_worksheet as _get_worksheet
+ from googleapiclient.discovery import build
+ from tenacity import (
+     retry,
+     retry_if_exception_type,
+     stop_after_attempt,
+     wait_exponential,
+ )
+ 
+ from extract.sheets_fetcher import SheetsFetcher
+ from treat.utils.validations import validate_columns
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ get_worksheet = _get_worksheet  # enable monkeypatch in tests
+ 
+ # ───────────────────────────── mapeamento origem → destino ──────────────────
+ DESTINATION_SHEETS: Dict[str, str] = {
+     "geral": "modeloGeral",
+     "genero": "modeloGenero",
+     "idade": "modeloIdade",
+     "alcance": "modeloAlcance",
+     "regiao": "modeloRegiao",
+ }
+ 
+ # ───────────────────────────── caches globais em memória ────────────────────
+ _HEADERS: Dict[str, List[str]] = {}  # aba-destino → header completo
+ _EXISTING_IDS: Dict[str, Set[str]] = {}  # aba-destino → set(ID)
+ 
+ 
+ def _idx_to_col(idx: int) -> str:
+     """Converte índice 0-based em letras de coluna estilo A1 (A, B, …, AA…)."""
+     out = ""
+     while True:
+         idx, rem = divmod(idx, 26)
+         out = chr(65 + rem) + out
+         if idx == 0:
+             return out
+diff --git a/load/load.py b/load/load.py
+index 7f4779a0554369961e51a5dff44c0539d04df4b3..8ffd2d07de53e5c9a7c61d26c1f19490d2258bb0 100644
+--- a/load/load.py
++++ b/load/load.py
+@@ -1,39 +1,39 @@
+ from extract.sheets_fetcher import SheetsFetcher
+ from treat.utils.get_missing_records import get_missing_records
+ from treat.utils.numeracao import gerar_numeracao
+ from treat.utils.organizar_dataframe import (
+     remover_colunas_indesejadas,
+     reordenar_colunas_para_modelo,
+ )
+ from treat.utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER
+ from treat.utils.append_records_to_sheet import append_records_to_sheet
+ import pandas as pd
+-import logging
++from logs.logging_setup import get_logger
+ from treat.utils.campos_calculados import gerar_id
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ 
+ def default_fetcher(spreadsheet_id: str, creds_path: str) -> SheetsFetcher:
+     """
+     Retorna uma instância padrão de SheetsFetcher.
+     """
+     return SheetsFetcher(spreadsheet_id=spreadsheet_id, creds_path=creds_path)
+ 
+ 
+ def default_appender(creds_path: str, spreadsheet_id: str):
+     """
+     Retorna uma função appender que insere registros na planilha.
+     """
+     def _append(sheet_name: str, df: pd.DataFrame):
+         append_records_to_sheet(
+             creds_path=creds_path,
+             spreadsheet_id=spreadsheet_id,
+             sheet_name=sheet_name,
+             df=df
+         )
+     return _append
+ 
+ 
+ def fetch_data(
+     fetcher: SheetsFetcher,
+diff --git a/load/origin_writer.py b/load/origin_writer.py
+index 79fa179949c0940e3ee75b72cf2a6d75b5f647f9..e1672872de6e7895fbf24b2f9910d4a6a221fa31 100644
+--- a/load/origin_writer.py
++++ b/load/origin_writer.py
+@@ -1,38 +1,38 @@
+ # load/origin_writer.py
+ 
+-import logging
++from logs.logging_setup import get_logger
+ import builtins
+ from typing import Optional
+ 
+ import pandas as pd
+ from gspread import Worksheet
+ 
+ from treat.utils.sheets_cache import get_worksheet
+ from treat.utils.write_back import write_back_df  # faz o batch_update
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ 
+ def write_back_origin(
+     df_raw: pd.DataFrame,
+     df_ok: pd.DataFrame,
+     creds_path: str,
+     spreadsheet_id: str,
+     *,
+     write_back: bool,
+     dry_run: bool = False,
+     a1_range: str = "A1",
+     value_input_option: str = "RAW",
+     worksheet: Optional[Worksheet] = None,
+     sheet_name: Optional[str] = None,
+     skip_if_written: bool = False,
+     header: Optional[list[str]] = None,
+ ) -> pd.DataFrame:
+     """
+     Grava correções de `df_ok` de volta na aba de origem, ajustando o tamanho da planilha
+     e escrevendo apenas uma vez via batch_update. Usa `worksheet` fornecido, se houver,
+     para evitar reabrir a conexão. Caso contrário, abre via `sheet_name`.
+ 
+     Parâmetros
+     ----------
+     df_raw : pd.DataFrame
+diff --git a/load/utils/append_records_to_sheet.py b/load/utils/append_records_to_sheet.py
+index e96ba3626191a13b546091b2679e629ed1dc2109..8c194fe745cdab65f54482fa70e4b27db4954382 100644
+--- a/load/utils/append_records_to_sheet.py
++++ b/load/utils/append_records_to_sheet.py
+@@ -1,37 +1,37 @@
+ # utils/append_records_to_sheet.py
+ 
+-import logging
++from logs.logging_setup import get_logger
+ from typing import Optional
+ 
+ import pandas as pd
+ from google.oauth2.service_account import Credentials
+ from googleapiclient.discovery import build
+ from googleapiclient.errors import HttpError
+ from tenacity import retry, wait_exponential, stop_after_attempt
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ 
+ def _build_service(
+     creds_path: str,
+     scopes: Optional[list[str]] = None,
+ ):
+     """
+     Cria a instância da Google Sheets API v4.
+     """
+     scopes = scopes or ["https://www.googleapis.com/auth/spreadsheets"]
+     creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
+     return build("sheets", "v4", credentials=creds, cache_discovery=False)
+ 
+ 
+ @retry(
+     wait=wait_exponential(multiplier=1, max=32),
+     stop=stop_after_attempt(5),
+     reraise=True,
+ )
+ def append_records_to_sheet(
+     creds_path: str,
+     spreadsheet_id: str,
+     sheet_name: str,
+     df: pd.DataFrame,
+     *,
+@@ -51,32 +51,32 @@ def append_records_to_sheet(
+         return 0
+ 
+     service = service or _build_service(creds_path)
+ 
+     # Prepara valores (sem cabeçalho)
+     values = df.fillna("").astype(str).values.tolist()
+ 
+     # Range de início ex.: "ModeloGeral!A2"
+     range_start = f"{sheet_name}!{start_column}{start_row}"
+     body = {"values": values}
+ 
+     try:
+         result = (
+             service.spreadsheets()
+             .values()
+             .append(
+                 spreadsheetId=spreadsheet_id,
+                 range=range_start,
+                 valueInputOption=value_input_option,
+                 insertDataOption="INSERT_ROWS",
+                 body=body,
+             )
+             .execute()
+         )
+     except HttpError as err:
+-        log.error("Erro ao inserir em '%s': %s", sheet_name, err)
++        log.error("Erro ao inserir em '%s': %s", sheet_name, err, exc_info=True)
+         raise
+ 
+     updated = result.get("updates", {}).get("updatedRows", 0)
+     log.info("✅ %d linhas adicionadas em '%s' a partir de %s%d",
+              updated, sheet_name, start_column, start_row)
+     return updated
+diff --git a/load/utils/organizar_dataframe.py b/load/utils/organizar_dataframe.py
+index 62ff9261d30371f1a05d7957d0d598141c13b26c..b4270cf7aa60992fa258315c86c568ecfd329183 100644
+--- a/load/utils/organizar_dataframe.py
++++ b/load/utils/organizar_dataframe.py
+@@ -1,23 +1,24 @@
+-import logging
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ from utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER
+ 
+ def remover_colunas_indesejadas(df):
+     """
+     Remove colunas que não fazem parte do modelo final.
+     """
+     colunas_para_remover = ['Placement', 'Campaign_ID', 'Campaign_name', ]
+     for col in colunas_para_remover:
+         if col in df.columns:
+             df.drop(columns=col, inplace=True)
+-            logging.debug(f"Coluna removida: {col}")
++            logger.debug(f"Coluna removida: {col}")
+     return df
+ 
+ 
+ def reordenar_colunas_para_modelo(df, column_order_list):
+     for col in column_order_list:
+         if col not in df.columns:
+             df[col] = ""
+-            logging.debug(f"Coluna adicionada (vazia): {col}")
++            logger.debug(f"Coluna adicionada (vazia): {col}")
+     df = df[column_order_list]
+     return df
+ 
+diff --git a/logs/logging_setup.py b/logs/logging_setup.py
+index 5a00bfc02cead7e91a67c42fffad80de7163795f..f78ffd37cba02356d1e6f7fd2f9bc538ecdd4cf0 100644
+--- a/logs/logging_setup.py
++++ b/logs/logging_setup.py
+@@ -1,35 +1,36 @@
+ import logging
+ import pathlib
+ 
+ # ── Configuração padrão de logging para todo o projeto ──────────────────────
+ 
+ # 1) Handler de console (STDOUT/STDERR)
+ console_handler = logging.StreamHandler()
+ console_handler.setLevel(logging.DEBUG)
+ console_handler.setFormatter(
+     logging.Formatter("%(asctime)s %(levelname)s %(name)s › %(message)s", datefmt="%H:%M:%S")
+ )
+ 
+ # 2) Handler de arquivo (pipeline_debug.log)
+ file_log = pathlib.Path("/home/debrito/Documentos/etl_debrito/logs/pipeline_debug.log")
++file_log.parent.mkdir(parents=True, exist_ok=True)
+ file_handler = logging.FileHandler(file_log, encoding="utf-8")
+ file_handler.setLevel(logging.DEBUG)
+ file_handler.setFormatter(
+     logging.Formatter("%(asctime)s %(levelname)s %(name)s › %(message)s", datefmt="%H:%M:%S")
+ )
+ 
+ # 3) Configuração global
+ logging.basicConfig(
+     level=logging.DEBUG,
+     handlers=[
+         console_handler,  # mostra todos os logs no console
+         file_handler      # grava todos os logs em pipeline_debug.log
+     ]
+ )
+ 
+ def get_logger(name: str) -> logging.Logger:
+     """
+     Retorna um logger configurado com o nível e formato definidos acima.
+     Logs serão exibidos no console e gravados em pipeline_debug.log.
+     """
+     return logging.getLogger(name)
+diff --git a/treat/bi_param_utils.py b/treat/bi_param_utils.py
+index 4a0290baec9611154e827fd5f3d59e48b413c437..b2364b4d013fa86cc7ca1a0dbaf8591fe02afe2b 100644
+--- a/treat/bi_param_utils.py
++++ b/treat/bi_param_utils.py
+@@ -1,35 +1,35 @@
+-import logging
++from logs.logging_setup import get_logger
+ import time as _time
+ from typing import Any, Dict, List, Optional, Tuple, Sequence
+ import pandas as pd
+ from gspread.utils import rowcol_to_a1
+ 
+ from treat.utils.get_google_client import get_google_client
+ from treat.utils.normalize import normalize_columns
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ class BIParamLookup:
+     """
+     Acesso parametrizado à aba BI_PARAMETRIZAÇÃO com cache global.
+ 
+     • A primeira instância carrega o DataFrame; as demais reutilizam.
+     • TTL de 10 min (_TTL) continua valendo para todo o processo.
+     """
+ 
+     SHEET_NAME = "BI_PARAMETRIZAÇÃO"
+     HEADER_ROW = 0
+     _TTL = 60 * 10  # 10 min
+ 
+     # ─── cache compartilhado entre TODAS as instâncias ──────────────────────
+     _df: Optional[pd.DataFrame] = None
+     _last_load: float = 0.0
+ 
+     def __init__(self, creds_path: str, spreadsheet_id: str):
+         self.creds_path = creds_path
+         self.spreadsheet_id = spreadsheet_id
+         # cache de correspondência de colunas continua por instância
+         self._col_cache: Dict[str, Optional[str]] = {}
+ 
+     # ────────────────────────────────────────────────────────────────────────
+     # helpers internos
+@@ -282,51 +282,51 @@ class BIParamLookup:
+         if write_back and updates:
+             worksheet.batch_update(updates, value_input_option="RAW")
+             log.info(
+                 "[BIParamLookup] Preenchidas %d células de '%s' via ad_name → %s",
+                 len(updates), coluna_ad_name, coluna_destino
+             )
+ 
+         if not_found:
+             preview = ", ".join(f"{i}:{v}" for i, v in not_found[:10])
+             if len(not_found) > 10:
+                 preview += ", …"
+             log.info(
+                 "[BIParamLookup] %d ad_name(s) sem correspondência em BI_PARAMETRIZAÇÃO: %s",
+                 len(not_found), preview
+             )
+ 
+         return out
+ 
+     def get_linkedin_ad_name_map(self) -> dict[str,str]:
+         if not hasattr(self, "_li_ad_name_map"):
+             df_param = self._load_df()
+             cols = {c.strip().lower(): c for c in df_param.columns}
+             utm_col = cols.get("utm_content_raw", cols.get("utm_content"))
+             name_col = cols.get("taxonomy_ad_name_social")
+             if utm_col is None or name_col is None:
+-                logging.warning("Não achei colunas 'utm_content[_raw]' ou 'taxonomy_ad_name_social' em BI_PARAMETRIZAÇÃO.")
++                logger.warning("Não achei colunas 'utm_content[_raw]' ou 'taxonomy_ad_name_social' em BI_PARAMETRIZAÇÃO.")
+                 self._li_ad_name_map = {}
+             else:
+                 self._li_ad_name_map = (
+                     df_param[[utm_col, name_col]]
+                     .dropna(subset=[utm_col, name_col])
+                     .assign(
+                         _utm=lambda d: d[utm_col].astype(str).str.strip(),
+                         _name=lambda d: d[name_col].astype(str).str.strip(),
+                     )
+                     .drop_duplicates(subset=["_utm"])
+                     .set_index("_utm")["_name"]
+                     .to_dict()
+                 )
+         return self._li_ad_name_map
+     
+     def get_objective_map(self) -> Dict[str, str]:
+             """
+             Retorna um dicionário {utm_content: objective} a partir da aba BI_PARAMETRIZAÇÃO.
+             """
+             # garante df carregado
+             self._ensure_df()
+             # encontra colunas
+             cols = {c.strip().lower(): c for c in self._df.columns}
+             utm_col = cols.get("utm_content_raw") or cols.get("utm_content")
+             obj_col = cols.get("objective")
+diff --git a/treat/platforms/utils/common/meta/age_placements_merge.py b/treat/platforms/utils/common/meta/age_placements_merge.py
+index f9eba052901039ef8ea09f37f5bde75d8fcbb8a1..270d9e945a7a2930ef5cd43c5ec5ceaf120eec9f 100644
+--- a/treat/platforms/utils/common/meta/age_placements_merge.py
++++ b/treat/platforms/utils/common/meta/age_placements_merge.py
+@@ -1,128 +1,127 @@
+ # utils/common/meta/age_placements_merge.py
+ from __future__ import annotations
+-import logging
++from logs.logging_setup import get_logger
+ from collections import Counter
+ from math import floor
+ from typing import Dict, List, Tuple
+ 
+ import pandas as pd
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ from utils.get_google_client import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ from utils.normalize import normalize_age
+ 
+-log = logging.getLogger(__name__)
+-logging.basicConfig(level=logging.INFO)
++log = get_logger(__name__)
+ 
+ METRICAS: List[str] = ["impressions", "link_clicks", "cost", "video_watched_100"]
+ 
+ # ------------------------------- CACHE -------------------------------- #
+ _client = get_google_client(CREDS_PATH)
+ _cache: dict[str, pd.DataFrame] = {}
+ 
+ 
+ def _read_sheet(sheet: str) -> pd.DataFrame:
+     if sheet not in _cache:
+         _cache[sheet] = read_sheet_as_dataframe_range(
+             _client,
+             SPREADSHEET_ID,
+             sheet_name=sheet,
+             range_str="A1:ZZ",
+             header_row_index=0,
+         )
+     return _cache[sheet].copy()
+ 
+ 
+ # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
+ def load_and_prepare_meta_age_data() -> pd.DataFrame:
+     df = _read_sheet("metaIdade")  # Carrega os dados da aba 'metaIdade'
+     
+     # Verificação de dados consistentes antes de qualquer transformação
+     df = df.dropna(subset=["ad_id", "date", "impressions", "cost"])  # Garante que não haja NaN nessas colunas essenciais
+     
+     # 0) Strip em todos os nomes de coluna
+     df.columns = df.columns.str.strip()
+     
+     # 1) Remove registros com dados ausentes em colunas críticas
+     df = df.dropna(subset=["ad_id", "date", "age"])  # Garante que 'age' está presente
+     
+     # 2) Converte cost (pode vir como 'cost' ou 'cost' etc) - busca case-insensitive
+     cost_col = next((c for c in df.columns if c.lower() == "cost"), None)
+     if cost_col:
+         s = df[cost_col].astype(str)
+         s = s.str.replace("\u00a0", "")
+         s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)
+         s = s.str.replace(",", ".", regex=False)
+         df[cost_col] = pd.to_numeric(s, errors="coerce").fillna(0)
+         df.rename(columns={cost_col: "cost"}, inplace=True)
+     
+     # 3) Outras métricas
+     for col in ["impressions", "link_clicks", "video_watched_100"]:
+         if col in df.columns:
+             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+     
+     # Verifique se 'age' está presente
+     if 'age' not in df.columns:
+-        logging.error("A coluna 'age' não foi encontrada na aba 'metaIdade'.")
++        logger.error("A coluna 'age' não foi encontrada na aba 'metaIdade'.")
+         raise KeyError("A coluna 'age' não foi encontrada na aba 'metaIdade'.")
+     
+     return df
+ 
+ def load_and_prepare_meta_placement_data() -> pd.DataFrame:
+     return _read_sheet("metaGeral").dropna(subset=["ad_id", "date"])
+ 
+ 
+ # ------------------------------ PIVOTS -------------------------------- #
+ def pivot_meta_age_data(df: pd.DataFrame) -> pd.DataFrame:
+     return df.groupby(["ad_id", "date", "age"], as_index=False)[METRICAS].sum()
+ 
+ def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
+     id_vars = ["ad_id", "date"]
+     value_vars = [c for c in df_placement.columns if c not in id_vars + ["placement"]]
+ 
+     pivot_df = df_placement.pivot_table(
+         index=id_vars,
+         columns="placement",
+         values=value_vars,
+         aggfunc="sum",
+         fill_value=0,
+     )
+ 
+     # Após o pivotamento, garantir que as colunas com métricas sejam numéricas
+     pivot_df = pivot_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+ 
+     pivot_df.columns.name = None
+     pivot_df.columns = [f"{pl}_{m}" for m, pl in pivot_df.columns]
+     return pivot_df.reset_index()
+ 
+ def merge_placement_and_age_data(df_age: pd.DataFrame, df_place: pd.DataFrame) -> pd.DataFrame:
+     df_merged = pd.merge(df_age, df_place, on=["ad_id", "date"], how="inner")
+     
+     # Verificação para garantir que a coluna 'age' foi incluída no merge
+     if 'age' not in df_merged.columns:
+-        logging.error("A coluna 'age' não foi incluída após o merge.")
++        logger.error("A coluna 'age' não foi incluída após o merge.")
+         raise KeyError("A coluna 'age' não foi incluída após o merge.")
+ 
+     return df_merged
+ 
+ 
+ # --------------------- REDISTRIBUIÇÃO DE MÉTRICAS --------------------- #
+ def get_placements(df: pd.DataFrame) -> List[str]:
+     return sorted({c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_impressions")})
+ 
+ 
+ def compute_pesos_impressao(row: pd.Series, placements: List[str]) -> Tuple[Dict[str, int], int]:
+     pesos = {pl: max(int(row.get(f"{pl}_impressions", 0)), 0) for pl in placements}
+ 
+     # se todos zero → define peso 1 para placement com maior métrica absoluta
+     if not any(pesos.values()):
+         top_pl = max(
+             placements,
+             key=lambda pl: max(abs(float(row.get(f"{pl}_{m}", 0))) for m in METRICAS),
+         )
+         pesos[top_pl] = 1
+     return pesos, sum(pesos.values())
+ 
+ 
+ def _floor_cents(v: float) -> float:
+     return floor(v * 100) / 100.0
+@@ -145,51 +144,51 @@ def _distribuir_cost(valor: float, pesos: Dict[str, int]) -> Dict[str, float]:
+ 
+ 
+ def _distribuir_contagem(valor: int, pesos: Dict[str, int]) -> Dict[str, int]:
+     if valor == 0 or not any(pesos.values()):
+         return {pl: 0 for pl in pesos}
+ 
+     total = sum(pesos.values())
+     bruto = {pl: peso / total * valor for pl, peso in pesos.items()}
+     base = {pl: int(floor(v)) for pl, v in bruto.items()}
+     resto = valor - sum(base.values())
+ 
+     if resto:
+         frac = {pl: bruto[pl] - base[pl] for pl in pesos}
+         for pl in sorted(frac, key=frac.get, reverse=True)[:resto]:
+             base[pl] += 1
+     return base
+ 
+ 
+ # contador global de “casos especiais”
+ DISTRIBUICAO_LOGS: Counter[str] = Counter()
+ 
+ 
+ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
+     # Verifique se 'age' está presente no DataFrame antes de continuar
+     if "age" not in df_in.columns:
+-        logging.error("A coluna 'age' não foi encontrada no DataFrame.")
++        logger.error("A coluna 'age' não foi encontrada no DataFrame.")
+         raise KeyError("A coluna 'age' não foi encontrada no DataFrame.")
+ 
+     # Continuação da lógica de distribuição
+     placements = get_placements(df_in)
+ 
+     # Garante colunas‑totais (impressions, cost, etc.)
+     for m in METRICAS:
+         if m not in df_in.columns:
+             cols = [f"{pl}_{m}" for pl in placements if f"{pl}_{m}" in df_in.columns]
+             df_in[m] = df_in[cols].sum(axis=1)
+ 
+     # Garantir que as colunas de métricas sejam numéricas antes de qualquer operação de distribuição
+     df_in[METRICAS] = df_in[METRICAS].apply(pd.to_numeric, errors='coerce').fillna(0)
+ 
+     output_rows: list[dict] = []
+ 
+     for _, row in df_in.iterrows():
+         pesos, _ = compute_pesos_impressao(row, placements)
+ 
+         # Distribuição proporcional por métrica
+         dist: Dict[str, Dict[str, float | int]] = {}
+         dist["cost"] = _distribuir_cost(float(row["cost"]), pesos)
+         for m in ("impressions", "link_clicks", "video_watched_100"):
+             dist[m] = _distribuir_contagem(int(row[m]), pesos)
+ 
+diff --git a/treat/platforms/utils/common/meta/gender_placement_merge.py b/treat/platforms/utils/common/meta/gender_placement_merge.py
+index e45f1d389f03b1b1c53461de3a3385526d8f052a..e9ccafb4724b8ba85b0b24ccfc7b5660a9f142ad 100644
+--- a/treat/platforms/utils/common/meta/gender_placement_merge.py
++++ b/treat/platforms/utils/common/meta/gender_placement_merge.py
+@@ -1,39 +1,38 @@
+ # utils/common/meta/gender_placements_merge.py
+ from __future__ import annotations
+-import logging
++from logs.logging_setup import get_logger
+ from collections import Counter
+ from math import floor
+ from typing import Dict, List, Tuple
+ 
+ import pandas as pd
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ from utils.get_google_client import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ 
+-log = logging.getLogger(__name__)
+-logging.basicConfig(level=logging.INFO)
++log = get_logger(__name__)
+ 
+ METRICAS: List[str] = ["Impressions", "Link clicks", "cost", "video_watched_100"]
+ 
+ # ------------------------------- CACHE -------------------------------- #
+ _client = get_google_client(CREDS_PATH)
+ _cache: dict[str, pd.DataFrame] = {}
+ 
+ 
+ def _read_sheet(sheet: str) -> pd.DataFrame:
+     if sheet not in _cache:
+         _cache[sheet] = read_sheet_as_dataframe_range(
+             _client,
+             SPREADSHEET_ID,
+             sheet_name=sheet,
+             range_str="A1:ZZ",
+             header_row_index=0,
+         )
+     return _cache[sheet].copy()
+ 
+ 
+ # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
+ def load_and_prepare_meta_gender_data() -> pd.DataFrame:
+     df = _read_sheet("meta")
+     # 0) Strip em todos os nomes de coluna
+     df.columns = df.columns.str.strip()
+diff --git a/treat/platforms/utils/common/meta/generic_dimension_merge.py b/treat/platforms/utils/common/meta/generic_dimension_merge.py
+index 791ec553f00c63d64baf547ecc6bdeb20289462b..c54892d55af8def72f2d0c1fb299585ae9d100eb 100644
+--- a/treat/platforms/utils/common/meta/generic_dimension_merge.py
++++ b/treat/platforms/utils/common/meta/generic_dimension_merge.py
+@@ -1,37 +1,36 @@
+ from collections import Counter
+-import logging
++from logs.logging_setup import get_logger
+ from typing import List, Dict, Tuple
+ import pandas as pd
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ from utils.get_google_client import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ from utils.normalize import parse_decimal_str_to_float, format_float_to_decimal_str
+ from math import floor
+ 
+-log = logging.getLogger(__name__)
+-logging.basicConfig(level=logging.INFO)
++log = get_logger(__name__)
+ 
+ METRICAS: List[str] = ["impressions", "cost", "Video watches at 100%", "Link clicks"]
+ 
+ # ------------------------------- CACHE -------------------------------- #
+ _client = get_google_client(CREDS_PATH)
+ _cache: dict[str, pd.DataFrame] = {}
+ 
+ def _read_sheet(sheet: str, dimension_col: str = None) -> pd.DataFrame:
+     """
+     Lê a aba da planilha Google e retorna os dados, adaptando as colunas para diferentes dimensões.
+     
+     :param sheet: Nome da aba a ser lida (como "metaIdade", "metaGenero", etc.)
+     :param dimension_col: (Opcional) Nome da coluna de dimensão (como 'age', 'gender', 'region') para ajustar o DataFrame
+     :return: DataFrame com os dados da aba
+     """
+     # Verifica se a aba já está em cache
+     if sheet not in _cache:
+         # Carrega os dados da planilha
+         _cache[sheet] = read_sheet_as_dataframe_range(
+             _client,
+             SPREADSHEET_ID,
+             sheet_name=sheet,
+             range_str="A1:ZZ",
+             header_row_index=0,
+         )
+diff --git a/treat/platforms/utils/common/meta/region_placements_merge.py b/treat/platforms/utils/common/meta/region_placements_merge.py
+index e1b1780083922a6606863b4b3514ccc8b9fff84f..d1a7ccfa09ebd10114ca8f855aacbb21cb1d8588 100644
+--- a/treat/platforms/utils/common/meta/region_placements_merge.py
++++ b/treat/platforms/utils/common/meta/region_placements_merge.py
+@@ -1,41 +1,40 @@
+ # utils/common/meta/region_placements_merge.py
+ 
+ from __future__ import annotations
+-import logging
++from logs.logging_setup import get_logger
+ from collections import Counter
+ from math import floor
+ from typing import Dict, List, Tuple
+ 
+ import pandas as pd
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ from utils.get_google_client import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ from utils.geo_normalize import carregar_caches_padrao, limpeza_basica, obter_estado_de_regiao
+ 
+-log = logging.getLogger(__name__)
+-logging.basicConfig(level=logging.DEBUG)
++log = get_logger(__name__)
+ 
+ METRICAS: List[str] = ["Impressions", "Link clicks", "cost", "Video watches at 100%"]
+ 
+ # ------------------------------- CACHE -------------------------------- #
+ _client = get_google_client(CREDS_PATH)
+ _cache: dict[str, pd.DataFrame] = {}
+ 
+ def _read_sheet(sheet: str) -> pd.DataFrame:
+     if sheet not in _cache:
+         _cache[sheet] = read_sheet_as_dataframe_range(
+             _client,
+             SPREADSHEET_ID,
+             sheet_name=sheet,
+             range_str="A1:ZZ",
+             header_row_index=0,
+         )
+     return _cache[sheet].copy()
+ 
+ # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
+ def load_and_prepare_meta_region_data() -> pd.DataFrame:
+     """
+     Lê a aba 'metaRegiao', trata region → Estado com limpeza e mapeamento geográfico,
+     e garante colunas numéricas.
+     """
+     # 1) Leitura e strip de colunas
 diff --git a/treat/treat_pipeline.py b/treat/treat_pipeline.py
-index 5abe6892c0f29241090d2dab7c51c1c8f59b60f0..94d205990efe71705a2b2f5daf7a0aafb6942395 100644
+index 94d205990efe71705a2b2f5daf7a0aafb6942395..ad80eddc88a42991e8e1a764212a6791b2ddf774 100644
 --- a/treat/treat_pipeline.py
 +++ b/treat/treat_pipeline.py
-@@ -11,50 +11,51 @@ Características principais
+@@ -1,49 +1,49 @@
+ # treat/treat_pipeline.py
+ """
+ Pipeline de tratamento por aba de origem.
+ 
+ Características principais
+ ──────────────────────────
+ • **Uma única autenticação** – `SheetsFetcher` é criado no `__init__`
+   (ou reaproveitado de `builtins.fetcher`) e serve para todas as leituras.
+ 
+ • **Lookups em memória** – SOURCE → `SourceLookup`, BI → `BIParamLookup`
    (ambos com cache + TTL de 10 min).
  
  • **Nenhuma leitura extra** – todas as funções que antes abriam o Sheets
@@ -38,7 +861,8 @@ index 5abe6892c0f29241090d2dab7c51c1c8f59b60f0..94d205990efe71705a2b2f5daf7a0aaf
  from __future__ import annotations
  
  import builtins
- import logging
+-import logging
++from logs.logging_setup import get_logger
  from typing import Callable, Dict, List, Optional
  from treat.utils.normalize import normalize_age, normalize_gender       # novo import
  import pandas as pd
@@ -50,7 +874,7 @@ index 5abe6892c0f29241090d2dab7c51c1c8f59b60f0..94d205990efe71705a2b2f5daf7a0aaf
  from treat.utils.datas import (
      converter_data,
      fill_missing_start_end_from_params,
-+    unify_campaign_dates,
+     unify_campaign_dates,
  )
  from treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge import (
      merge_pinterest_dimension as pin_merge,
@@ -64,8 +888,7 @@ index 5abe6892c0f29241090d2dab7c51c1c8f59b60f0..94d205990efe71705a2b2f5daf7a0aaf
  from treat.utils.atribuicoes_via_lookup import SourceLookup
  from treat.bi_param_utils import (
      BIParamLookup,
-     enrich_with_bi_parametrizacao,
-     fill_objective_from_bi,
+@@ -52,51 +52,51 @@ from treat.bi_param_utils import (
  )
  from treat.utils.renomeacoes import (
      renomear_colunas_origem_para_modelo,
@@ -76,129 +899,1901 @@ index 5abe6892c0f29241090d2dab7c51c1c8f59b60f0..94d205990efe71705a2b2f5daf7a0aaf
  )
  from treat.utils.campos_calculados import gerar_id, calcular_engajamento_total
  from load.dest_writer import (
-@@ -184,50 +185,55 @@ class TreatPipeline:
-         # ───────────────────────────────────────────────────────────────
-         df_bi = self.bi_lookup.df()
-         validate_utm_content_in_bi(df, df_bi)
-         self._last_taxo_report = validate_taxonomy_consistency(df, df_bi)
+     DESTINATION_SHEETS,
+     _infer_data_type,
+     collect_dest_payload,
+     flush_payloads,
+     prefetch_meta,
+ )
+ from treat.utils.validations import (
+     check_required_columns,
+     validate_aggregates,
+     validate_columns,
+     validate_utm_content_in_bi,
+     validate_taxonomy_consistency,
+     validate_impressions_by_platform,
+ )
  
-         # ───────────────────────────────────────────────────────────────
-         # 5) Enriquecimento BI + preenchimento de ‘objective’
-         # ───────────────────────────────────────────────────────────────
-         df = enrich_with_bi_parametrizacao(
-             df, self.creds_path, self.spreadsheet_id, sheet_name=self.sheet_name
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ 
+ class TreatPipeline:
+     """Pipeline genérico que normaliza, enriquece, valida e grava uma aba."""
+ 
+     def __init__(
+         self,
+         creds_path: str,
+         spreadsheet_id: str,
+         sheet_name: str,
+         mapping_renomeacao: Dict[str, str],
+         *,
+         write_back: bool = True,
+         subs_objetivo_fn: Callable[[pd.DataFrame], pd.DataFrame] = aplicar_substituicoes_objetivo,
+     ) -> None:
+         self.creds_path = creds_path
+         self.spreadsheet_id = spreadsheet_id
+         self.sheet_name = sheet_name
+         self.write_back = write_back
+         self.mapping = mapping_renomeacao
+         self.subs_obj_fn = subs_objetivo_fn
+ 
+         # BI lookup (cache + TTL)
+         self.bi_lookup = BIParamLookup(creds_path, spreadsheet_id)
+ 
+diff --git a/treat/treat_runner.py b/treat/treat_runner.py
+index 788b2939122fd25844e05ca0a05fac5f6fed4e3b..30fe2e207aa6dc0c91b412be6277002929cd6208 100644
+--- a/treat/treat_runner.py
++++ b/treat/treat_runner.py
+@@ -1,53 +1,53 @@
+ # treat/treat_runner.py
+ """
+ Wrappers convenientes em torno do TreatPipeline.
+ 
+ Cada função prepara a instância correta de TreatPipeline e chama .run(),
+ centralizando todo o fluxo de transformação (pré-processo, BI, write-back,
+ renomeação, substituição de objective, geração de ID).
+ 
+ Para adicionar nova aba/plataforma:
+  1) crie o dicionário de renomeação em treat/utils/renomeacoes.py
+  2) adicione um wrapper neste arquivo (4-5 linhas)
+ """
+ 
+ from __future__ import annotations
+ from typing import Dict
+ import pandas as pd
+-import logging
++from logs.logging_setup import get_logger
+ 
+ from treat.treat_pipeline import TreatPipeline
+ from treat.utils.renomeacoes import (
+     renomeacao_geral,
+     renomeacao_metaGenero,
+     renomeacao_metaIdade,
+     # renomeacao_tiktok_genero,
+     # renomeacao_pinterest_idade,
+ )
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ 
+ def _run_pipeline(
+     df_raw: pd.DataFrame,
+     creds_path: str,
+     spreadsheet_id: str,
+     sheet_name: str,
+     mapping: Dict[str, str],
+     *,
+     write_back: bool = True,
+ ) -> pd.DataFrame:
+     """
+     Instancia e executa o pipeline genérico.
+     """
+     pipeline = TreatPipeline(
+         creds_path=creds_path,
+         spreadsheet_id=spreadsheet_id,
+         sheet_name=sheet_name,
+         mapping_renomeacao=mapping,
+         write_back=write_back,
+     )
+     return pipeline.run(df_raw)
+ 
+ 
+ # ───────────────────────── wrappers públicos ─────────────────────────── #
+diff --git a/treat/utils/age_placements_merge.py b/treat/utils/age_placements_merge.py
+index f9eba052901039ef8ea09f37f5bde75d8fcbb8a1..270d9e945a7a2930ef5cd43c5ec5ceaf120eec9f 100644
+--- a/treat/utils/age_placements_merge.py
++++ b/treat/utils/age_placements_merge.py
+@@ -1,128 +1,127 @@
+ # utils/common/meta/age_placements_merge.py
+ from __future__ import annotations
+-import logging
++from logs.logging_setup import get_logger
+ from collections import Counter
+ from math import floor
+ from typing import Dict, List, Tuple
+ 
+ import pandas as pd
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ from utils.get_google_client import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ from utils.normalize import normalize_age
+ 
+-log = logging.getLogger(__name__)
+-logging.basicConfig(level=logging.INFO)
++log = get_logger(__name__)
+ 
+ METRICAS: List[str] = ["impressions", "link_clicks", "cost", "video_watched_100"]
+ 
+ # ------------------------------- CACHE -------------------------------- #
+ _client = get_google_client(CREDS_PATH)
+ _cache: dict[str, pd.DataFrame] = {}
+ 
+ 
+ def _read_sheet(sheet: str) -> pd.DataFrame:
+     if sheet not in _cache:
+         _cache[sheet] = read_sheet_as_dataframe_range(
+             _client,
+             SPREADSHEET_ID,
+             sheet_name=sheet,
+             range_str="A1:ZZ",
+             header_row_index=0,
          )
-         df = fill_objective_from_bi(df, self.bi_lookup)
+     return _cache[sheet].copy()
  
-         # ───────────────────────────────────────────────────────────────
-         # 6) Conversão de colunas datetime → date / start / end
-         # ───────────────────────────────────────────────────────────────
-         for col in ("date", "start", "end"):
-             if col in df.columns:
-                 df = converter_data(df, col)
  
-         # ───────────────────────────────────────────────────────────────
-         # 7) Preenche start/end em memória
-         # ───────────────────────────────────────────────────────────────
-         df = fill_missing_start_end_from_params(df, lookup=self.bi_lookup, inplace=False)
+ # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
+ def load_and_prepare_meta_age_data() -> pd.DataFrame:
+     df = _read_sheet("metaIdade")  # Carrega os dados da aba 'metaIdade'
+     
+     # Verificação de dados consistentes antes de qualquer transformação
+     df = df.dropna(subset=["ad_id", "date", "impressions", "cost"])  # Garante que não haja NaN nessas colunas essenciais
+     
+     # 0) Strip em todos os nomes de coluna
+     df.columns = df.columns.str.strip()
+     
+     # 1) Remove registros com dados ausentes em colunas críticas
+     df = df.dropna(subset=["ad_id", "date", "age"])  # Garante que 'age' está presente
+     
+     # 2) Converte cost (pode vir como 'cost' ou 'cost' etc) - busca case-insensitive
+     cost_col = next((c for c in df.columns if c.lower() == "cost"), None)
+     if cost_col:
+         s = df[cost_col].astype(str)
+         s = s.str.replace("\u00a0", "")
+         s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)
+         s = s.str.replace(",", ".", regex=False)
+         df[cost_col] = pd.to_numeric(s, errors="coerce").fillna(0)
+         df.rename(columns={cost_col: "cost"}, inplace=True)
+     
+     # 3) Outras métricas
+     for col in ["impressions", "link_clicks", "video_watched_100"]:
+         if col in df.columns:
+             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+     
+     # Verifique se 'age' está presente
+     if 'age' not in df.columns:
+-        logging.error("A coluna 'age' não foi encontrada na aba 'metaIdade'.")
++        logger.error("A coluna 'age' não foi encontrada na aba 'metaIdade'.")
+         raise KeyError("A coluna 'age' não foi encontrada na aba 'metaIdade'.")
+     
+     return df
  
-+        # ───────────────────────────────────────────────────────────────
-+        # 7a) Uniformiza datas por campaign_name
-+        # ───────────────────────────────────────────────────────────────
-+        df = unify_campaign_dates(df)
-+
-         # ───────────────────────────────────────────────────────────────
-         # 8) Atribuição de Veiculo + ID_Veiculo (lookup BI)
-         # ───────────────────────────────────────────────────────────────
-         df = assign_vehicle_and_id(
-             df, sheet_name=self.sheet_name, fetcher=self.fetcher, bi_lookup=self.bi_lookup
+ def load_and_prepare_meta_placement_data() -> pd.DataFrame:
+     return _read_sheet("metaGeral").dropna(subset=["ad_id", "date"])
+ 
+ 
+ # ------------------------------ PIVOTS -------------------------------- #
+ def pivot_meta_age_data(df: pd.DataFrame) -> pd.DataFrame:
+     return df.groupby(["ad_id", "date", "age"], as_index=False)[METRICAS].sum()
+ 
+ def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
+     id_vars = ["ad_id", "date"]
+     value_vars = [c for c in df_placement.columns if c not in id_vars + ["placement"]]
+ 
+     pivot_df = df_placement.pivot_table(
+         index=id_vars,
+         columns="placement",
+         values=value_vars,
+         aggfunc="sum",
+         fill_value=0,
+     )
+ 
+     # Após o pivotamento, garantir que as colunas com métricas sejam numéricas
+     pivot_df = pivot_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+ 
+     pivot_df.columns.name = None
+     pivot_df.columns = [f"{pl}_{m}" for m, pl in pivot_df.columns]
+     return pivot_df.reset_index()
+ 
+ def merge_placement_and_age_data(df_age: pd.DataFrame, df_place: pd.DataFrame) -> pd.DataFrame:
+     df_merged = pd.merge(df_age, df_place, on=["ad_id", "date"], how="inner")
+     
+     # Verificação para garantir que a coluna 'age' foi incluída no merge
+     if 'age' not in df_merged.columns:
+-        logging.error("A coluna 'age' não foi incluída após o merge.")
++        logger.error("A coluna 'age' não foi incluída após o merge.")
+         raise KeyError("A coluna 'age' não foi incluída após o merge.")
+ 
+     return df_merged
+ 
+ 
+ # --------------------- REDISTRIBUIÇÃO DE MÉTRICAS --------------------- #
+ def get_placements(df: pd.DataFrame) -> List[str]:
+     return sorted({c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_impressions")})
+ 
+ 
+ def compute_pesos_impressao(row: pd.Series, placements: List[str]) -> Tuple[Dict[str, int], int]:
+     pesos = {pl: max(int(row.get(f"{pl}_impressions", 0)), 0) for pl in placements}
+ 
+     # se todos zero → define peso 1 para placement com maior métrica absoluta
+     if not any(pesos.values()):
+         top_pl = max(
+             placements,
+             key=lambda pl: max(abs(float(row.get(f"{pl}_{m}", 0))) for m in METRICAS),
+         )
+         pesos[top_pl] = 1
+     return pesos, sum(pesos.values())
+ 
+ 
+ def _floor_cents(v: float) -> float:
+     return floor(v * 100) / 100.0
+@@ -145,51 +144,51 @@ def _distribuir_cost(valor: float, pesos: Dict[str, int]) -> Dict[str, float]:
+ 
+ 
+ def _distribuir_contagem(valor: int, pesos: Dict[str, int]) -> Dict[str, int]:
+     if valor == 0 or not any(pesos.values()):
+         return {pl: 0 for pl in pesos}
+ 
+     total = sum(pesos.values())
+     bruto = {pl: peso / total * valor for pl, peso in pesos.items()}
+     base = {pl: int(floor(v)) for pl, v in bruto.items()}
+     resto = valor - sum(base.values())
+ 
+     if resto:
+         frac = {pl: bruto[pl] - base[pl] for pl in pesos}
+         for pl in sorted(frac, key=frac.get, reverse=True)[:resto]:
+             base[pl] += 1
+     return base
+ 
+ 
+ # contador global de “casos especiais”
+ DISTRIBUICAO_LOGS: Counter[str] = Counter()
+ 
+ 
+ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
+     # Verifique se 'age' está presente no DataFrame antes de continuar
+     if "age" not in df_in.columns:
+-        logging.error("A coluna 'age' não foi encontrada no DataFrame.")
++        logger.error("A coluna 'age' não foi encontrada no DataFrame.")
+         raise KeyError("A coluna 'age' não foi encontrada no DataFrame.")
+ 
+     # Continuação da lógica de distribuição
+     placements = get_placements(df_in)
+ 
+     # Garante colunas‑totais (impressions, cost, etc.)
+     for m in METRICAS:
+         if m not in df_in.columns:
+             cols = [f"{pl}_{m}" for pl in placements if f"{pl}_{m}" in df_in.columns]
+             df_in[m] = df_in[cols].sum(axis=1)
+ 
+     # Garantir que as colunas de métricas sejam numéricas antes de qualquer operação de distribuição
+     df_in[METRICAS] = df_in[METRICAS].apply(pd.to_numeric, errors='coerce').fillna(0)
+ 
+     output_rows: list[dict] = []
+ 
+     for _, row in df_in.iterrows():
+         pesos, _ = compute_pesos_impressao(row, placements)
+ 
+         # Distribuição proporcional por métrica
+         dist: Dict[str, Dict[str, float | int]] = {}
+         dist["cost"] = _distribuir_cost(float(row["cost"]), pesos)
+         for m in ("impressions", "link_clicks", "video_watched_100"):
+             dist[m] = _distribuir_contagem(int(row[m]), pesos)
+ 
+diff --git a/treat/utils/append_records_to_sheet.py b/treat/utils/append_records_to_sheet.py
+index afde9e65556dc883f10966b28feac34328d5f515..bb0494c803a73c04c40d45c762a46d9f0909d2e0 100644
+--- a/treat/utils/append_records_to_sheet.py
++++ b/treat/utils/append_records_to_sheet.py
+@@ -1,87 +1,87 @@
+ # treat/utils/append.py
+ 
+-import logging
++from logs.logging_setup import get_logger
+ from typing import Optional
+ 
+ import pandas as pd
+ from gspread_dataframe import set_with_dataframe
+ from extract.sheets_fetcher import SheetsFetcher
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ 
+ def append_records_to_sheet(
+     fetcher: SheetsFetcher,
+     spreadsheet_id: str,
+     sheet_name: str,
+     df: pd.DataFrame,
+     *,
+     include_header: Optional[bool] = None
+ ) -> None:
+     """
+     Insere os registros de `df` na aba `sheet_name`, usando apenas UMA chamada de leitura
+     (via SheetsFetcher) e UMA chamada de escrita (batch_update). Depois redimensiona
+     a aba com base nas dimensões combinadas de dados existentes + novos.
+ 
+     Parâmetros:
+     ----------
+     fetcher : SheetsFetcher
+         Instância pré-autenticada para acessar planilhas. Deve conter `spreadsheet_id`.
+     spreadsheet_id : str
+         ID da planilha (deve coincidir com o usado pelo fetcher).
+     sheet_name : str
+         Nome da aba onde serão inseridos os dados.
+     df : pd.DataFrame
+         DataFrame com os registros a serem inseridos.
+     include_header : bool | None
+         Se True, força incluir cabeçalho do DataFrame. Se False, nunca inclui. Se None (padrão),
+         inclui header apenas se a aba estiver vazia (sem linhas).
+     """
+     # 1) Obtém dados existentes via SheetsFetcher (em memória)
+     try:
+         existing = fetcher.get([sheet_name])[sheet_name]
+     except Exception as e:
+-        log.error(f"Falha ao ler aba '{sheet_name}' via SheetsFetcher: {e}")
++        log.error(f"Falha ao ler aba '{sheet_name}' via SheetsFetcher: {e}", exc_info=True)
+         raise
+ 
+     existing_rows = existing.shape[0]
+     existing_cols = existing.shape[1] if existing_rows > 0 else 0
+ 
+     # 2) Decide se inclui cabeçalho
+     if include_header is None:
+         include_header = existing_rows == 0
+ 
+     # 3) Calcular a linha inicial (1-based)
+     next_row = existing_rows + 1 if not include_header else 1
+ 
+     # 4) Inserir DataFrame a partir da coluna B (col=1, index inicia em 1)
+     #    - include_column_header controla inclusão do cabeçalho
+     try:
+         worksheet = fetcher.open_worksheet(sheet_name)
+         set_with_dataframe(
+             worksheet,
+             df,
+             row=next_row,
+             col=1,
+             include_column_header=include_header
+         )
+     except Exception as e:
+-        log.error(f"Falha ao escrever dados em '{sheet_name}': {e}")
++        log.error(f"Falha ao escrever dados em '{sheet_name}': {e}", exc_info=True)
+         raise
+ 
+     # 5) Calcular novas dimensões sem ler de novo:
+     new_rows = df.shape[0]
+     new_cols = df.shape[1] + (1 if include_header else 0)  # colunas do df, header não conta como coluna extra
+     total_rows = existing_rows + new_rows + (1 if include_header and existing_rows == 0 else 0)
+     total_cols = max(existing_cols, new_cols)
+ 
+     # 6) Ajustar tamanho da planilha
+     try:
+         worksheet.resize(rows=total_rows, cols=total_cols)
+         log.info(
+             f"Inseridos {new_rows} registros em '{sheet_name}' a partir da linha {next_row}. "
+             f"Planilha redimensionada para {total_rows} linhas e {total_cols} colunas."
+         )
+     except Exception as e:
+-        log.error(f"Falha ao redimensionar '{sheet_name}': {e}")
++        log.error(f"Falha ao redimensionar '{sheet_name}': {e}", exc_info=True)
+         raise
+diff --git a/treat/utils/atribuicoes_via_lookup.py b/treat/utils/atribuicoes_via_lookup.py
+index c08a5ddfc655a771dfaca01ede976ee179e291b8..88ea13fd4de305d6ff2fb4f985874065127e0be2 100644
+--- a/treat/utils/atribuicoes_via_lookup.py
++++ b/treat/utils/atribuicoes_via_lookup.py
+@@ -1,36 +1,36 @@
+ from __future__ import annotations
+ 
+-import logging
++from logs.logging_setup import get_logger
+ import time   # ← ESQUECEU de importar
+ import pandas as pd
+ 
+ from treat.bi_param_utils import BIParamLookup
+ from treat.utils.normalize import extract_meta_platform_from_placement
+ from treat.utils.campanha_mapper import buscar_mapping
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ PLATFORM_TO_VEICULO = {
+     "tiktok":    "TikTok",
+     "linkedin":  "LinkedIn",
+     "pinterest": "Pinterest",
+     "twitter":   "Twitter",
+     "youtube":   "YouTube",
+     "facebook":  "Facebook",   # normalize a chave para lowercase
+     "instagram": "Instagram",
+     # adicione outros conforme necessário
+ }
+ 
+ 
+ # ─────────────────────────────────────────────────────────────────────────────
+ # HELPERS
+ # ─────────────────────────────────────────────────────────────────────────────
+ 
+ 
+ class SourceLookup:
+     """
+     Carrega a aba 'SOURCE' **apenas uma vez** (cache + TTL),
+     mas usando o SheetsFetcher em vez de gspread direto.
+     """
+     _df: pd.DataFrame | None = None
+     _last_load: float = 0
+@@ -141,51 +141,51 @@ def atribuir_veiculo_e_id_meta(
+ 
+         # Converter para minúsculo e buscar no source_map
+         df["ID_Veiculo"] = (
+             df["Veiculo"].astype(str)
+             .str.strip()
+             .str.lower()
+             .map(source_map)
+             .fillna("")
          )
  
-         # ───────────────────────────────────────────────────────────────
-         # 9) Transformações específicas da plataforma
-         # ───────────────────────────────────────────────────────────────
-         df = dispatch(self.sheet_name)(df, lookup=self.bi_lookup)
+     return df
  
-         # ───────────────────────────────────────────────────────────────
-         # 10) Substituições de objetivo customizadas
-         # ───────────────────────────────────────────────────────────────
-         df = self.subs_obj_fn(df)
+ # ─────────────────────────────────────────────────────────────────────────────
+ # 3) LINKEDIN / TWITTER – veiculo via Criativo
+ # ─────────────────────────────────────────────────────────────────────────────
  
-         # ───────────────────────────────────────────────────────────────
-         # 10a)  Se for pinterestGeral, guarda VERSÃO ENRIQUECIDA no cache
-         #       (antes de renomear colunas → usada no merge demográfico)
-         # ───────────────────────────────────────────────────────────────
-         if lower == "pinterestgeral":
-             import builtins
-             builtins._pinterest_geral_tratado = df.copy()
+ def atribuir_veiculo_por_criativo(
+     df: pd.DataFrame,
+     bi_lookup: BIParamLookup
+ ) -> pd.DataFrame:
+     """
+     Lookup de 'Ad name' → 'Veiculo' usando o mapeamento cached em BIParamLookup.
+     • bi_lookup: instância de BIParamLookup já inicializada no pipeline.
+     • Não faz nova leitura da planilha; usa bi_lookup._map_columns para obter criativo→veículos.
+     """
+-    log = logging.getLogger(__name__)
++    log = get_logger(__name__)
+     log.debug(">>> atribuir_veiculo_por_criativo (usando BIParamLookup)")
  
-diff --git a/treat/utils/datas.py b/treat/utils/datas.py
-index c047bb3ebc0ed48009451e524ce459954799fddc..8ded974ea93b527042155b2e1f4324e5beffa0cb 100644
---- a/treat/utils/datas.py
-+++ b/treat/utils/datas.py
-@@ -71,25 +71,62 @@ def transformar_para_date(valor):
+     # Tenta obter o dicionário raw_map = {CRIATIVO_EMMAIÚSCULO: ("VeiculoNome",)}
+     try:
+         raw_map = bi_lookup._map_columns(
+             key_kw="criativo",
+             val_kws=["veículos"],
+             upper_keys=True
+         )
+     except KeyError:
+         log.warning("Colunas 'CRIATIVO' ou 'VEÍCULOS' não encontradas em BI_PARAMETRIZAÇÃO.")
+         raw_map = {}
  
+     # Converte raw_map para um dict simples {criativo_lower: veiculo_nome}
+     mapping: dict[str, str] = {
+         k.strip().lower(): vals[0].strip()
+         for k, vals in raw_map.items()
+         if vals and vals[0] is not None
+     }
  
- def converter_data(df: pd.DataFrame, coluna: str) -> pd.DataFrame:
-     if coluna in df.columns:
-         parsed = pd.to_datetime(df[coluna], errors="coerce")
-         df[coluna] = parsed.dt.date.where(~parsed.isna(), "")
+     # Garante que haja coluna 'Ad name'
+     if "Ad name" not in df.columns:
+         df["Veiculo"] = ""
+         return df
+ 
+diff --git a/treat/utils/campos_calculados.py b/treat/utils/campos_calculados.py
+index d6d534aa118bf2adbeb10bfd0d3e19987b728fa4..452c0c2f52ff627389966a82f07bc757684c97cd 100644
+--- a/treat/utils/campos_calculados.py
++++ b/treat/utils/campos_calculados.py
+@@ -1,61 +1,62 @@
+ import pandas as pd
+-import logging
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ 
+ def calcular_engajamento_total(df: pd.DataFrame) -> pd.DataFrame:
+     """
+     Calcula a coluna 'Engajamento_Total' como a soma de:
+     - post_reactions
+     - post_shares
+     - post_comments
+ 
+     Caso os campos 'post_shares' ou 'post_comments' estejam ausentes ou vazios,
+     assume valor 0.
+     """
+     for col in ['post_shares', 'post_comments']:
+         if col not in df.columns:
+             df[col] = 0
+         else:
+             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+ 
+     if 'post_reactions' not in df.columns:
+         df['post_reactions'] = 0
+     else:
+         df['post_reactions'] = pd.to_numeric(df['post_reactions'], errors='coerce').fillna(0)
+ 
+     df['Engajamento_Total'] = (
+         df['post_reactions'] + df['post_shares'] + df['post_comments']
+     )
+ 
      return df
  
  
- def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
+ def inicializar_colunas_auxiliares(df: pd.DataFrame) -> pd.DataFrame:
      """
-     Preenche as colunas 'Inicio_da_Campanha' e 'Fim_da_Campanha' convertendo
-     as colunas 'start' e 'end' (datetime) para datas (YYYY-MM-DD) no Pinterest.
+     Garante que as colunas auxiliares 'Numero' e 'ID' existam no DataFrame.
      """
-     if "start" in df.columns:
-         df["Inicio_da_Campanha"] = df["start"].apply(transformar_para_date)
-     else:
-         df["Inicio_da_Campanha"] = ""
+-    logging.debug(">>> In inicializar_colunas_auxiliares")
++    logger.debug(">>> In inicializar_colunas_auxiliares")
+     df['Numero'] = df.get('Numero', pd.NA)
+     df['ID'] = df.get('ID', pd.NA)
+     return df
  
-     if "end" in df.columns:
-         df["Fim_da_Campanha"] = df["end"].apply(transformar_para_date)
-     else:
-         df["Fim_da_Campanha"] = ""
+ 
+ def remover_colunas_indesejadas(self):
+     for col in ['placement', 'campaign_id', 'campaign_name', 'utm_content']:
+         if col in self.df.columns:
+             self.df.drop(columns=col, inplace=True)
+ 
+ 
+ def gerar_id(row: pd.Series) -> str:
+     """
+     ID = {data}-{Campanha}-{impressions}-{cost}-{link_clicks}
+     Aceita tanto colunas snake_case (inglês) quanto as
+     antigas em PT-BR com iniciais maiúsculas.
+     """
+     def pick(*candidatos: str) -> str:
+         for c in candidatos:
+             if c in row and str(row[c]).strip():
+                 return str(row[c]).strip()
+         return ""
+ 
+     parts = [
+         pick("date",      "Data"),
+diff --git a/treat/utils/common_linkedin.py b/treat/utils/common_linkedin.py
+index 2efa83c210dc7d441433d984f9351f603a621bff..96a3ecc95e268005084a973e60d6da6b7845201d 100644
+--- a/treat/utils/common_linkedin.py
++++ b/treat/utils/common_linkedin.py
+@@ -1,107 +1,106 @@
+ # common_linkedin.py
+ 
+-import logging
+-logging.basicConfig(level=logging.DEBUG)
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ 
+ from utils.get_google_client import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ from utils.normalize import normalize_columns, normalize_parametrizacao_values
+ from utils.preview_links import generate_linkedin_ad_preview_link_from_lookup
+ from utils.creative_mapping import load_ad_name_mapping, get_ad_name_from_utm_content
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ 
+ 
+ def carregar_mapeamentos_linkedin():
+     """
+     Carrega os mapeamentos de preview e criativo da aba BI_PARAMETRIZAÇÃO
+     para uso nos ETLs do LinkedIn.
+ 
+     Agora assume que os cabeçalhos estão na linha 2 da planilha (A2:ZZ)
+     e, portanto, usamos header_row_index=0.
+     """
+-    import logging
+     from utils.get_google_client import get_google_client
+     from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+     from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+     from utils.normalize import normalize_columns, normalize_parametrizacao_values
+     from utils.creative_mapping import load_ad_name_mapping
+ 
+-    logging.info("Carregando mapeamentos do LinkedIn (preview e criativo)...")
++    logger.info("Carregando mapeamentos do LinkedIn (preview e criativo)...")
+ 
+     client = get_google_client(CREDS_PATH)
+     # Aqui usamos A2:ZZ e header_row_index=0 para indicar que a linha 2 é o cabeçalho.
+     df_parametrizacao = read_sheet_as_dataframe_range(
+         client,
+         SPREADSHEET_ID,
+         sheet_name="BI_PARAMETRIZAÇÃO",
+         range_str="A2:ZZ",
+         header_row_index=0
+     )
+ 
+     # Normaliza os nomes das colunas (isso converte para minúsculo, remove quebras de linha e acentuação)
+     df_parametrizacao.columns = normalize_columns(df_parametrizacao.columns)
+-    logging.debug(f"[DEBUG] Colunas após normalização: {df_parametrizacao.columns.tolist()}")
++    logger.debug(f"[DEBUG] Colunas após normalização: {df_parametrizacao.columns.tolist()}")
+ 
+     # Aplica normalização dos valores nos campos de parametrização
+     df_parametrizacao = normalize_parametrizacao_values(df_parametrizacao)
+ 
+     # Gerar o mapeamento preview: o lookup usará a coluna 'utm_content' e os valores deverão ser extraídos da coluna 'preview'
+     mapping_preview = generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao)
+     mapping_criativo = load_ad_name_mapping(df_parametrizacao)
+ 
+     return mapping_preview, mapping_criativo
+ 
+ 
+ def buscar_nome_criativo_com_log(utm_content, mapping_criativo):
+     """
+     Busca o nome do criativo com base no utm_content.
+     Se não encontrar, loga uma mensagem de debug.
+     """
+     utm_str = str(utm_content).strip()
+     nome = get_ad_name_from_utm_content(utm_str, mapping_criativo)
+     if not nome:
+-        logging.debug(f"[LinkedIn] utm_content '{utm_str}' NÃO encontrado no mapping_criativo.")
++        logger.debug(f"[LinkedIn] utm_content '{utm_str}' NÃO encontrado no mapping_criativo.")
+     return nome
+ 
+ 
+ def preparar_kwargs_linkedin() -> dict:
+     """
+     Prepara os kwargs extras necessários para inicializar ETLs do LinkedIn,
+     carregando os mapeamentos de preview e criativo.
+     """
+     mapping_preview, mapping_criativo = carregar_mapeamentos_linkedin()
+     return {
+         "mapping_preview": mapping_preview,
+         "mapping_criativo": mapping_criativo,
+     }
+ 
+ 
+ def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
+     
+     """
+     Preenche as colunas 'Nome_do_Anuncio' e 'Nome_do_Conjunto_de_Anuncio' no DataFrame de LinkedIn.
+     - 'Nome_do_Anuncio' recebe o valor presente na coluna 'ID_Content'
+     - 'Nome_do_Conjunto_de_Anuncio' é o resultado do lookup da coluna 'ID_Content'
+       no mapeamento de criativo (mapping_criativo).
+ 
+     Se algum valor em 'ID_Content' não tiver correspondência, é feito log de aviso.
+     """
+     
+     df = df.copy()
+ 
+     if "ID_Content" not in df.columns:
+         raise KeyError("A coluna 'ID_Content' não foi encontrada no DataFrame após renomeação.")
+ 
+     # 'Nome_do_Anuncio' recebe diretamente o valor de 'ID_Content'
+     df["Nome_do_Anuncio"] = df["ID_Content"]
+     # 'Nome_do_Conjunto_de_Anuncio' é preenchido via mapeamento (ID_Content → nome amigável)
+     df["Nome_do_Conjunto_de_Anuncio"] = df["ID_Content"].map(mapping_criativo)
+ 
+     # Log de valores de ID_Content que não tiveram correspondência
+     utms_nao_mapeados = df[df["Nome_do_Conjunto_de_Anuncio"].isna()]["ID_Content"].dropna().unique()
+     if len(utms_nao_mapeados) > 0:
+-        logging.warning("ID_Content sem correspondência em BI_PARAMETRIZAÇÃO (LinkedIn):")
++        logger.warning("ID_Content sem correspondência em BI_PARAMETRIZAÇÃO (LinkedIn):")
+         for utm in utms_nao_mapeados[:10]:
+-            logging.warning(f"- {utm}")
++            logger.warning(f"- {utm}")
  
      return df
-+
-+
-+def unify_campaign_dates(
-+    df: pd.DataFrame,
-+    camp_col: str = "campaign_name",
-+    start_col: str = "start",
-+    end_col: str = "end",
-+    *,
-+    inplace: bool = True,
-+) -> pd.DataFrame:
-+    """Padroniza start/end por ``campaign_name`` usando menor/maior datas.
-+
-+    Para cada ``campaign_name`` presente em ``camp_col`` calcula a data mais
-+    antiga encontrada em ``start_col`` e a mais recente em ``end_col``. Todas as
-+    linhas daquela campanha recebem esses valores, mantendo vazios quando não
-+    houver datas válidas.
-+    """
-+
-+    if not inplace:
-+        df = df.copy()
-+
-+    if camp_col not in df.columns:
-+        return df
-+
-+    key = df[camp_col].astype(str).str.strip().str.lower()
-+
-+    if start_col in df.columns:
-+        start_dates = pd.to_datetime(df[start_col], errors="coerce")
-+        earliest = start_dates.groupby(key).transform("min")
-+        df[start_col] = earliest.dt.date.where(~earliest.isna(), df[start_col])
-+
-+    if end_col in df.columns:
-+        end_dates = pd.to_datetime(df[end_col], errors="coerce")
-+        latest = end_dates.groupby(key).transform("max")
-+        df[end_col] = latest.dt.date.where(~latest.isna(), df[end_col])
-+
-+    return df
+diff --git a/treat/utils/common_meta.py b/treat/utils/common_meta.py
+index d9bbc8da6554f9d0947e1475bb044a6621d65b38..2898ad44d646cb692e10efbae34d9901640e46bc 100644
+--- a/treat/utils/common_meta.py
++++ b/treat/utils/common_meta.py
+@@ -1,37 +1,38 @@
+ """
+ Funções utilitárias comuns aos ETLs do **Meta Ads** (Idade, Gênero, Região …).
+ 
+ •  carrega as abas *metaIdade* e *metaGeral* do Google‑Sheets  
+ •  faz pivôs por placement / age  
+ •  contém o algoritmo `distribute_age_metrics` – totalmente testado em
+    `tests/test_meta_idade_algoritmo_extra.py`
+ """
+ 
+ from __future__ import annotations
+ 
+-import logging
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ from collections import Counter
+ from decimal import Decimal, ROUND_DOWN
+ from math      import floor
+ from typing    import Dict, List, Tuple, Union
+ 
+ import pandas as pd
+ 
+ # -------------------------------------------------------------------- #
+ # Dependências auxiliares de Sheets
+ # -------------------------------------------------------------------- #
+ from utils.google_sheets          import CREDS_PATH, SPREADSHEET_ID
+ from utils.get_google_client      import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ 
+ 
+ # -------------------------------------------------------------------- #
+ # 0) Conjunto ÚNICO de métricas usadas em Meta‑Idade
+ # -------------------------------------------------------------------- #
+ METRICAS: List[str] = [
+     "Impressions",
+     "Link clicks",
+     "Cost",
+     "Video watches at 100%",
+ ]
+ 
+@@ -91,51 +92,51 @@ def pivot_meta_placement_data(df: pd.DataFrame) -> pd.DataFrame:
+     df_piv.columns = [f"{pl}_{m}" for m, pl in df_piv.columns]
+     df_piv.reset_index(inplace=True)
+     return df_piv
+ 
+ 
+ def merge_placement_and_age_data(
+     df_age: pd.DataFrame,
+     df_placement: pd.DataFrame,
+ ) -> pd.DataFrame:
+     """Merge final por ['Ad ID', 'Date']."""
+     return pd.merge(df_age, df_placement, on=["Ad ID", "Date"], how="inner")
+ 
+ 
+ # -------------------------------------------------------------------- #
+ # 3) Algoritmo de redistribuição por Age
+ # -------------------------------------------------------------------- #
+ def get_placements(df: pd.DataFrame) -> List[str]:
+     """Extrai e devolve *placements* ordenados alfabeticamente."""
+     cols = [c for c in df.columns if c.endswith("_Impressions")]
+     return sorted({c.rsplit("_", 1)[0] for c in cols})
+ 
+ 
+ def compute_pesos_impressao(
+     row: pd.Series, placements: List[str]
+ ) -> Tuple[Dict[str, int], int]:
+-    log = logging.getLogger("common_meta.compute_pesos_impressao")
++    log = get_logger("common_meta.compute_pesos_impressao")
+     pesos = {pl: max(int(row.get(f"{pl}_Impressions", 0)), 0) for pl in placements}
+     if all(v == 0 for v in pesos.values()):
+         top_pl, _ = max(
+             ((pl, abs(float(row.get(f"{pl}_{m}", 0))))
+              for pl in placements for m in METRICAS),
+             key=lambda t: t[1],
+             default=(placements[0], 0),
+         )
+         pesos[top_pl] = 1
+     return pesos, sum(pesos.values())
+ 
+ 
+ DISTRIBUICAO_LOGS: Counter[str] = Counter()
+ 
+ 
+ def _sanitize_metric_value(metric: str, raw):
+     v = 0 if raw is None or pd.isna(raw) else raw
+     v = max(v, 0)
+     return float(v) if metric == "Cost" else int(round(v))
+ 
+ 
+ def _floor_cents(v: float) -> float:
+     return float(Decimal(str(v)).quantize(Decimal("0.01"), rounding=ROUND_DOWN))
+ 
+ 
+@@ -165,61 +166,61 @@ def _distribute_proportional(
+     total_peso = sum(peso_imp.values())
+     if valor == 0 or total_peso == 0:
+         return {pl: 0 for pl in placements}
+ 
+     quots = {pl: (peso_imp[pl] / total_peso) * valor for pl in placements}
+     if metric == "Cost":
+         base = {pl: _floor_cents(quots[pl]) for pl in placements}
+         resto = round(valor - sum(base.values()), 2)
+         inc   = 0.01
+     else:
+         base = {pl: int(floor(quots[pl])) for pl in placements}
+         resto = int(round(valor - sum(base.values())))
+         inc   = 1
+ 
+     if resto > 0:
+         frac = {pl: quots[pl] - base[pl] for pl in placements}
+         ordem = sorted(placements, key=lambda pl: (-frac[pl], pl))
+         for pl in ordem[: int(round(resto / inc))]:
+             base[pl] += inc
+     if metric == "Cost":
+         base = {pl: round(base[pl], 2) for pl in base}
+     return base
+ 
+ 
+ def _fix_inconsistencies_and_types(metric, distrib, peso_imp):
+-    log = logging.getLogger("common_meta.fix")
++    log = get_logger("common_meta.fix")
+     out = {}
+     for pl, v in distrib.items():
+         if v > 0 and peso_imp.get(pl, 0) == 0:
+             log.critical("Placement %s recebeu cota mas peso 0", pl)
+         out[pl] = _floor_cents(v) if metric == "Cost" else int(round(v))
+     return out
+ 
+ 
+ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
+-    log = logging.getLogger("common_meta.distribute_age_metrics")
++    log = get_logger("common_meta.distribute_age_metrics")
+     log.info("🚚  Distribuindo métricas por Age…")
+ 
+     P = get_placements(df_in)
+ 
+     # Garante métricas totais se não existirem
+     for m in METRICAS:
+         if m not in df_in.columns:
+             df_in[m] = df_in[[f"{pl}_{m}" for pl in P if f"{pl}_{m}" in df_in.columns]].sum(
+                 axis=1
+             )
+ 
+     out_rows: list[dict] = []
+ 
+     for _, row in df_in.iterrows():
+         peso_imp, _ = compute_pesos_impressao(row, P)
+         dist_metric = {}
+         for m in METRICAS:
+             val = _sanitize_metric_value(m, row.get(m, 0))
+             dist, used = _special_distribution(m, int(val), P, peso_imp)
+             if not used:
+                 dist = _distribute_proportional(m, val, P, peso_imp)
+                 dist = _fix_inconsistencies_and_types(m, dist, peso_imp)
+             dist_metric[m] = dist
+ 
+         for pl in P:
+diff --git a/treat/utils/common_pinterest.py b/treat/utils/common_pinterest.py
+index efe1d97f9055fe34c5d401e1fbc58510f63c3a33..2703abbb7b39962588cdbefe2b4aee6a39695bb7 100644
+--- a/treat/utils/common_pinterest.py
++++ b/treat/utils/common_pinterest.py
+@@ -1,24 +1,25 @@
+-import logging
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ 
+ def preencher_campos_com_campanha(df):
+     """
+     Para plataformas como Pinterest, Age, Gender e Region,
+     mantém os valores de 'Campanha' e 'ID_Campanha'
+     e aproveita a coluna 'Campaign_name' para preencher:
+       - Nome_do_Conjunto_de_Anuncio
+       - Nome_do_Anuncio
+     """
+-    logging.debug(">>> In preencher_campos_com_campanha (Pinterest)")
++    logger.debug(">>> In preencher_campos_com_campanha (Pinterest)")
+ 
+     if 'Campaign_name' not in df.columns:
+-        logging.warning("Coluna 'Campaign_name' não encontrada. Não será possível preencher campos de anúncio.")
++        logger.warning("Coluna 'Campaign_name' não encontrada. Não será possível preencher campos de anúncio.")
+         df['Nome_do_Conjunto_de_Anuncio'] = ""
+         df['Nome_do_Anuncio'] = ""
+         return df
+ 
+     # Mantém 'Campanha' e 'ID_Campanha' vindos do lookup.
+     # Usa 'Campaign_name' apenas para Nome_do_Conjunto_de_Anuncio/Anuncio.
+     df['Nome_do_Conjunto_de_Anuncio'] = df['Campaign_name']
+     df['Nome_do_Anuncio'] = df['Campaign_name']
+ 
+     return df
+diff --git a/treat/utils/consistency.py b/treat/utils/consistency.py
+index 05021b4ba1ecfdc62f129a26811b62b2b199a719..f5ce6e5c654a80484b2788ad244c60945cc1d065 100644
+--- a/treat/utils/consistency.py
++++ b/treat/utils/consistency.py
+@@ -1,14 +1,15 @@
+ # utils/consistency.py
+-import logging
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ 
+ def verify_impressions_match(df_ref, df_cmp, ref_name, cmp_name):
+     """
+     Compara a soma da coluna 'Impressoes' entre dois DataFrames e emite
+     um log com 🟢 se baterem ou 🔴 se divergirem.
+     """
+     tot_ref = df_ref['Impressoes'].sum()
+     tot_cmp = df_cmp['Impressoes'].sum()
+     if tot_ref == tot_cmp:
+-        logging.info(f"🟢 IMPRESSÕES IGUAIS: {ref_name} ({tot_ref}) == {cmp_name} ({tot_cmp})")
++        logger.info(f"🟢 IMPRESSÕES IGUAIS: {ref_name} ({tot_ref}) == {cmp_name} ({tot_cmp})")
+     else:
+-        logging.warning(f"🔴 IMPRESSÕES DIFERENTES: {ref_name} ({tot_ref}) != {cmp_name} ({tot_cmp})")
++        logger.warning(f"🔴 IMPRESSÕES DIFERENTES: {ref_name} ({tot_ref}) != {cmp_name} ({tot_cmp})")
+diff --git a/treat/utils/creative_mapping.py b/treat/utils/creative_mapping.py
+index 6c6aebce8e16ec2403aa325451c54884b1344ff5..3267ca60422af21bf248a6ef52ee913cc07fb89e 100644
+--- a/treat/utils/creative_mapping.py
++++ b/treat/utils/creative_mapping.py
+@@ -1,92 +1,92 @@
+ #creative_mappging.py
+ 
+-import logging
++from logs.logging_setup import get_logger
+ import pandas as pd
+ from gspread.utils import rowcol_to_a1
+ from utils.get_google_client import get_google_client
+ from utils.google_sheets import CREDS_PATH as creds_path, SPREADSHEET_ID
+ from utils.normalize import normalize_columns 
+ import unicodedata
+ 
+ def _normalize(s: str) -> str:
+     s = unicodedata.normalize("NFKD", s)
+     s = "".join(c for c in s if not unicodedata.combining(c))
+     return s.strip().lower().replace("\n", " ")
+ 
+ def load_ad_name_mapping(df_parametrizacao: pd.DataFrame) -> dict[str, str]:
+     """
+     Devolve {utm_content -> CRIATIVO} normalizando cabeçalhos
+     ('UTM_CONTENT', 'CRIATIVO', etc.) para lower-case.
+     """
+     if df_parametrizacao.empty:
+-        logging.warning("[load_ad_name_mapping] DataFrame vazio")
++        logger.warning("[load_ad_name_mapping] DataFrame vazio")
+         return {}
+ 
+     # ── normaliza cabeçalhos ──────────────────────────────────────────────────
+     df_norm = df_parametrizacao.copy()
+     df_norm.columns = [_normalize(c) for c in df_norm.columns]
+ 
+     missing = {"utm_content", "CRIATIVO"} - set(df_norm.columns)
+     if missing:
+-        logging.warning("[load_ad_name_mapping] faltam colunas: %s", ", ".join(sorted(missing)))
++        logger.warning("[load_ad_name_mapping] faltam colunas: %s", ", ".join(sorted(missing)))
+         return {}
+ 
+     mapping = (df_norm[["utm_content", "CRIATIVO"]]
+                .dropna()
+                .astype(str)
+                .applymap(str.strip))          # remove espaços
+     return dict(zip(mapping["utm_content"], mapping["CRIATIVO"]))
+ 
+ 
+ def get_ad_name_from_utm_content(utm_content: str, mapping_criativo: dict) -> str:
+     """
+     Dado um valor de utm_content (ex.: 'abc123') e um dicionário {utm_content -> CRIATIVO},
+     retorna o 'CRIATIVO' correspondente.
+ 
+     Se não encontrar, retorna string vazia.
+     """
+     if not isinstance(utm_content, str):
+         return ""
+     return mapping_criativo.get(utm_content.strip(), "")
+ 
+ 
+ def get_utm_content_from_ad_name(
+     df: pd.DataFrame,
+     mapping_criativo: dict[str, str],
+     coluna_ad_name: str = "Ad name",
+     coluna_destino: str = "Content (utm)",
+     *,
+     sheet_name: str | None = None,
+     worksheet=None,
+     write_back: bool = False
+ ) -> pd.DataFrame:
+     """
+     Mapeia 'Ad name' → 'Content (utm)' invertendo o mapping_criativo (utm_content -> CRIATIVO)
+     e, se write_back=True, grava somente as células vazias que receberam um novo utm.
+     """
+-    log = logging.getLogger(__name__)
++    log = get_logger(__name__)
+     df = df.copy()
+ 
+     # Inverte mapping criativo→utm_content para utm_content lookup
+     inv = {v: k for k, v in mapping_criativo.items()}
+ 
+     # Prepara worksheet para write-back
+     if write_back:
+         if worksheet is None:
+             if sheet_name is None:
+                 raise ValueError("sheet_name é obrigatório quando write_back=True")
+             client = get_google_client(creds_path)
+             worksheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+         header = worksheet.row_values(1)
+         header_lc = [h.strip().lower() for h in header]
+ 
+     updates: list[dict] = []
+     # Itera somente para preencher vazios
+     for idx, ad_name in df[coluna_ad_name].astype(str).str.strip().items():
+         original = str(df.at[idx, coluna_destino]).strip()
+         # só tenta mapear se estiver vazio
+         if not original:
+             utm = inv.get(ad_name, "")
+             if utm:
+                 df.at[idx, coluna_destino] = utm
+                 if write_back:
+diff --git a/treat/utils/filter_utils.py b/treat/utils/filter_utils.py
+index e01d1a55cfa709767387798ecce8fcb555b4be8a..8ab18c68ba6de653a631741fe8aa18621f58cd5a 100644
+--- a/treat/utils/filter_utils.py
++++ b/treat/utils/filter_utils.py
+@@ -1,54 +1,55 @@
+ import pandas as pd
+ from utils.filter_lists import CAMPAIGN_NAME_FILTER_LIST
+-import logging
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ from typing import List
+ 
+ def remove_zero_impressoes(df: pd.DataFrame) -> pd.DataFrame:
+     """
+     Remove todas as linhas cujo valor na coluna 'Impressoes' seja zero ou nulo.
+ 
+     Parâmetros:
+         df (pd.DataFrame): DataFrame de entrada com a coluna 'Impressoes'.
+ 
+     Retorna:
+         pd.DataFrame: DataFrame filtrado, sem linhas onde 'Impressoes' == 0.
+     """
+     if 'Impressoes' not in df.columns:
+         # Se não existir, nada a fazer
+         return df
+ 
+     # Garante que 'Impressoes' é numérico
+     df = df.copy()
+     df['Impressoes'] = pd.to_numeric(df['Impressoes'], errors='coerce').fillna(0)
+ 
+     # Filtra somente valores > 0
+     return df[df['Impressoes'] > 0]
+ 
+ 
+ def filter_campaign_names(df: pd.DataFrame) -> pd.DataFrame:
+     """
+     Remove rows where the 'Campanha' column matches any name in CAMPAIGN_NAME_FILTER_LIST.
+ 
+     Logs:
+       • INFO: total number of rows removed
+       • INFO: the unique list of campaign names filtered
+       • If no filtering occurred, logs that as well.
+     """
+-    logging.debug("Applying campaign name filter: %s", CAMPAIGN_NAME_FILTER_LIST)
++    logger.debug("Applying campaign name filter: %s", CAMPAIGN_NAME_FILTER_LIST)
+     if 'Campanha' not in df.columns:
+-        logging.warning("'Campanha' column not found; skipping campaign name filter.")
++        logger.warning("'Campanha' column not found; skipping campaign name filter.")
+         return df
+ 
+     mask = df['Campanha'].isin(CAMPAIGN_NAME_FILTER_LIST)
+     removed_count = int(mask.sum())
+     filtered_campaigns = df.loc[mask, 'Campanha'].drop_duplicates().tolist()
+ 
+     if removed_count > 0:
+-        logging.info("🚫 Filtered out %d row(s) matching blocked campaign names:", removed_count)
++        logger.info("🚫 Filtered out %d row(s) matching blocked campaign names:", removed_count)
+         for name in filtered_campaigns:
+-            logging.info("   • %s", name)
++            logger.info("   • %s", name)
+     else:
+-        logging.info("✅ No campaign names matched the filter list; nothing removed.")
++        logger.info("✅ No campaign names matched the filter list; nothing removed.")
+ 
+     # Return only the rows we keep
+     return df.loc[~mask].copy()
+\ No newline at end of file
+diff --git a/treat/utils/gender_placement_merge.py b/treat/utils/gender_placement_merge.py
+index e45f1d389f03b1b1c53461de3a3385526d8f052a..e9ccafb4724b8ba85b0b24ccfc7b5660a9f142ad 100644
+--- a/treat/utils/gender_placement_merge.py
++++ b/treat/utils/gender_placement_merge.py
+@@ -1,39 +1,38 @@
+ # utils/common/meta/gender_placements_merge.py
+ from __future__ import annotations
+-import logging
++from logs.logging_setup import get_logger
+ from collections import Counter
+ from math import floor
+ from typing import Dict, List, Tuple
+ 
+ import pandas as pd
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ from utils.get_google_client import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ 
+-log = logging.getLogger(__name__)
+-logging.basicConfig(level=logging.INFO)
++log = get_logger(__name__)
+ 
+ METRICAS: List[str] = ["Impressions", "Link clicks", "cost", "video_watched_100"]
+ 
+ # ------------------------------- CACHE -------------------------------- #
+ _client = get_google_client(CREDS_PATH)
+ _cache: dict[str, pd.DataFrame] = {}
+ 
+ 
+ def _read_sheet(sheet: str) -> pd.DataFrame:
+     if sheet not in _cache:
+         _cache[sheet] = read_sheet_as_dataframe_range(
+             _client,
+             SPREADSHEET_ID,
+             sheet_name=sheet,
+             range_str="A1:ZZ",
+             header_row_index=0,
+         )
+     return _cache[sheet].copy()
+ 
+ 
+ # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
+ def load_and_prepare_meta_gender_data() -> pd.DataFrame:
+     df = _read_sheet("meta")
+     # 0) Strip em todos os nomes de coluna
+     df.columns = df.columns.str.strip()
+diff --git a/treat/utils/generic_dimension_merge.py b/treat/utils/generic_dimension_merge.py
+index 791ec553f00c63d64baf547ecc6bdeb20289462b..c54892d55af8def72f2d0c1fb299585ae9d100eb 100644
+--- a/treat/utils/generic_dimension_merge.py
++++ b/treat/utils/generic_dimension_merge.py
+@@ -1,37 +1,36 @@
+ from collections import Counter
+-import logging
++from logs.logging_setup import get_logger
+ from typing import List, Dict, Tuple
+ import pandas as pd
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ from utils.get_google_client import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ from utils.normalize import parse_decimal_str_to_float, format_float_to_decimal_str
+ from math import floor
+ 
+-log = logging.getLogger(__name__)
+-logging.basicConfig(level=logging.INFO)
++log = get_logger(__name__)
+ 
+ METRICAS: List[str] = ["impressions", "cost", "Video watches at 100%", "Link clicks"]
+ 
+ # ------------------------------- CACHE -------------------------------- #
+ _client = get_google_client(CREDS_PATH)
+ _cache: dict[str, pd.DataFrame] = {}
+ 
+ def _read_sheet(sheet: str, dimension_col: str = None) -> pd.DataFrame:
+     """
+     Lê a aba da planilha Google e retorna os dados, adaptando as colunas para diferentes dimensões.
+     
+     :param sheet: Nome da aba a ser lida (como "metaIdade", "metaGenero", etc.)
+     :param dimension_col: (Opcional) Nome da coluna de dimensão (como 'age', 'gender', 'region') para ajustar o DataFrame
+     :return: DataFrame com os dados da aba
+     """
+     # Verifica se a aba já está em cache
+     if sheet not in _cache:
+         # Carrega os dados da planilha
+         _cache[sheet] = read_sheet_as_dataframe_range(
+             _client,
+             SPREADSHEET_ID,
+             sheet_name=sheet,
+             range_str="A1:ZZ",
+             header_row_index=0,
+         )
+diff --git a/treat/utils/lookups_bi_parametrizacao.py b/treat/utils/lookups_bi_parametrizacao.py
+index bee124a4fc2bb014033987078079145dc753a078..98c476c24936cf6129e94aa442d60b2468fc0a15 100644
+--- a/treat/utils/lookups_bi_parametrizacao.py
++++ b/treat/utils/lookups_bi_parametrizacao.py
+@@ -1,46 +1,46 @@
+ # utils/bi_param_utils.py
+ """
+ Módulo único para todas as funções que leem e manipulam
+ conteúdo da aba BI_PARAMETRIZAÇÃO (lookup, preenchimento, preview etc.),
+ antes de dividirmos em treat/common/.
+ """
+ 
+-import logging
++from logs.logging_setup import get_logger
+ import time
+ import pandas as pd
+ import unicodedata
+ from typing import Any, Dict, List, Optional, Tuple
+ from datetime import datetime, date
+ from gspread import Worksheet
+ from gspread.utils import rowcol_to_a1
+ from utils.get_google_client import get_google_client
+ from utils.normalize import normalize_columns, normalize_campaign_series
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ # ------------------------------------------------------------------------------
+ # 1) BIParamLookup: cache e geração de lookup dicts da planilha BI_PARAMETRIZAÇÃO
+ # ------------------------------------------------------------------------------
+ class BIParamLookup:
+     SHEET_NAME = "BI_PARAMETRIZAÇÃO"
+     HEADER_ROW = 1     # 0-indexed
+     _TTL = 60 * 10     # 10 minutos
+ 
+     def __init__(self, creds_path: str, spreadsheet_id: str):
+         self.creds_path = creds_path
+         self.spreadsheet_id = spreadsheet_id
+         self._df: Optional[pd.DataFrame] = None
+         self._last_load: float = 0.0
+         self._col_cache: Dict[str, Optional[str]] = {}
+         log.debug("Inicializado BIParamLookup for %s", spreadsheet_id)
+ 
+     def _load_df(self) -> pd.DataFrame:
+         client = get_google_client(self.creds_path)
+         sheet = client.open_by_key(self.spreadsheet_id)
+         rows = sheet.worksheet(self.SHEET_NAME).get_all_values()
+         if len(rows) <= self.HEADER_ROW:
+             raise ValueError("BI_PARAMETRIZAÇÃO sem dados suficientes.")
+         raw_hdr = rows[self.HEADER_ROW]
+         hdr = normalize_columns(pd.Index(raw_hdr))
+diff --git a/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py b/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py
+index 781958db49b422864b368d773b85a1fb099413a2..fc71828c2eeb14c06d79478436c8de3c9c64970e 100644
+--- a/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py
++++ b/treat/utils/merges/pinterest/pinterest_dimension_pin_id_merge.py
+@@ -1,42 +1,42 @@
+ from __future__ import annotations
+ 
+ """Pinterest demographic merge (Idade/Gênero/Região) — versão corrigida
+ ------------------------------------------------------------------------
+ Une pinterestGeral (métricas por pin) com pinterestIdade / pinterestGenero /
+ pinterestRegiao (métricas demográficas por campanha), redistribuindo
+ proporcionalmente as métricas aos pins e PRESERVANDO colunas de contexto.
+ """
+ 
+-import logging
++from logs.logging_setup import get_logger
+ from math import floor
+ from typing import Dict, List, Tuple
+ 
+ import pandas as pd
+ from treat.utils.normalize import convert_numeric_columns
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ # --------------------------------------------------------------------- #
+ #  Constantes                                                           #
+ # --------------------------------------------------------------------- #
+ _METRICS: Tuple[str, ...] = (
+     "impressions",
+     "link_clicks",
+     "cost",
+     "video_watched_100",
+ )
+ 
+ # Campos que queremos manter no resultado final
+ _DESIRED_BASE: Tuple[str, ...] = (
+     "pin_id",
+     "campaign_id",
+     "campaign_name",
+     "account_name",
+     "ID_Veiculo",
+     "Veiculo",
+     "ID_Campanha",
+     "Campanha",
+     "ad_group_name",
+     "ad_name",
+     "objective",
+     "utm_content",
+diff --git a/treat/utils/normalize.py b/treat/utils/normalize.py
+index e477b4e38aa52bd3cd3b4f2dc6710542de7e9f95..f36810d30e777a21c2b0414d3eecefdf01d70524 100644
+--- a/treat/utils/normalize.py
++++ b/treat/utils/normalize.py
+@@ -1,35 +1,36 @@
+ # treat/utils/normalize.py
+ """
+ Funções utilitárias de normalização que rodam 100 % em memória.
+ Nenhuma rotina deste módulo faz chamadas à API do Google Sheets.
+ """
+ 
+ from __future__ import annotations
+ 
+ import datetime as _dt
+-import logging
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ import re
+ import unicodedata
+ from typing import List, Optional
+ 
+ import pandas as pd
+ 
+ # ----------------------------------------------------------------------
+ # Datas helpers
+ # ----------------------------------------------------------------------
+ 
+ _TIME_STAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+ 
+ 
+ def _try_manual_parse(val: str) -> Optional[_dt.date]:
+     """Tenta converter 'YYYY-MM-DD HH:MM:SS' em date ou devolve None."""
+     if not isinstance(val, str):
+         return None
+     txt = val.strip()
+     if not _TIME_STAMP_RE.fullmatch(txt):
+         return None
+     try:
+         return _dt.datetime.strptime(txt, "%Y-%m-%d %H:%M:%S").date()
+     except ValueError:
+         return None
+ 
+diff --git a/treat/utils/organizar_dataframe.py b/treat/utils/organizar_dataframe.py
+index 50807a93a24aa275c1b9a66aee511bc138555c2c..122bb954567e0a0120a3ed980a375470fcb5b615 100644
+--- a/treat/utils/organizar_dataframe.py
++++ b/treat/utils/organizar_dataframe.py
+@@ -1,23 +1,24 @@
+-import logging
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ from treat.utils.fields_lists import GENERAL_MODEL_COLUMN_ORDER
+ 
+ def remover_colunas_indesejadas(df):
+     """
+     Remove colunas que não fazem parte do modelo final.
+     """
+     colunas_para_remover = ['Placement', 'Campaign_ID', 'Campaign_name', 'Content_utm']
+     for col in colunas_para_remover:
+         if col in df.columns:
+             df.drop(columns=col, inplace=True)
+-            logging.debug(f"Coluna removida: {col}")
++            logger.debug(f"Coluna removida: {col}")
+     return df
+ 
+ 
+ def reordenar_colunas_para_modelo(df, column_order_list):
+     for col in column_order_list:
+         if col not in df.columns:
+             df[col] = ""
+-            logging.debug(f"Coluna adicionada (vazia): {col}")
++            logger.debug(f"Coluna adicionada (vazia): {col}")
+     df = df[column_order_list]
+     return df
+ 
+diff --git a/treat/utils/preview_links.py b/treat/utils/preview_links.py
+index f3c211966bb4e17a74c70ee202330ca18aa99d5e..6893ee43b404e03081cb334004b5b8c1e6b4cf0e 100644
+--- a/treat/utils/preview_links.py
++++ b/treat/utils/preview_links.py
+@@ -1,50 +1,50 @@
+-import logging
++from logs.logging_setup import get_logger
+ import pandas as pd
+ import numpy as np
+-import logging
++from logs.logging_setup import get_logger
+ 
+ def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
+     """
+     Preenche/atualiza 'URL_do_Anuncio' para relatórios Meta:
+ 
+     Regras de prioridade por linha
+     ------------------------------
+     1) Se 'URL_do_Anuncio' já tem valor não-vazio → preserva.
+     2) Caso contrário:
+        • Se Veiculo == "Facebook"   → usa preview_link_fb; se vazio, usa preview_link_ig.
+        • Se Veiculo == "Instagram" → usa preview_link_ig; se vazio, usa preview_link_fb.
+        • Outro / sem Veiculo       → usa preview_link_ig; se vazio, usa preview_link_fb.
+ 
+     Observações
+     -----------
+     • Colunas de preview podem vir com espaços ou capitalização diferente:
+       'Preview Link IG', 'preview_link_ig ', etc.  São normalizadas via strip/lower.
+     • Se a coluna desejada não existir, pula para o fallback seguinte.
+     """
+ 
+-    log = logging.getLogger(__name__)
++    log = get_logger(__name__)
+ 
+     # ---------------- normalização de cabeçalhos ---------------- #
+     colmap = {c.lower().strip(): c for c in df.columns}
+     ig_col = colmap.get("preview_link_ig")
+     fb_col = colmap.get("preview_link_fb")
+     veic_col = colmap.get("veiculo")  # pode não existir
+ 
+     if ig_col is None and fb_col is None:
+         log.warning("[determine_meta_ad_preview_link] Nenhuma coluna preview_* encontrada.")
+         return df
+ 
+     # ---------------- garante coluna destino -------------------- #
+     if "URL_do_Anuncio" not in df.columns:
+         df["URL_do_Anuncio"] = ""
+     else:
+         # normaliza valores já existentes (NaN → "")
+         df["URL_do_Anuncio"] = (
+             df["URL_do_Anuncio"]
+             .astype(str)
+             .where(~df["URL_do_Anuncio"].isin([np.nan, "nan", "NaN"]), "")
+             .str.strip()
+         )
+ 
+ 
+ 
+@@ -56,60 +56,60 @@ def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
+ 
+         veic = str(row.get(veic_col, "")).strip().lower() if veic_col else ""
+         ig = str(row.get(ig_col, "")).strip() if ig_col else ""
+         fb = str(row.get(fb_col, "")).strip() if fb_col else ""
+ 
+         if veic == "facebook":
+             return fb or ig
+         elif veic == "instagram":
+             return ig or fb
+         else:  # genérico / sem veículo
+             return ig or fb
+ 
+     # aplica vetorizado com Series.map (mais rápido que apply linha-a-linha)
+     df["URL_do_Anuncio"] = df.apply(_choose, axis=1)
+ 
+     return df
+ 
+ def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao: pd.DataFrame) -> dict:
+     """
+     Gera um dicionário {utm_content: preview} para ser usado no preenchimento de preview do LinkedIn.
+     """
+     COL_UTM = "utm_content"
+     COL_PREVIEW = "ad_preview_link"
+ 
+     if COL_UTM not in df_parametrizacao.columns or COL_PREVIEW not in df_parametrizacao.columns:
+-        logging.warning("Colunas 'utm_content' ou 'preview' não encontradas em BI_PARAMETRIZAÇÃO.")
++        logger.warning("Colunas 'utm_content' ou 'preview' não encontradas em BI_PARAMETRIZAÇÃO.")
+         return {}
+ 
+     mapping = df_parametrizacao[[COL_UTM, COL_PREVIEW]].dropna()
+     mapping = mapping.astype(str).drop_duplicates(subset=[COL_UTM])
+     preview_dict = dict(zip(mapping[COL_UTM], mapping[COL_PREVIEW]))
+ 
+-    logging.debug("Exemplo de mapeamentos de preview gerados para LinkedIn:")
++    logger.debug("Exemplo de mapeamentos de preview gerados para LinkedIn:")
+     for k, v in list(preview_dict.items())[:5]:
+-        logging.debug(f"{k} -> {v}")
++        logger.debug(f"{k} -> {v}")
+ 
+     return preview_dict
+ 
+ def build_pinterest_preview_link(id_pin: str) -> str:
+     """
+     Constrói a URL de preview pública de um Pin do Pinterest a partir do seu ID.
+ 
+     Args:
+         id_pin (str or int): ID do Pin (ex: "1234567890")
+ 
+     Returns:
+         str: URL completa (ex: "https://www.pinterest.com/pin/1234567890")
+     """
+     if not id_pin or str(id_pin).strip() == "":
+         return ""
+     return f"https://www.pinterest.com/pin/{str(id_pin).strip()}"
+ 
+ 
+ 
+ def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
+     """
+     Preenche a coluna 'URL_do_Anuncio' com base na coluna 'Preview Link'
+     aplicando a função build_pinterest_preview_link().
+     """
+     match_col = [col for col in df.columns if col.strip().lower() == 'preview link']
+diff --git a/treat/utils/region_placements_merge.py b/treat/utils/region_placements_merge.py
+index e1b1780083922a6606863b4b3514ccc8b9fff84f..d1a7ccfa09ebd10114ca8f855aacbb21cb1d8588 100644
+--- a/treat/utils/region_placements_merge.py
++++ b/treat/utils/region_placements_merge.py
+@@ -1,41 +1,40 @@
+ # utils/common/meta/region_placements_merge.py
+ 
+ from __future__ import annotations
+-import logging
++from logs.logging_setup import get_logger
+ from collections import Counter
+ from math import floor
+ from typing import Dict, List, Tuple
+ 
+ import pandas as pd
+ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ from utils.get_google_client import get_google_client
+ from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+ from utils.geo_normalize import carregar_caches_padrao, limpeza_basica, obter_estado_de_regiao
+ 
+-log = logging.getLogger(__name__)
+-logging.basicConfig(level=logging.DEBUG)
++log = get_logger(__name__)
+ 
+ METRICAS: List[str] = ["Impressions", "Link clicks", "cost", "Video watches at 100%"]
+ 
+ # ------------------------------- CACHE -------------------------------- #
+ _client = get_google_client(CREDS_PATH)
+ _cache: dict[str, pd.DataFrame] = {}
+ 
+ def _read_sheet(sheet: str) -> pd.DataFrame:
+     if sheet not in _cache:
+         _cache[sheet] = read_sheet_as_dataframe_range(
+             _client,
+             SPREADSHEET_ID,
+             sheet_name=sheet,
+             range_str="A1:ZZ",
+             header_row_index=0,
+         )
+     return _cache[sheet].copy()
+ 
+ # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
+ def load_and_prepare_meta_region_data() -> pd.DataFrame:
+     """
+     Lê a aba 'metaRegiao', trata region → Estado com limpeza e mapeamento geográfico,
+     e garante colunas numéricas.
+     """
+     # 1) Leitura e strip de colunas
+diff --git a/treat/utils/renomeacoes.py b/treat/utils/renomeacoes.py
+index c8e896776efbcaf4baf85623924163f20f9a980e..03e0c4406a0f5d1263aaa8b8506617c6c199f2a4 100644
+--- a/treat/utils/renomeacoes.py
++++ b/treat/utils/renomeacoes.py
+@@ -1,63 +1,64 @@
+-import logging
++from logs.logging_setup import get_logger
++logger = get_logger(__name__)
+ from typing import Dict
+ import pandas as pd
+ 
+ # Mapeamento de objetivos de campanha para nomes padronizados
+ SUBSTITUICOES_OBJETIVO = {
+     'AWARENESS': 'Alcance',
+     'COMMUNITY_INTERACTION': 'Engajamento',
+     'APP_PROMOTION': 'Promoção do app',
+     'REACH': 'Alcance',
+     'VIDEO_VIEWS': 'Visualização',
+     'TRAFFIC': 'Tráfego',
+     'CONVERSIONS': 'Conversões',
+     'LEAD_GENERATION': 'Geração de Leads',
+     'OUTCOME_AWARENESS': 'Alcance',
+     'OUTCOME_TRAFFIC': 'Tráfego',
+     'OUTCOME_ENGAGEMENT': 'Engajamento',
+     'OUTCOME_SALES': 'Vendas',
+     'OUTCOME_APP+PROMOTION': 'Promoção do app',
+     'BRAND_AWARENESS': 'Alcance',
+     'WEBSITE_VISITS': 'Tráfego',
+     'ENGAGEMENT': 'Engajamento',
+     'WEBSITE_CONVERSIONS': 'Conversões',
+     'CONSIDERATION': 'Tráfego',
+     'CATALOG_SALES': 'Vendas',
+     'WEBSITE_VISIT': 'Tráfego'
+ }
+ 
+ def aplicar_substituicoes_objetivo(df):
+     """
+     Substitui valores da coluna 'Objetivo' com base no dicionário SUBSTITUICOES_OBJETIVO.
+     """
+     if 'objective' in df.columns:
+         for old, new in SUBSTITUICOES_OBJETIVO.items():
+             df.loc[df['objective'] == old, 'objective'] = new
+-        logging.debug("[aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'")
++        logger.debug("[aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'")
+     else:
+-        logging.warning("[aplicar_substituicoes_objetivo] Coluna 'Objetivo' não encontrada no DataFrame.")
++        logger.warning("[aplicar_substituicoes_objetivo] Coluna 'Objetivo' não encontrada no DataFrame.")
+     return df
+ 
+ 
+ def renomear_colunas_origem_para_modelo(
+     df: pd.DataFrame,
+     mapping: Dict[str, str]
+ ) -> pd.DataFrame:
+     """
+     Renomeia as colunas de 'df' conforme o dicionário 'mapping'
+     (chave = nome de coluna atual; valor = nome de coluna no modelo).
+     Retorna um novo DataFrame com as colunas renomeadas.
+     """
+     return df.rename(columns=mapping)
+ 
+ renomeacao_geral = {
+     "Date": "date",
+     "Account name": "account_name",
+     "Campaign name": "campaign_name",
+     "Ad group name": "ad_group_name",
+     "Ad name": "ad_name",
+     "Content (utm)": "utm_content",
+     "Ad ID": "ad_id",
+     "Campaign ID": "campaign_id",
+     "Start": "start",
+     "End": "end",
+diff --git a/treat/utils/setup_logging.py b/treat/utils/setup_logging.py
+deleted file mode 100644
+index 5e2712677c269cca1b05aa9ad26c27e67b55de6b..0000000000000000000000000000000000000000
+--- a/treat/utils/setup_logging.py
++++ /dev/null
+@@ -1,45 +0,0 @@
+-# utils/setup_logging.py
+-
+-import logging
+-from logging import StreamHandler, FileHandler, Formatter
+-from typing import Optional
+-
+-def setup_logging(
+-    level: int = logging.INFO,
+-    log_file: Optional[str] = "etl_geral.log",
+-    console: bool = True,
+-):
+-    """
+-    Configura logging padrão para console e (opcionalmente) para arquivo.
+-
+-    Parameters
+-    ----------
+-    level : int
+-        Nível de logging (e.g. logging.DEBUG, logging.INFO).
+-    log_file : str | None
+-        Caminho do arquivo de log. Se None, não grava em arquivo.
+-    console : bool
+-        Se True, adiciona handler para stdout.
+-    """
+-    # Remove handlers pré-existentes (evita duplicação)
+-    root = logging.getLogger()
+-    for h in list(root.handlers):
+-        root.removeHandler(h)
+-
+-    handlers = []
+-    fmt = Formatter("%(asctime)s | %(levelname)-5s | %(name)s:%(lineno)d | %(message)s",
+-                    datefmt="%Y-%m-%d %H:%M:%S")
+-
+-    if console:
+-        ch = StreamHandler()
+-        ch.setLevel(level)
+-        ch.setFormatter(fmt)
+-        handlers.append(ch)
+-
+-    if log_file:
+-        fh = FileHandler(log_file, encoding="utf-8")
+-        fh.setLevel(level)
+-        fh.setFormatter(fmt)
+-        handlers.append(fh)
+-
+-    logging.basicConfig(level=level, handlers=handlers)
+diff --git a/treat/utils/substitute_origin_values.py b/treat/utils/substitute_origin_values.py
+index d8aa806f23e7e0ab748b3542577b1224e5e6e286..db9a102731c5c95b2becdffdfce7d5d4e49be0cc 100644
+--- a/treat/utils/substitute_origin_values.py
++++ b/treat/utils/substitute_origin_values.py
+@@ -1,36 +1,36 @@
+ # treat/utils/substitute_origin_values.py
+ 
+ """
+ Aplica substituições (utm_content, campaign_name, …) em memória
+ e, opcionalmente, grava as diferenças usando a worksheet já aberta
+ pelo pipeline.  Nenhuma nova autenticação é feita aqui.
+ """
+ 
+ from __future__ import annotations
+ import itertools
+-import logging
++from logs.logging_setup import get_logger
+ from typing import Iterable, List, Dict, Mapping, Optional
+ 
+ import pandas as pd
+ from gspread.utils import rowcol_to_a1
+ from gspread import Worksheet
+ 
+ from treat.utils.substitutions_lists import (          # listas continuam no projeto
+     ID_CONTENT_REPLACEMENTS,
+     CAMPAIGN_NAME_REPLACEMENTS,
+     AD_GROUP_NAME_REPLACEMENTS,
+     AD_NAME_REPLACEMENTS,
+ )
+ 
+ __all__ = ["apply_all_origin_substitutions"]
+ 
+ # ---------------------------------------------------------------------------
+ _REPLACEMENT_SPECS: list[tuple[str, Mapping[str, str]]] = [
+     ("utm_content", ID_CONTENT_REPLACEMENTS),
+     ("campaign_name", CAMPAIGN_NAME_REPLACEMENTS),
+     ("ad_group_name", AD_GROUP_NAME_REPLACEMENTS),
+     ("ad_name", AD_NAME_REPLACEMENTS),
+ ]
+ 
+ _MAX_CELLS_PER_BATCH = 10_000           # segurança – 10 k células ≅ 5 MiB
+ # ---------------------------------------------------------------------------
+@@ -56,51 +56,51 @@ def _chunk(it: Iterable, n: int):
+ # ---------------------------------------------------------------------------
+ 
+ 
+ def apply_all_origin_substitutions(
+     df: pd.DataFrame,
+     *,
+     worksheet: Worksheet | None = None,
+     write_back: bool = True,
+     inplace: bool = True,
+     header: List[str] | None = None,
+ ) -> pd.DataFrame:
+     """
+     Aplica substituições nas colunas de origem.
+ 
+     Parâmetros
+     ----------
+     df         : DataFrame de origem.
+     worksheet  : Worksheet já aberta pelo pipeline (obrigatório se write_back=True).
+     write_back : Se True, atualiza apenas as células modificadas.
+     inplace    : Se False, opera sobre uma cópia de *df*.
+ 
+     Retorna
+     -------
+     DataFrame resultante (cópia ou referência, conforme *inplace*).
+     """
+-    log = logging.getLogger(__name__)
++    log = get_logger(__name__)
+ 
+     if write_back and worksheet is None:
+         raise ValueError("`worksheet` deve ser fornecido se write_back=True.")
+ 
+     if not inplace:
+         df = df.copy()
+ 
+     header_lc: List[str] = []
+     if write_back:
+         if header is not None:
+             header_lc = [h.strip().lower() for h in header]
+         else:
+             header_lc = [h.strip().lower() for h in worksheet.row_values(1)]
+ 
+     # Mantém index estável → mapeia linha → célula
+     df.reset_index(drop=True, inplace=True)
+ 
+     updates: List[Dict[str, object]] = []
+ 
+     for col_name, mapping in _REPLACEMENT_SPECS:
+         if col_name not in df.columns or not mapping:
+             continue
+ 
+         # normaliza dicionário
+         mapping_norm = {k.strip().lower(): v for k, v in mapping.items()}
+diff --git a/treat/utils/utm_lookup.py b/treat/utils/utm_lookup.py
+index 234b4f4ecb23e45f680d743c86567e4f0be73637..f1b1a0a01b31231455ea6f6069737627d8e095fc 100644
+--- a/treat/utils/utm_lookup.py
++++ b/treat/utils/utm_lookup.py
+@@ -1,78 +1,78 @@
+ import pandas as pd
+-import logging
++from logs.logging_setup import get_logger
+ 
+ def load_utm_mapping() -> dict[str, dict[str, str]]:
+     """
+     Loads the BI_PARAMETRIZAÇÃO sheet and returns a mapping:
+     { utm_content_lower -> {"START": start_date_str, "END": end_date_str} }.
+     """
+     from utils.get_google_client import get_google_client
+     from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+     from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+ 
+-    logger = logging.getLogger("load_utm_mapping")
++    logger = get_logger("load_utm_mapping")
+     logger.debug("Loading UTM mapping from BI_PARAMETRIZAÇÃO")
+ 
+     client = get_google_client(CREDS_PATH)
+     df = read_sheet_as_dataframe_range(
+         client,
+         SPREADSHEET_ID,
+         sheet_name="BI_PARAMETRIZAÇÃO",
+         range_str="A2:ZZ",
+         header_row_index=0
+     )
+ 
+     # Safely get the utm_content column or create an empty one
+     if "utm_content" in df.columns:
+         utm_series = (
+             df["utm_content"]
+             .astype(str)
+             .str.strip()
+             .str.lower()
+         )
+     else:
+         logger.warning("Column 'utm_content' not found in BI_PARAMETRIZAÇÃO; using empty keys")
+         utm_series = pd.Series([""] * len(df), index=df.index)
+ 
+     df = df.copy()
+     df["utm_content"] = utm_series
+ 
+     mapping: dict[str, dict[str, str]] = {}
+     for _, row in df.iterrows():
+         key = row["utm_content"]
+         if key:
+             mapping[key] = {
+                 "start": row.get("start", ""),
+                 "end":   row.get("end",   "")
+             }
+ 
+     logger.info(f"Loaded {len(mapping)} UTM entries for start/end lookup")
+     return mapping
+ 
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.DataFrame:
+     """
+     Fill missing 'start' / 'end' by looking-up the
+     utm_content in *utm_mapping* (dict: utm -> {"START":…, "END":…}).
+ 
+     • Ignora linhas cujo “Content (utm)” esteja vazio.  
+     • Mantém valores originais quando já preenchidos.  
+     • Faz log INFO com contagem de linhas realmente preenchidas.
+     """
+     if not utm_mapping:
+         log.info("[utm_lookup] Empty mapping – nothing to fill.")
+         return df
+ 
+     df = df.copy()
+ 
+     # 1) Normalised key
+     df["_utm_key"] = (
+         df.get("Content (utm)", "")
+           .astype(str)
+           .str.strip()
+           .str.lower()
+     )
+ 
+     # 2) Build lookup Series once
+diff --git a/treat/utils/validations.py b/treat/utils/validations.py
+index 4235c8c4ec2b25a196e831aa1f0ba546a3422b4f..531dae62d2f4dc19d8f0e80baf88314b728e4c23 100644
+--- a/treat/utils/validations.py
++++ b/treat/utils/validations.py
+@@ -1,34 +1,34 @@
+-import logging
++from logs.logging_setup import get_logger
+ import pandas as pd
+ from typing import List, Sequence, Any, Dict
+ from treat.bi_param_utils import BIParamLookup  # ajuste conforme seu projeto
+ import math
+ import numpy as np
+ from collections import defaultdict
+ 
+-log = logging.getLogger(__name__)
++log = get_logger(__name__)
+ 
+ 
+ 
+ def _json_ready(obj):
+     if obj is None:
+         return None
+     if isinstance(obj, bool):
+         return obj
+     if isinstance(obj, (int, str)):
+         return obj
+     if isinstance(obj, float):
+         return None if math.isnan(obj) or math.isinf(obj) else obj
+     if isinstance(obj, np.integer):
+         return int(obj)
+     if isinstance(obj, np.floating):
+         return None if math.isnan(obj) else float(obj)
+     if isinstance(obj, dict):
+         return {k: _json_ready(v) for k, v in obj.items()}
+     if isinstance(obj, (list, tuple, set)):
+         return type(obj)(_json_ready(v) for v in obj)
+     return str(obj)
+ 
+ 
+ def check_required_columns(
+     df: pd.DataFrame,
+@@ -58,53 +58,53 @@ def check_required_columns(
+         if col in optional_cols:
+             continue
+ 
+         serie = df[col]
+         if col in zero_valid_cols:
+             mask_empty = serie.isna() | (serie.astype(str).str.strip() == "")
+         else:
+             mask_empty = (
+                 serie.isna() |
+                 serie.astype(str).str.strip().isin(["", "nan"])
+             )
+ 
+         mask_empty &= ~fully_blank_rows
+ 
+         if mask_empty.any():
+             linhas = mask_empty[mask_empty].index.tolist()
+             preview = ", ".join(str(i) for i in linhas[:10])
+             if len(linhas) > 10:
+                 preview += ", …"
+             log.warning(
+                 "[Validação] Coluna '%s' vazia em %d linha(s): %s",
+                 col, len(linhas), preview
+             )
+ 
+ 
+-import logging
++from logs.logging_setup import get_logger
+ 
+-logger = logging.getLogger(__name__)
++logger = get_logger(__name__)
+ 
+ def validate_columns(df: pd.DataFrame, expected_cols: List[str], stage: str):
+     """
+     Verifica se as colunas de `df` correspondem exatamente a `expected_cols`.
+     Se houver discrepância, registra um WARNING com detalhes e levanta ValueError.
+ 
+     Parâmetros:
+     - df: pandas.DataFrame a ser verificado.
+     - expected_cols: lista de strings com as colunas esperadas.
+     - stage: string indicando a etapa ou contexto (ex.: "origem" ou "destino").
+     """
+     actual_cols = df.columns.tolist()
+     set_actual = set(actual_cols)
+     set_expected = set(expected_cols)
+ 
+     if set_actual != set_expected:
+         missing = set_expected - set_actual
+         extra = set_actual - set_expected
+         msg_parts = []
+         if missing:
+             msg_parts.append(f"Colunas faltando: {sorted(missing)}")
+         if extra:
+             msg_parts.append(f"Colunas inesperadas: {sorted(extra)}")
+         msg = "; ".join(msg_parts)
+ 
  
 EOF
 )
