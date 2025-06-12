@@ -1,51 +1,71 @@
 import logging
 import pathlib
 import sys
+import warnings
 
-# ── Configuração padrão de logging para todo o projeto ──────────────────────
+# ── Caminho para o diretório de logs ────────────────────────────────────────
+LOG_DIR = pathlib.Path("/home/debrito/Documentos/etl_debrito/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "pipeline_debug.log"
 
-# 1) Handler de console (STDOUT/STDERR)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(
-    logging.Formatter("%(asctime)s %(levelname)s %(name)s › %(message)s", datefmt="%H:%M:%S")
-)
 
-# 2) Handler de arquivo (pipeline_debug.log)
-file_log = pathlib.Path("/home/debrito/Documentos/etl_debrito/logs/pipeline_debug.log")
-file_handler = logging.FileHandler(file_log, encoding="utf-8")
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(
-    logging.Formatter("%(asctime)s %(levelname)s %(name)s › %(message)s", datefmt="%H:%M:%S")
-)
+def setup_logging() -> None:
+    """
+    Configura logging global:
+      - Console (INFO+)
+      - Arquivo pipeline_debug.log (DEBUG+)
+      - Captura warnings do módulo warnings
+      - Intercepta exceções não tratadas e grava o traceback completo
+    Deve ser chamada **antes** do seu código (no seu entrypoint).
+    """
+    # Formato de log
+    fmt    = "%(asctime)s %(levelname)s %(name)s › %(message)s"
+    datefmt = "%H:%M:%S"
 
-# 3) Configuração global
-logging.basicConfig(
-    level=logging.DEBUG,
-    handlers=[
-        console_handler,  # mostra INFO+ no console
-        file_handler      # grava DEBUG+ em pipeline_debug.log
-    ]
-)
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+
+    # Remove handlers pré-existentes (se houver)
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+
+    # 1) Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+    root.addHandler(console_handler)
+
+    # 2) File handler
+    file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8", mode="a")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+    root.addHandler(file_handler)
+
+    # 3) Captura warnings.do módulo warnings
+    logging.captureWarnings(True)
+
+    # 4) Captura exceções não tratadas
+    def _handle_exception(exc_type, exc_value, exc_tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            # Permite Ctrl+C interromper normalmente
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+            return
+        logger = logging.getLogger("unhandled")
+        logger.critical("Exceção não capturada", exc_info=(exc_type, exc_value, exc_tb))
+
+    sys.excepthook = _handle_exception
+
+
+# Invoca na importação do módulo para garantir que o setup seja aplicado
+setup_logging()
+
 
 def get_logger(name: str) -> logging.Logger:
     """
-    Retorna um logger configurado com o nível e formato definidos acima.
-    Logs serão exibidos no console e gravados em pipeline_debug.log.
+    Retorna um logger já configurado.
+    Em cada módulo do seu pipeline, faça:
+    
+        from logging_setup import get_logger
+        logger = get_logger(__name__)
     """
     return logging.getLogger(name)
-
-def _handle_unhandled_exception(exc_type, exc_value, exc_traceback):
-    """
-    Captura exceções não tratadas e registra o traceback completo nos handlers.
-    KeyboardInterrupt é repassado ao excepthook padrão para permitir interrupção por Ctrl+C.
-    """
-    if issubclass(exc_type, KeyboardInterrupt):
-        # Permite que o Ctrl+C encerre o processo normalmente
-        sys.__excepthook__(exc_type, exc_value, exc_traceback)
-        return
-    logger = get_logger("unhandled")
-    logger.critical("Exceção não capturada", exc_info=(exc_type, exc_value, exc_traceback))
-
-# Substitui o excepthook padrão para capturar todos os erros não tratados
-sys.excepthook = _handle_unhandled_exception
