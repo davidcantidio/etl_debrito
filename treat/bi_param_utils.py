@@ -356,6 +356,8 @@ def fill_objective_from_bi(
         """
         Preenche objective vazio via mapping utm_content → objective usando BIParamLookup.
         """
+        if objective_col not in df.columns:
+            return df  # GA não possui coluna de objetivo
         if key_col not in df.columns:
             return df
         obj_map = lookup.get_objective_map()

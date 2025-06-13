@@ -1,8 +1,11 @@
 import pandas as pd
 from typing import Optional
+import logging
 
 from treat.utils.geo_normalize import normalize_region
 from treat.utils.substitute_origin_values import apply_all_origin_substitutions
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "normalize_region_column",
@@ -31,6 +34,11 @@ def normalize_region_column(
         .astype(str)
         .str.strip()
         .apply(normalize_region)
+    )
+    logger.debug(
+        "[geo] region normalizada em %s (n=%d linhas)",
+        df.attrs.get("sheet_name", "UNKNOWN"),
+        len(df),
     )
     return out
 
