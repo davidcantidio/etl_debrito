@@ -16,6 +16,8 @@ from typing import Dict
 import pandas as pd
 import logging
 
+from treat.preprocess_utils import preprocess_origin
+
 from treat.treat_pipeline import TreatPipeline
 from treat.utils.renomeacoes import (
     renomeacao_geral,
@@ -105,6 +107,28 @@ def treat_age_data(
         write_back=write_back,
     )
 
+
+def treat_ga_geral(
+    df_raw: pd.DataFrame,
+    creds_path: str,
+    spreadsheet_id: str,
+    *,
+    write_back: bool = True,
+) -> pd.DataFrame:
+    """Processa aba 'GAGeral' (Google Analytics)"""
+    if "Province name" in df_raw.columns and "region" not in df_raw.columns:
+        df_raw = df_raw.rename(columns={"Province name": "region"})
+    # Pré-processa para normalizar região e aplicar substituições
+    df_raw = preprocess_origin(df_raw)
+    return _run_pipeline(
+        df_raw,
+        creds_path,
+        spreadsheet_id,
+        sheet_name="GAGeral",
+        mapping=renomeacao_geral,
+        write_back=write_back,
+    )
+
 # Exemplo de wrappers adicionais para outras plataformas:
 # def treat_tiktok_gender(...):
 #     return _run_pipeline(..., sheet_name="tiktokGenero", mapping=renomeacao_tiktok_genero)
@@ -118,3 +142,4 @@ def treat_age_data(
 treat_meta_geral  = treat_general_data
 treat_meta_genero = treat_gender_data
 treat_meta_idade  = treat_age_data
+treat_ga = treat_ga_geral
