@@ -297,7 +297,7 @@ class TreatPipeline:
             log.warning("[%s] linhas sem Veiculo: %s",
                         self.sheet_name,
                         df.index[df["Veiculo"].fillna('') == ""].tolist())
-        if not df[df["objective"].fillna("") == ""].empty:
+        if "objective" in df.columns and not df[df["objective"].fillna("") == ""].empty:
             log.warning("[%s] linhas sem objective: %s",
                         self.sheet_name,
                         df.index[df["objective"].fillna('') == ""].tolist())
