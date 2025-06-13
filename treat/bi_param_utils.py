@@ -361,9 +361,11 @@ def fill_objective_from_bi(
         obj_map = lookup.get_objective_map()
         # só preenche onde objective está vazio e utm_content não vazio
         mask = (
-            df.get(objective_col, "").astype(str).str.strip().eq("") &
-            df[key_col].astype(str).str.strip().ne("")
+            df.get(objective_col, pd.Series("", index=df.index))
+            .astype(str).str.strip().eq("")
+            & df[key_col].astype(str).str.strip().ne("")
         )
+
         df.loc[mask, objective_col] = (
             df.loc[mask, key_col]
             .astype(str).str.strip()

@@ -1669,3 +1669,934 @@ AttributeError: 'str' object has no attribute 'astype'
  (13029, 'BI_PARAMETRIZAÇÃO', 303, 43),
  (12000, 'Cópia de tiktokRegiao', 480, 25),
  (11580, 'tiktokIdade', 772, 15)]
+10:02:31 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:02:31 INFO __main__ › 🔄 Iniciando processamento de abas
+10:02:31 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['metaGeral!A:ZZ', 'metaIdade!A:ZZ', 'metaGenero!A:ZZ', 'metaRegiao!A:ZZ', 'metaAlcance!A:ZZ', 'tiktokGeral!A:ZZ', 'tiktokIdade!A:ZZ', 'tiktokGenero!A:ZZ', 'tiktokRegiao!A:ZZ', 'tiktokAlcance!A:ZZ', 'pinterestGeral!A:ZZ', 'pinterestGenero!A:ZZ', 'pinterestIdade!A:ZZ', 'pinterestRegiao!A:ZZ', 'pinterestAlcance!A:ZZ', 'linkedinGeral!A:ZZ', 'linkedinRegiao!A:ZZ', 'linkedinAlcance!A:ZZ', 'GAGeral!A:ZZ']
+10:02:31 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=metaGeral%21A%3AZZ&ranges=metaIdade%21A%3AZZ&ranges=metaGenero%21A%3AZZ&ranges=metaRegiao%21A%3AZZ&ranges=metaAlcance%21A%3AZZ&ranges=tiktokGeral%21A%3AZZ&ranges=tiktokIdade%21A%3AZZ&ranges=tiktokGenero%21A%3AZZ&ranges=tiktokRegiao%21A%3AZZ&ranges=tiktokAlcance%21A%3AZZ&ranges=pinterestGeral%21A%3AZZ&ranges=pinterestGenero%21A%3AZZ&ranges=pinterestIdade%21A%3AZZ&ranges=pinterestRegiao%21A%3AZZ&ranges=pinterestAlcance%21A%3AZZ&ranges=linkedinGeral%21A%3AZZ&ranges=linkedinRegiao%21A%3AZZ&ranges=linkedinAlcance%21A%3AZZ&ranges=GAGeral%21A%3AZZ&alt=json
+10:02:31 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGeral!A1:AB620
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaIdade!A1:Q2068
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGenero!A1:T943
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaRegiao!A1:Q10529
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaAlcance!A1:N620
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGeral!A1:W176
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokIdade!A1:O776
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGenero!A1:O273
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokRegiao!A1:O3221
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokAlcance!A1:L136
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGeral!A1:U1009
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGenero!A1:M274
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestIdade!A1:M1117
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestRegiao!A1:M2551
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestAlcance!A1:K992
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinGeral!A1:U557
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinRegiao!A1:M14707
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinAlcance!A1:J279
+10:02:35 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: GAGeral!A1:J6223
+10:02:35 INFO extract.sheets_fetcher › 📡 batchGet 19 ranges
+10:02:36 DEBUG __main__ › Aba 'metaGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'utm_content', 'ad_id', 'campaign_id', 'start', 'end', 'objective', 'preview_link_ig', 'preview_link_fb', 'placement', 'campaign_daily_budget', 'campaign_lifetime_budget', 'campaign_remaining_budget', 'impressions', 'cost', 'link_clicks', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments', 'video_play']
+10:02:36 DEBUG __main__ › Aba 'metaIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'utm_content', 'ad_id', 'start', 'end', 'placement', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+10:02:36 DEBUG __main__ › Aba 'metaGenero' colunas originais: ['date', 'gender', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'placement', 'ad_id', 'utm_content', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'post_shares', 'post_comments', 'post_reactions']
+10:02:36 DEBUG __main__ › Aba 'metaRegiao' colunas originais: ['date', 'region', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'placement', 'ad_id', 'utm_content', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+10:02:36 DEBUG __main__ › Aba 'metaAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'utm_content', 'ad_id', 'start', 'end', 'placement', 'reach', 'impressions']
+10:02:36 DEBUG __main__ › Aba 'tiktokGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'ad_preview_link', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments']
+10:02:36 DEBUG __main__ › Aba 'tiktokIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'ad_group_name', 'ad_name', 'objective', 'start', 'end', 'utm_content', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+10:02:36 DEBUG __main__ › Aba 'tiktokGenero' colunas originais: ['date', 'account_name', 'campaign_id', 'campaign_name', 'ad_group_name', 'ad_name', 'objective', 'gender', 'utm_content', 'start', 'end', 'impressions', 'cost', 'link_clicks', 'video_watched_100']
+10:02:36 DEBUG __main__ › Aba 'tiktokRegiao' colunas originais: ['date', 'region', 'campaign_name', 'account_name', 'ad_name', 'campaign_id', 'ad_group_name', 'objective', 'utm_content', 'start', 'end', 'impressions', 'link_clicks', 'cost', 'video_watched_100']
+10:02:36 DEBUG __main__ › Aba 'tiktokAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'placement', 'ad_group_name', 'ad_name', 'objective', 'start', 'end', 'utm_content', 'reach', 'impressions']
+10:02:36 DEBUG __main__ › Aba 'pinterestGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'pin_id', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions']
+10:02:36 DEBUG __main__ › Aba 'pinterestGenero' colunas originais: ['date', 'gender', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'utm_content']
+10:02:36 DEBUG __main__ › Aba 'pinterestIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'utm_content']
+10:02:36 DEBUG __main__ › Aba 'pinterestRegiao' colunas originais: ['date', 'region', 'campaign_name', 'account_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'link_clicks', 'cost', 'video_watched_100', 'utm_content']
+10:02:36 DEBUG __main__ › Aba 'pinterestAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'objective', 'utm_content', 'start', 'end', 'reach', 'imrpessions']
+10:02:36 DEBUG __main__ › Aba 'linkedinGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments']
+10:02:36 DEBUG __main__ › Aba 'linkedinRegiao' colunas originais: ['date', 'account_name', 'campaign_id', 'campaign_name', 'objective', 'region', 'start', 'end', 'impressions', 'cost', 'link_clicks', 'video_watched_100', 'utm_content']
+10:02:36 DEBUG __main__ › Aba 'linkedinAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'utm_content', 'start', 'end', 'reach', 'impressions']
+10:02:36 DEBUG __main__ › Aba 'GAGeral' colunas originais: ['date', 'campaign_name', 'sessionSourceMedium', 'utm_content', 'region', 'totalUsers', 'sessions', 'averageSessionDuration', 'screenPageViews', 'engagedSessions']
+10:02:36 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['modeloGeral!A:ZZ', 'modeloGenero!A:ZZ', 'modeloIdade!A:ZZ', 'modeloAlcance!A:ZZ', 'modeloRegiao!A:ZZ']
+10:02:36 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=modeloGeral%21A%3AZZ&ranges=modeloGenero%21A%3AZZ&ranges=modeloIdade%21A%3AZZ&ranges=modeloAlcance%21A%3AZZ&ranges=modeloRegiao%21A%3AZZ&alt=json
+10:02:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloGeral!A1:Z2321
+10:02:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloGenero!A1:O12919
+10:02:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloIdade!A1:O71495
+10:02:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloAlcance!A1:L17287
+10:02:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloRegiao!A1:O207213
+10:02:39 INFO extract.sheets_fetcher › 📡 batchGet 5 ranges
+10:02:39 INFO load.dest_writer › 📥 Prefetch destino concluído: 5 abas com cabeçalho, total de IDs carregados=35545
+10:02:39 INFO __main__ › 📥 Prefetch meta concluído – iniciando ETL por aba
+10:02:39 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:02:39 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:02:39 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:02:39 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:02:39 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:02:50 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:02:50 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:02:50 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:02:50 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:02:51 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:02:51 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:02:51 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:02:52 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:02:52 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values/%27BI_PARAMETRIZA%C3%87%C3%83O%27 HTTP/1.1" 200 None
+10:02:52 WARNING treat.utils.validations › [Validação] 34 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0028', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0044', '2025_3_BR_STORIES_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0021', '2025_3_BR_STORIES_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0061', '2025_3_BR_STORIES_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0041', '2025_3_BR_STORIES_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0057', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0056', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0064', '2025_3_BR_CARD_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0150', '2025_3_BR_CARD_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_CER_PAN0146', '2025_3_BR_CARD_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0152', '2025_3_BR_CARD_CERRADO_PANTANAL_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0153', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0142', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0149', '2025_3_BR_CARD_PANTANAL_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0144', '2025_3_BR_CARD_PANTANAL_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_PAN0140', '2025_3_BR_CARD_PANTANAL_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0145', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0155', '2025_3_BR_VÍDEO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0177', '2025_3_BR_VÍDEO_CARTAS_DANIELLE_ACAO_DBT_SBRAE_2025_EMP_FEM0161'] …
+10:02:52 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['SOURCE!A:ZZ']
+10:02:52 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=SOURCE%21A%3AZZ&alt=json
+10:02:52 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:02:53 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: SOURCE!A1:Z999
+10:02:53 INFO extract.sheets_fetcher › 📡 batchGet 1 ranges
+10:02:53 DEBUG treat.utils.atribuicoes_via_lookup › >>> atribuir_veiculo_e_id_meta
+10:02:53 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:02:53 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 196437642 imp, 419232.58 cost
+10:02:53 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:02:53 WARNING treat.utils.validations › [Validação] Coluna 'preview_link_ig' vazia em 43 linha(s): 72, 73, 75, 78, 94, 96, 99, 106, 114, 128, …
+10:02:53 WARNING treat.utils.validations › [Validação] Coluna 'campaign_daily_budget' vazia em 619 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:02:53 WARNING treat.utils.validations › [Validação] Coluna 'campaign_lifetime_budget' vazia em 305 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:02:53 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaGeral': 619 linhas × 28 colunas (com cabeçalho) = 17,360 células
+10:02:55 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:02:55 INFO load.origin_writer › ✅ Write-back concluído para 'metaGeral' (619 linhas × 28 colunas)
+10:02:55 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo']
+10:02:55 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaGeral': 619 linhas × 28 colunas (com cabeçalho) = 17,360 células
+10:02:56 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:02:56 INFO load.origin_writer › ✅ Write-back concluído para 'metaGeral' (619 linhas × 28 colunas)
+10:02:56 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:03:10 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:03:11 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:03:11 INFO __main__ › 🔄 Iniciando processamento de abas
+10:03:11 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['metaGeral!A:ZZ', 'metaIdade!A:ZZ', 'metaGenero!A:ZZ', 'metaRegiao!A:ZZ', 'metaAlcance!A:ZZ', 'tiktokGeral!A:ZZ', 'tiktokIdade!A:ZZ', 'tiktokGenero!A:ZZ', 'tiktokRegiao!A:ZZ', 'tiktokAlcance!A:ZZ', 'pinterestGeral!A:ZZ', 'pinterestGenero!A:ZZ', 'pinterestIdade!A:ZZ', 'pinterestRegiao!A:ZZ', 'pinterestAlcance!A:ZZ', 'linkedinGeral!A:ZZ', 'linkedinRegiao!A:ZZ', 'linkedinAlcance!A:ZZ', 'GAGeral!A:ZZ']
+10:03:11 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=metaGeral%21A%3AZZ&ranges=metaIdade%21A%3AZZ&ranges=metaGenero%21A%3AZZ&ranges=metaRegiao%21A%3AZZ&ranges=metaAlcance%21A%3AZZ&ranges=tiktokGeral%21A%3AZZ&ranges=tiktokIdade%21A%3AZZ&ranges=tiktokGenero%21A%3AZZ&ranges=tiktokRegiao%21A%3AZZ&ranges=tiktokAlcance%21A%3AZZ&ranges=pinterestGeral%21A%3AZZ&ranges=pinterestGenero%21A%3AZZ&ranges=pinterestIdade%21A%3AZZ&ranges=pinterestRegiao%21A%3AZZ&ranges=pinterestAlcance%21A%3AZZ&ranges=linkedinGeral%21A%3AZZ&ranges=linkedinRegiao%21A%3AZZ&ranges=linkedinAlcance%21A%3AZZ&ranges=GAGeral%21A%3AZZ&alt=json
+10:03:11 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGeral!A1:AB620
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaIdade!A1:Q2068
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGenero!A1:T943
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaRegiao!A1:Q10529
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaAlcance!A1:N620
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGeral!A1:W176
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokIdade!A1:O776
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGenero!A1:O273
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokRegiao!A1:O3221
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokAlcance!A1:L136
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGeral!A1:U1009
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGenero!A1:M274
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestIdade!A1:M1117
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestRegiao!A1:M2551
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestAlcance!A1:K992
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinGeral!A1:U557
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinRegiao!A1:M14707
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinAlcance!A1:J279
+10:03:14 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: GAGeral!A1:J6223
+10:03:14 INFO extract.sheets_fetcher › 📡 batchGet 19 ranges
+10:03:14 DEBUG __main__ › Aba 'metaGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'utm_content', 'ad_id', 'campaign_id', 'start', 'end', 'objective', 'preview_link_ig', 'preview_link_fb', 'placement', 'campaign_daily_budget', 'campaign_lifetime_budget', 'campaign_remaining_budget', 'impressions', 'cost', 'link_clicks', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments', 'video_play']
+10:03:14 DEBUG __main__ › Aba 'metaIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'utm_content', 'ad_id', 'start', 'end', 'placement', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+10:03:14 DEBUG __main__ › Aba 'metaGenero' colunas originais: ['date', 'gender', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'placement', 'ad_id', 'utm_content', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'post_shares', 'post_comments', 'post_reactions']
+10:03:14 DEBUG __main__ › Aba 'metaRegiao' colunas originais: ['date', 'region', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'placement', 'ad_id', 'utm_content', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+10:03:14 DEBUG __main__ › Aba 'metaAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'utm_content', 'ad_id', 'start', 'end', 'placement', 'reach', 'impressions']
+10:03:14 DEBUG __main__ › Aba 'tiktokGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'ad_preview_link', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments']
+10:03:14 DEBUG __main__ › Aba 'tiktokIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'ad_group_name', 'ad_name', 'objective', 'start', 'end', 'utm_content', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+10:03:14 DEBUG __main__ › Aba 'tiktokGenero' colunas originais: ['date', 'account_name', 'campaign_id', 'campaign_name', 'ad_group_name', 'ad_name', 'objective', 'gender', 'utm_content', 'start', 'end', 'impressions', 'cost', 'link_clicks', 'video_watched_100']
+10:03:14 DEBUG __main__ › Aba 'tiktokRegiao' colunas originais: ['date', 'region', 'campaign_name', 'account_name', 'ad_name', 'campaign_id', 'ad_group_name', 'objective', 'utm_content', 'start', 'end', 'impressions', 'link_clicks', 'cost', 'video_watched_100']
+10:03:14 DEBUG __main__ › Aba 'tiktokAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'placement', 'ad_group_name', 'ad_name', 'objective', 'start', 'end', 'utm_content', 'reach', 'impressions']
+10:03:14 DEBUG __main__ › Aba 'pinterestGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'pin_id', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions']
+10:03:14 DEBUG __main__ › Aba 'pinterestGenero' colunas originais: ['date', 'gender', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'utm_content']
+10:03:14 DEBUG __main__ › Aba 'pinterestIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'utm_content']
+10:03:14 DEBUG __main__ › Aba 'pinterestRegiao' colunas originais: ['date', 'region', 'campaign_name', 'account_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'link_clicks', 'cost', 'video_watched_100', 'utm_content']
+10:03:14 DEBUG __main__ › Aba 'pinterestAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'objective', 'utm_content', 'start', 'end', 'reach', 'imrpessions']
+10:03:14 DEBUG __main__ › Aba 'linkedinGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments']
+10:03:14 DEBUG __main__ › Aba 'linkedinRegiao' colunas originais: ['date', 'account_name', 'campaign_id', 'campaign_name', 'objective', 'region', 'start', 'end', 'impressions', 'cost', 'link_clicks', 'video_watched_100', 'utm_content']
+10:03:14 DEBUG __main__ › Aba 'linkedinAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'utm_content', 'start', 'end', 'reach', 'impressions']
+10:03:14 DEBUG __main__ › Aba 'GAGeral' colunas originais: ['date', 'campaign_name', 'sessionSourceMedium', 'utm_content', 'region', 'totalUsers', 'sessions', 'averageSessionDuration', 'screenPageViews', 'engagedSessions']
+10:03:14 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['modeloGeral!A:ZZ', 'modeloGenero!A:ZZ', 'modeloIdade!A:ZZ', 'modeloAlcance!A:ZZ', 'modeloRegiao!A:ZZ']
+10:03:14 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=modeloGeral%21A%3AZZ&ranges=modeloGenero%21A%3AZZ&ranges=modeloIdade%21A%3AZZ&ranges=modeloAlcance%21A%3AZZ&ranges=modeloRegiao%21A%3AZZ&alt=json
+10:03:16 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:03:16 INFO __main__ › 🔄 Iniciando processamento de abas
+10:03:16 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['metaGeral!A:ZZ', 'metaIdade!A:ZZ', 'metaGenero!A:ZZ', 'metaRegiao!A:ZZ', 'metaAlcance!A:ZZ', 'tiktokGeral!A:ZZ', 'tiktokIdade!A:ZZ', 'tiktokGenero!A:ZZ', 'tiktokRegiao!A:ZZ', 'tiktokAlcance!A:ZZ', 'pinterestGeral!A:ZZ', 'pinterestGenero!A:ZZ', 'pinterestIdade!A:ZZ', 'pinterestRegiao!A:ZZ', 'pinterestAlcance!A:ZZ', 'linkedinGeral!A:ZZ', 'linkedinRegiao!A:ZZ', 'linkedinAlcance!A:ZZ', 'GAGeral!A:ZZ']
+10:03:16 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=metaGeral%21A%3AZZ&ranges=metaIdade%21A%3AZZ&ranges=metaGenero%21A%3AZZ&ranges=metaRegiao%21A%3AZZ&ranges=metaAlcance%21A%3AZZ&ranges=tiktokGeral%21A%3AZZ&ranges=tiktokIdade%21A%3AZZ&ranges=tiktokGenero%21A%3AZZ&ranges=tiktokRegiao%21A%3AZZ&ranges=tiktokAlcance%21A%3AZZ&ranges=pinterestGeral%21A%3AZZ&ranges=pinterestGenero%21A%3AZZ&ranges=pinterestIdade%21A%3AZZ&ranges=pinterestRegiao%21A%3AZZ&ranges=pinterestAlcance%21A%3AZZ&ranges=linkedinGeral%21A%3AZZ&ranges=linkedinRegiao%21A%3AZZ&ranges=linkedinAlcance%21A%3AZZ&ranges=GAGeral%21A%3AZZ&alt=json
+10:03:16 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGeral!A1:AB620
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaIdade!A1:Q2068
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGenero!A1:T943
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaRegiao!A1:Q10529
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaAlcance!A1:N620
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGeral!A1:W176
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokIdade!A1:O776
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGenero!A1:O273
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokRegiao!A1:O3221
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokAlcance!A1:L136
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGeral!A1:U1009
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGenero!A1:M274
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestIdade!A1:M1117
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestRegiao!A1:M2551
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestAlcance!A1:K992
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinGeral!A1:U557
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinRegiao!A1:M14707
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinAlcance!A1:J279
+10:03:33 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: GAGeral!A1:J6223
+10:03:33 INFO extract.sheets_fetcher › 📡 batchGet 19 ranges
+10:03:33 DEBUG __main__ › Aba 'metaGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'utm_content', 'ad_id', 'campaign_id', 'start', 'end', 'objective', 'preview_link_ig', 'preview_link_fb', 'placement', 'campaign_daily_budget', 'campaign_lifetime_budget', 'campaign_remaining_budget', 'impressions', 'cost', 'link_clicks', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments', 'video_play']
+10:03:33 DEBUG __main__ › Aba 'metaIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'utm_content', 'ad_id', 'start', 'end', 'placement', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+10:03:33 DEBUG __main__ › Aba 'metaGenero' colunas originais: ['date', 'gender', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'placement', 'ad_id', 'utm_content', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'post_shares', 'post_comments', 'post_reactions']
+10:03:33 DEBUG __main__ › Aba 'metaRegiao' colunas originais: ['date', 'region', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'placement', 'ad_id', 'utm_content', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+10:03:33 DEBUG __main__ › Aba 'metaAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'campaign_id', 'ad_name', 'ad_group_name', 'objective', 'utm_content', 'ad_id', 'start', 'end', 'placement', 'reach', 'impressions']
+10:03:33 DEBUG __main__ › Aba 'tiktokGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'ad_preview_link', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments']
+10:03:33 DEBUG __main__ › Aba 'tiktokIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'ad_group_name', 'ad_name', 'objective', 'start', 'end', 'utm_content', 'impressions', 'cost', 'video_watched_100', 'link_clicks']
+10:03:33 DEBUG __main__ › Aba 'tiktokGenero' colunas originais: ['date', 'account_name', 'campaign_id', 'campaign_name', 'ad_group_name', 'ad_name', 'objective', 'gender', 'utm_content', 'start', 'end', 'impressions', 'cost', 'link_clicks', 'video_watched_100']
+10:03:33 DEBUG __main__ › Aba 'tiktokRegiao' colunas originais: ['date', 'region', 'campaign_name', 'account_name', 'ad_name', 'campaign_id', 'ad_group_name', 'objective', 'utm_content', 'start', 'end', 'impressions', 'link_clicks', 'cost', 'video_watched_100']
+10:03:33 DEBUG __main__ › Aba 'tiktokAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'placement', 'ad_group_name', 'ad_name', 'objective', 'start', 'end', 'utm_content', 'reach', 'impressions']
+10:03:33 DEBUG __main__ › Aba 'pinterestGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'pin_id', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions']
+10:03:33 DEBUG __main__ › Aba 'pinterestGenero' colunas originais: ['date', 'gender', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'utm_content']
+10:03:33 DEBUG __main__ › Aba 'pinterestIdade' colunas originais: ['date', 'age', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'cost', 'video_watched_100', 'link_clicks', 'utm_content']
+10:03:33 DEBUG __main__ › Aba 'pinterestRegiao' colunas originais: ['date', 'region', 'campaign_name', 'account_name', 'campaign_id', 'objective', 'start', 'end', 'impressions', 'link_clicks', 'cost', 'video_watched_100', 'utm_content']
+10:03:33 DEBUG __main__ › Aba 'pinterestAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_group_name', 'ad_name', 'objective', 'utm_content', 'start', 'end', 'reach', 'imrpessions']
+10:03:33 DEBUG __main__ › Aba 'linkedinGeral' colunas originais: ['date', 'account_name', 'campaign_name', 'ad_name', 'campaign_id', 'start', 'end', 'objective', 'placement', 'utm_content', 'impressions', 'cost', 'link_clicks', 'video_play', 'video_watched_25', 'video_watched_50', 'video_watched_75', 'video_watched_100', 'post_reactions', 'post_shares', 'post_comments']
+10:03:33 DEBUG __main__ › Aba 'linkedinRegiao' colunas originais: ['date', 'account_name', 'campaign_id', 'campaign_name', 'objective', 'region', 'start', 'end', 'impressions', 'cost', 'link_clicks', 'video_watched_100', 'utm_content']
+10:03:33 DEBUG __main__ › Aba 'linkedinAlcance' colunas originais: ['date', 'account_name', 'campaign_name', 'campaign_id', 'objective', 'utm_content', 'start', 'end', 'reach', 'impressions']
+10:03:33 DEBUG __main__ › Aba 'GAGeral' colunas originais: ['date', 'campaign_name', 'sessionSourceMedium', 'utm_content', 'region', 'totalUsers', 'sessions', 'averageSessionDuration', 'screenPageViews', 'engagedSessions']
+10:03:33 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['modeloGeral!A:ZZ', 'modeloGenero!A:ZZ', 'modeloIdade!A:ZZ', 'modeloAlcance!A:ZZ', 'modeloRegiao!A:ZZ']
+10:03:33 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=modeloGeral%21A%3AZZ&ranges=modeloGenero%21A%3AZZ&ranges=modeloIdade%21A%3AZZ&ranges=modeloAlcance%21A%3AZZ&ranges=modeloRegiao%21A%3AZZ&alt=json
+10:03:36 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloGeral!A1:Z2321
+10:03:36 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloGenero!A1:O12919
+10:03:36 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloIdade!A1:O71495
+10:03:36 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloAlcance!A1:L17287
+10:03:36 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: modeloRegiao!A1:O207213
+10:03:36 INFO extract.sheets_fetcher › 📡 batchGet 5 ranges
+10:03:36 INFO load.dest_writer › 📥 Prefetch destino concluído: 5 abas com cabeçalho, total de IDs carregados=35545
+10:03:36 INFO __main__ › 📥 Prefetch meta concluído – iniciando ETL por aba
+10:03:36 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:03:36 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:03:36 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:03:37 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:03:37 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:03:37 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:03:38 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:03:38 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:03:38 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:03:38 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:03:38 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:03:39 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:03:39 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:03:40 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values/%27BI_PARAMETRIZA%C3%87%C3%83O%27 HTTP/1.1" 200 None
+10:03:40 WARNING treat.utils.validations › [Validação] 34 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0028', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0044', '2025_3_BR_STORIES_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0021', '2025_3_BR_STORIES_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0061', '2025_3_BR_STORIES_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0041', '2025_3_BR_STORIES_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0057', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0056', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0064', '2025_3_BR_CARD_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0150', '2025_3_BR_CARD_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_CER_PAN0146', '2025_3_BR_CARD_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0152', '2025_3_BR_CARD_CERRADO_PANTANAL_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0153', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0142', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0149', '2025_3_BR_CARD_PANTANAL_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0144', '2025_3_BR_CARD_PANTANAL_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_PAN0140', '2025_3_BR_CARD_PANTANAL_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0145', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0155', '2025_3_BR_VÍDEO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0177', '2025_3_BR_VÍDEO_CARTAS_DANIELLE_ACAO_DBT_SBRAE_2025_EMP_FEM0161'] …
+10:03:40 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['SOURCE!A:ZZ']
+10:03:40 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=SOURCE%21A%3AZZ&alt=json
+10:03:40 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:03:41 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: SOURCE!A1:Z999
+10:03:41 INFO extract.sheets_fetcher › 📡 batchGet 1 ranges
+10:03:41 DEBUG treat.utils.atribuicoes_via_lookup › >>> atribuir_veiculo_e_id_meta
+10:03:41 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:03:41 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 196437642 imp, 419232.58 cost
+10:03:41 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:03:41 WARNING treat.utils.validations › [Validação] Coluna 'preview_link_ig' vazia em 43 linha(s): 72, 73, 75, 78, 94, 96, 99, 106, 114, 128, …
+10:03:41 WARNING treat.utils.validations › [Validação] Coluna 'campaign_daily_budget' vazia em 619 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:03:41 WARNING treat.utils.validations › [Validação] Coluna 'campaign_lifetime_budget' vazia em 305 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:03:41 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaGeral': 619 linhas × 28 colunas (com cabeçalho) = 17,360 células
+10:03:42 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:03:42 INFO load.origin_writer › ✅ Write-back concluído para 'metaGeral' (619 linhas × 28 colunas)
+10:03:42 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo']
+10:03:42 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaGeral': 619 linhas × 28 colunas (com cabeçalho) = 17,360 células
+10:03:44 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:03:44 INFO load.origin_writer › ✅ Write-back concluído para 'metaGeral' (619 linhas × 28 colunas)
+10:03:44 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:03:44 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:03:44 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:03:44 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:03:45 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 130 células
+10:03:45 DEBUG __main__ › Aba 'metaGeral' processada com sucesso
+10:03:46 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:03:46 WARNING treat.utils.validations › [Validação] 34 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0028', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0044', '2025_3_BR_STORIES_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0021', '2025_3_BR_STORIES_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0061', '2025_3_BR_STORIES_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0041', '2025_3_BR_STORIES_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0057', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0056', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0064', '2025_3_BR_CARD_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0150', '2025_3_BR_CARD_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_CER_PAN0146', '2025_3_BR_CARD_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0152', '2025_3_BR_CARD_CERRADO_PANTANAL_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0153', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0142', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0149', '2025_3_BR_CARD_PANTANAL_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0144', '2025_3_BR_CARD_PANTANAL_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_PAN0140', '2025_3_BR_CARD_PANTANAL_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0145', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0155', '2025_3_BR_VÍDEO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0177', '2025_3_BR_VÍDEO_CARTAS_DANIELLE_ACAO_DBT_SBRAE_2025_EMP_FEM0161'] …
+10:03:46 DEBUG treat.utils.atribuicoes_via_lookup › >>> atribuir_veiculo_e_id_meta
+10:03:46 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:03:46 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 192846538 imp, 388058.25 cost
+10:03:46 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:03:46 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaIdade': 2067 linhas × 17 colunas (com cabeçalho) = 35,156 células
+10:03:48 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:03:48 INFO load.origin_writer › ✅ Write-back concluído para 'metaIdade' (2067 linhas × 17 colunas)
+10:03:48 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'Veiculo', 'post_comments', 'post_reactions', 'post_shares']
+10:03:48 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaIdade': 2067 linhas × 17 colunas (com cabeçalho) = 35,156 células
+10:03:51 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:03:51 INFO load.origin_writer › ✅ Write-back concluído para 'metaIdade' (2067 linhas × 17 colunas)
+10:03:51 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:03:51 INFO load.dest_writer › Destino 'idade': nenhuma linha nova para gravar
+10:03:51 DEBUG __main__ › Aba 'metaIdade' processada com sucesso
+10:03:51 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:03:51 WARNING treat.utils.validations › [Validação] 34 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0028', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0044', '2025_3_BR_STORIES_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0021', '2025_3_BR_STORIES_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0061', '2025_3_BR_STORIES_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0041', '2025_3_BR_STORIES_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0057', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0056', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0064', '2025_3_BR_CARD_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0150', '2025_3_BR_CARD_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_CER_PAN0146', '2025_3_BR_CARD_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0152', '2025_3_BR_CARD_CERRADO_PANTANAL_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0153', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0142', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0149', '2025_3_BR_CARD_PANTANAL_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0144', '2025_3_BR_CARD_PANTANAL_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_PAN0140', '2025_3_BR_CARD_PANTANAL_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0145', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0155', '2025_3_BR_VÍDEO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0177', '2025_3_BR_VÍDEO_CARTAS_DANIELLE_ACAO_DBT_SBRAE_2025_EMP_FEM0161'] …
+10:03:51 DEBUG treat.utils.atribuicoes_via_lookup › >>> atribuir_veiculo_e_id_meta
+10:03:51 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:03:51 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 195829564 imp, 414079.20 cost
+10:03:51 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:03:51 WARNING treat.utils.validations › [Validação] Coluna 'video_watched_100' vazia em 501 linha(s): 4, 5, 10, 11, 16, 17, 22, 23, 28, 29, …
+10:03:51 WARNING treat.utils.validations › [Validação] Coluna 'link_clicks' vazia em 110 linha(s): 64, 65, 111, 112, 113, 115, 119, 122, 125, 127, …
+10:03:51 WARNING treat.utils.validations › [Validação] Coluna 'post_shares' vazia em 15 linha(s): 927, 928, 929, 930, 931, 932, 933, 934, 935, 936, …
+10:03:51 WARNING treat.utils.validations › [Validação] Coluna 'post_comments' vazia em 15 linha(s): 927, 928, 929, 930, 931, 932, 933, 934, 935, 936, …
+10:03:51 WARNING treat.utils.validations › [Validação] Coluna 'post_reactions' vazia em 15 linha(s): 927, 928, 929, 930, 931, 932, 933, 934, 935, 936, …
+10:03:51 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaGenero': 942 linhas × 20 colunas (com cabeçalho) = 18,860 células
+10:03:53 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:03:53 INFO load.origin_writer › ✅ Write-back concluído para 'metaGenero' (942 linhas × 20 colunas)
+10:03:53 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'Veiculo']
+10:03:53 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaGenero': 942 linhas × 20 colunas (com cabeçalho) = 18,860 células
+10:03:54 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:03:54 INFO load.origin_writer › ✅ Write-back concluído para 'metaGenero' (942 linhas × 20 colunas)
+10:03:54 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:03:55 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:03:55 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:03:55 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:04:09 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 255 células
+10:04:09 DEBUG __main__ › Aba 'metaGenero' processada com sucesso
+10:04:10 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:10 WARNING treat.utils.validations › [Validação] 33 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0028', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0044', '2025_3_BR_STORIES_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0021', '2025_3_BR_STORIES_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0061', '2025_3_BR_STORIES_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0041', '2025_3_BR_STORIES_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0057', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0056', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0064', '2025_3_BR_CARD_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0150', '2025_3_BR_CARD_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_CER_PAN0146', '2025_3_BR_CARD_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0152', '2025_3_BR_CARD_CERRADO_PANTANAL_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0153', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0142', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0149', '2025_3_BR_CARD_PANTANAL_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0144', '2025_3_BR_CARD_PANTANAL_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_PAN0140', '2025_3_BR_CARD_PANTANAL_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0145', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0155', '2025_3_BR_VÍDEO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0177', '2025_3_BR_VÍDEO_CARTAS_DANIELLE_ACAO_DBT_SBRAE_2025_EMP_FEM0161'] …
+10:04:10 DEBUG treat.utils.atribuicoes_via_lookup › >>> atribuir_veiculo_e_id_meta
+10:04:10 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:04:10 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 109401671 imp, 228036.33 cost
+10:04:10 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:04:10 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaRegiao': 10528 linhas × 17 colunas (com cabeçalho) = 178,993 células
+10:04:19 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:19 INFO load.origin_writer › ✅ Write-back concluído para 'metaRegiao' (10528 linhas × 17 colunas)
+10:04:19 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'Veiculo', 'post_comments', 'post_reactions', 'post_shares']
+10:04:19 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaRegiao': 10528 linhas × 17 colunas (com cabeçalho) = 178,993 células
+10:04:28 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:28 INFO load.origin_writer › ✅ Write-back concluído para 'metaRegiao' (10528 linhas × 17 colunas)
+10:04:28 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:04:29 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:29 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:04:29 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:04:30 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 2,085 células
+10:04:30 DEBUG __main__ › Aba 'metaRegiao' processada com sucesso
+10:04:30 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:30 WARNING treat.utils.validations › [Validação] 34 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0028', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0044', '2025_3_BR_STORIES_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0021', '2025_3_BR_STORIES_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0061', '2025_3_BR_STORIES_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0041', '2025_3_BR_STORIES_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0057', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0056', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0064', '2025_3_BR_CARD_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0150', '2025_3_BR_CARD_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_CER_PAN0146', '2025_3_BR_CARD_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0152', '2025_3_BR_CARD_CERRADO_PANTANAL_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0153', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0142', '2025_3_BR_CARD_CERRADO_QUEM_PODE_PARTICIPAR_ACAO_DBT_SBRAE_2025_CER_PAN0149', '2025_3_BR_CARD_PANTANAL_CERRADO_COMO_SE_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0144', '2025_3_BR_CARD_PANTANAL_CERRADO_DIA_DAS_INSCRIÇÕES_ACAO_DBT_SBRAE_2025_PAN0140', '2025_3_BR_CARD_PANTANAL_CERRADO_MOTIVOS_PARA_INSCREVER_ACAO_DBT_SBRAE_2025_CER_PAN0145', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0155', '2025_3_BR_VÍDEO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0177', '2025_3_BR_VÍDEO_CARTAS_DANIELLE_ACAO_DBT_SBRAE_2025_EMP_FEM0161'] …
+10:04:30 DEBUG treat.utils.atribuicoes_via_lookup › >>> atribuir_veiculo_e_id_meta
+10:04:30 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:04:30 WARNING treat.utils.validations › [Validação] Coluna 'cost' ausente em df_raw ou df_ok; pulando aggregate check
+10:04:30 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:04:30 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaAlcance': 619 linhas × 14 colunas (com cabeçalho) = 8,680 células
+10:04:32 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:32 INFO load.origin_writer › ✅ Write-back concluído para 'metaAlcance' (619 linhas × 14 colunas)
+10:04:32 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'Veiculo', 'post_comments', 'post_reactions', 'post_shares']
+10:04:32 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'metaAlcance': 619 linhas × 14 colunas (com cabeçalho) = 8,680 células
+10:04:33 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:33 INFO load.origin_writer › ✅ Write-back concluído para 'metaAlcance' (619 linhas × 14 colunas)
+10:04:33 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:04:33 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:33 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:04:33 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:04:34 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 60 células
+10:04:34 DEBUG __main__ › Aba 'metaAlcance' processada com sucesso
+10:04:34 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:34 WARNING treat.utils.validations › [Validação] 1 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['"2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL + PERSONA ""DONAS DE PEQUENOS NEGÓCIOS"" + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS"']
+10:04:34 WARNING treat.utils.validations › [Validação] 8 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0069', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0070', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0071', '2025_3_BR_VÍDEO_TTCX_GAB_ACAO_DBT_SBRAE_2025_EMP_FEM0199', '2025_3_BR_VÍDEO_TTCX_GIOVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0197', '2025_3_BR_VÍDEO_TTCX_ISABELA_ACAO_DBT_SBRAE_2025_EMP_FEM0198', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0202', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0201']
+10:04:35 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:04:35 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 97933444 imp, 382617.91 cost
+10:04:35 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:04:35 WARNING treat.utils.validations › [Validação] Coluna 'ad_preview_link' vazia em 3 linha(s): 39, 46, 53
+10:04:35 WARNING treat.utils.validations › [Validação] Coluna 'URL_do_Anuncio' vazia em 3 linha(s): 39, 46, 53
+10:04:35 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokGeral': 175 linhas × 23 colunas (com cabeçalho) = 4,048 células
+10:04:35 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:35 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokGeral' (175 linhas × 23 colunas)
+10:04:35 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo']
+10:04:35 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokGeral': 175 linhas × 23 colunas (com cabeçalho) = 4,048 células
+10:04:36 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:36 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokGeral' (175 linhas × 23 colunas)
+10:04:36 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:04:36 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:04:36 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:04:37 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 78 células
+10:04:37 DEBUG __main__ › Aba 'tiktokGeral' processada com sucesso
+10:04:38 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:38 WARNING treat.utils.validations › [Validação] 1 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['"2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL + PERSONA ""DONAS DE PEQUENOS NEGÓCIOS"" + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS"']
+10:04:38 WARNING treat.utils.validations › [Validação] 8 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0069', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0070', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0071', '2025_3_BR_VÍDEO_TTCX_GAB_ACAO_DBT_SBRAE_2025_EMP_FEM0199', '2025_3_BR_VÍDEO_TTCX_GIOVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0197', '2025_3_BR_VÍDEO_TTCX_ISABELA_ACAO_DBT_SBRAE_2025_EMP_FEM0198', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0202', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0201']
+10:04:38 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:04:38 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 97929359 imp, 382617.91 cost
+10:04:38 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:04:38 WARNING treat.utils.validations › [Validação] Coluna 'URL_do_Anuncio' vazia em 775 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:04:38 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokIdade': 775 linhas × 15 colunas (com cabeçalho) = 11,640 células
+10:04:39 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:39 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokIdade' (775 linhas × 15 colunas)
+10:04:39 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo', 'post_comments', 'post_reactions', 'post_shares']
+10:04:39 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokIdade': 775 linhas × 15 colunas (com cabeçalho) = 11,640 células
+10:04:40 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:40 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokIdade' (775 linhas × 15 colunas)
+10:04:40 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:04:41 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:41 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:04:41 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:04:42 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 60 células
+10:04:42 DEBUG __main__ › Aba 'tiktokIdade' processada com sucesso
+10:04:42 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:42 WARNING treat.utils.validations › [Validação] 1 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['"2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL + PERSONA ""DONAS DE PEQUENOS NEGÓCIOS"" + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS"']
+10:04:42 WARNING treat.utils.validations › [Validação] 8 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0069', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0070', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0071', '2025_3_BR_VÍDEO_TTCX_GAB_ACAO_DBT_SBRAE_2025_EMP_FEM0199', '2025_3_BR_VÍDEO_TTCX_GIOVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0197', '2025_3_BR_VÍDEO_TTCX_ISABELA_ACAO_DBT_SBRAE_2025_EMP_FEM0198', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0202', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0201']
+10:04:42 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:04:42 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 97929359 imp, 382617.91 cost
+10:04:42 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:04:42 WARNING treat.utils.validations › [Validação] Coluna 'URL_do_Anuncio' vazia em 272 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:04:42 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokGenero': 272 linhas × 15 colunas (com cabeçalho) = 4,095 células
+10:04:43 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:43 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokGenero' (272 linhas × 15 colunas)
+10:04:43 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo', 'post_comments', 'post_reactions', 'post_shares']
+10:04:43 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokGenero': 272 linhas × 15 colunas (com cabeçalho) = 4,095 células
+10:04:44 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:44 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokGenero' (272 linhas × 15 colunas)
+10:04:44 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:04:44 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:04:44 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:04:45 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 30 células
+10:04:45 DEBUG __main__ › Aba 'tiktokGenero' processada com sucesso
+10:04:45 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:45 WARNING treat.utils.validations › [Validação] 1 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['"2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL + PERSONA ""DONAS DE PEQUENOS NEGÓCIOS"" + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS"']
+10:04:45 WARNING treat.utils.validations › [Validação] 6 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0069', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0070', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0071', '2025_3_BR_VÍDEO_TTCX_GAB_ACAO_DBT_SBRAE_2025_EMP_FEM0199', '2025_3_BR_VÍDEO_TTCX_GIOVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0197', '2025_3_BR_VÍDEO_TTCX_ISABELA_ACAO_DBT_SBRAE_2025_EMP_FEM0198']
+10:04:45 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:04:45 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 90072294 imp, 365105.36 cost
+10:04:45 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:04:45 WARNING treat.utils.validations › [Validação] Coluna 'URL_do_Anuncio' vazia em 3220 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:04:45 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokRegiao': 3220 linhas × 15 colunas (com cabeçalho) = 48,315 células
+10:04:49 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:49 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokRegiao' (3220 linhas × 15 colunas)
+10:04:49 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo', 'post_comments', 'post_reactions', 'post_shares']
+10:04:49 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokRegiao': 3220 linhas × 15 colunas (com cabeçalho) = 48,315 células
+10:04:52 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:52 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokRegiao' (3220 linhas × 15 colunas)
+10:04:52 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:04:52 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:04:52 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:04:53 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 420 células
+10:04:53 DEBUG __main__ › Aba 'tiktokRegiao' processada com sucesso
+10:04:54 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:54 WARNING treat.utils.validations › [Validação] 1 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['"2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL + PERSONA ""DONAS DE PEQUENOS NEGÓCIOS"" + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS"']
+10:04:54 WARNING treat.utils.validations › [Validação] 8 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0069', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0070', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0071', '2025_3_BR_VÍDEO_TTCX_GAB_ACAO_DBT_SBRAE_2025_EMP_FEM0199', '2025_3_BR_VÍDEO_TTCX_GIOVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0197', '2025_3_BR_VÍDEO_TTCX_ISABELA_ACAO_DBT_SBRAE_2025_EMP_FEM0198', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_ANA_LUISA_ACAO_DBT_SBRAE_2025_CER_PAN0202', '2025_3_BR_VÍDEO_PANTANAL_CERRADO_BABI_ACAO_DBT_SBRAE_2025_CER_PAN0201']
+10:04:54 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:04:54 WARNING treat.utils.validations › [Validação] Coluna 'cost' ausente em df_raw ou df_ok; pulando aggregate check
+10:04:54 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:04:54 WARNING treat.utils.validations › [Validação] Coluna 'URL_do_Anuncio' vazia em 135 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:04:54 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokAlcance': 135 linhas × 12 colunas (com cabeçalho) = 1,632 células
+10:04:54 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:54 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokAlcance' (135 linhas × 12 colunas)
+10:04:54 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo', 'post_comments', 'post_reactions', 'post_shares']
+10:04:54 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'tiktokAlcance': 135 linhas × 12 colunas (com cabeçalho) = 1,632 células
+10:04:55 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:55 INFO load.origin_writer › ✅ Write-back concluído para 'tiktokAlcance' (135 linhas × 12 colunas)
+10:04:55 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:04:55 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:04:55 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:04:57 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 12 células
+10:04:57 DEBUG __main__ › Aba 'tiktokAlcance' processada com sucesso
+10:04:57 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:04:57 DEBUG treat.utils.substitute_origin_values › [ad_name] 7 alterações. Ex.: ['card_nat', 'video_horizontal_manifesto_15', 'video_horizontal_manifesto_30'] → ['2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0105', '2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM', '2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM']
+10:04:58 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:58 INFO treat.utils.substitute_origin_values › [subst] 7 células gravadas em 'pinterestGeral'
+10:04:58 WARNING treat.utils.validations › [Validação] 2 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['2025_3_BR_ALC_CPC_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS', '2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS']
+10:04:58 WARNING treat.utils.validations › [Validação] 6 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0113', '2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0104', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0115', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0103', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0111', '2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM']
+10:04:58 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:04:58 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 23729979 imp, 71847.38 cost
+10:04:58 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:04:58 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'pinterestGeral': 1008 linhas × 21 colunas (com cabeçalho) = 21,189 células
+10:04:59 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:04:59 INFO load.origin_writer › ✅ Write-back concluído para 'pinterestGeral' (1008 linhas × 21 colunas)
+10:04:59 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo', 'post_comments', 'post_shares']
+10:04:59 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'pinterestGeral': 1008 linhas × 21 colunas (com cabeçalho) = 21,189 células
+10:05:00 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:00 INFO load.origin_writer › ✅ Write-back concluído para 'pinterestGeral' (1008 linhas × 21 colunas)
+10:05:00 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:05:00 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:05:00 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:05:01 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 2,184 células
+10:05:01 DEBUG __main__ › Aba 'pinterestGeral' processada com sucesso
+10:05:02 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:02 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'pinterestGenero': 273 linhas × 13 colunas (com cabeçalho) = 3,562 células
+10:05:02 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:03 INFO load.origin_writer › ✅ Write-back concluído para 'pinterestGenero' (273 linhas × 13 colunas)
+10:05:03 INFO treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › 📊 gender → 273 linhas após _prepare_dimension
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-02'): 24.0 vs 25
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-03'): 20.0 vs 29
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-06'): 19.0 vs 20
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-13'): 15.0 vs 16
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-30'): 23.0 vs 24
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-14'): 4.0 vs 5
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-06-02'): 4.0 vs 6
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-06-09'): 6.0 vs 7
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-03-31'): 37.0 vs 43
+10:05:03 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-04-05'): 1.0 vs 2
+10:05:03 INFO treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Validação de soma concluída para 251 grupos
+10:05:03 INFO treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › ✅ merge_pinterest_dimension – 1050 linhas (gender)
+10:05:03 INFO treat.treat_pipeline › merge_pinterest_dimension concluído – retornando ao pipeline genérico
+10:05:03 WARNING treat.utils.validations › [Validação] 2 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['2025_3_BR_ALC_CPC_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS', '2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS']
+10:05:03 WARNING treat.utils.validations › [Validação] 5 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0113', '2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0104', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0115', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0103', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0111']
+10:05:03 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:05:03 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 23730003 imp, 71847.29 cost
+10:05:03 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:05:03 DEBUG __main__ › 🔸 pinterestGenero: pulando write-back de origem (já feito dentro de pipeline)
+10:05:03 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:05:03 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:05:03 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:05:04 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 240 células
+10:05:04 DEBUG __main__ › Aba 'pinterestGenero' processada com sucesso
+10:05:04 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:04 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'pinterestIdade': 1116 linhas × 13 colunas (com cabeçalho) = 14,521 células
+10:05:06 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:06 INFO load.origin_writer › ✅ Write-back concluído para 'pinterestIdade' (1116 linhas × 13 colunas)
+10:05:06 INFO treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › 📊 age → 1116 linhas após _prepare_dimension
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-01'): 114.0 vs 112
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-02'): 24.0 vs 20
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-03'): 20.0 vs 29
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-04'): 27.0 vs 26
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-11'): 13.0 vs 12
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-13'): 15.0 vs 11
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-14'): 12.0 vs 11
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-25'): 10.0 vs 6
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-30'): 23.0 vs 24
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-04'): 12.0 vs 11
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-09'): 10.0 vs 4
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-16'): 11.0 vs 10
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-18'): 4.0 vs 1
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-20'): 11.0 vs 9
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-23'): 27.0 vs 24
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-24'): 15.0 vs 14
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-30'): 3.0 vs 1
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-06-02'): 4.0 vs 6
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-06-04'): 7.0 vs 6
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-06-05'): 3.0 vs 1
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-06-07'): 9.0 vs 8
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-06-09'): 6.0 vs 7
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-03-31'): 37.0 vs 43
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-04-05'): 1.0 vs 2
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-04-06'): 2.0 vs 1
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-04-28'): 4.0 vs 3
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-04-29'): 3.0 vs 2
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-05-17'): 11.0 vs 9
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-06-01'): 10.0 vs 9
+10:05:06 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-06-10'): 5.0 vs 2
+10:05:06 INFO treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Validação de soma concluída para 251 grupos
+10:05:06 INFO treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › ✅ merge_pinterest_dimension – 5009 linhas (age)
+10:05:06 INFO treat.treat_pipeline › merge_pinterest_dimension concluído – retornando ao pipeline genérico
+10:05:06 WARNING treat.utils.validations › [Validação] 2 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['2025_3_BR_ALC_CPC_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS', '2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS']
+10:05:06 WARNING treat.utils.validations › [Validação] 5 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0113', '2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0104', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0115', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0103', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0111']
+10:05:06 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:05:06 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 23729937 imp, 71847.24 cost
+10:05:06 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:05:06 DEBUG __main__ › 🔸 pinterestIdade: pulando write-back de origem (já feito dentro de pipeline)
+10:05:07 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:05:07 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:05:07 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:05:08 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 750 células
+10:05:08 DEBUG __main__ › Aba 'pinterestIdade' processada com sucesso
+10:05:08 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:08 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'pinterestRegiao': 2550 linhas × 13 colunas (com cabeçalho) = 33,163 células
+10:05:10 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:10 INFO load.origin_writer › ✅ Write-back concluído para 'pinterestRegiao' (2550 linhas × 13 colunas)
+10:05:10 INFO treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › 📊 region → 2550 linhas após _prepare_dimension
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-02'): 24.0 vs 25
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-03'): 20.0 vs 29
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-06'): 19.0 vs 20
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-13'): 15.0 vs 16
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-04-30'): 23.0 vs 24
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-05-14'): 4.0 vs 5
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-06-02'): 4.0 vs 6
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626754844563', '2025-06-09'): 6.0 vs 7
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-03-31'): 37.0 vs 43
+10:05:10 WARNING treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Divergência impressions em ('626755006867', '2025-04-05'): 1.0 vs 2
+10:05:10 INFO treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › Validação de soma concluída para 251 grupos
+10:05:10 INFO treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge › ✅ merge_pinterest_dimension – 12262 linhas (region)
+10:05:10 INFO treat.treat_pipeline › merge_pinterest_dimension concluído – retornando ao pipeline genérico
+10:05:10 WARNING treat.utils.validations › [Validação] 2 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['2025_3_BR_ALC_CPC_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS', '2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS']
+10:05:10 WARNING treat.utils.validations › [Validação] 5 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0113', '2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0104', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0115', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0103', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0111']
+10:05:11 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:05:11 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 23730003 imp, 71847.44 cost
+10:05:11 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:05:11 DEBUG __main__ › 🔸 pinterestRegiao: pulando write-back de origem (já feito dentro de pipeline)
+10:05:11 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:05:12 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:05:12 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:05:14 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 20,745 células
+10:05:14 DEBUG __main__ › Aba 'pinterestRegiao' processada com sucesso
+10:05:14 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:14 DEBUG treat.utils.substitute_origin_values › [ad_name] 7 alterações. Ex.: ['card_nat', 'video_horizontal_manifesto_15', 'video_horizontal_manifesto_30'] → ['2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0105', '2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM', '2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM']
+10:05:14 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:14 INFO treat.utils.substitute_origin_values › [subst] 7 células gravadas em 'pinterestAlcance'
+10:05:14 WARNING treat.utils.validations › [Validação] 2 valor(es) de 'ad_group_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_group_name): ['2025_3_BR_ALC_CPC_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS', '2025_3_BR_ALC_CPM_BRASIL, 18+, POPULAÇÃO EM GERAL +BRASIL, 18+, POPULAÇÃO EM GERAL + COBERTURA DE PALAVRAS-CHAVE RELACIONADAS']
+10:05:14 WARNING treat.utils.validations › [Validação] 6 valor(es) de 'ad_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_ad_name): ['2025_3_BR_CARD_CINTIA_ACAO_DBT_SBRAE_2025_EMP_FEM0113', '2025_3_BR_CARD_NAT_ACAO_DBT_SBRAE_2025_EMP_FEM0104', '2025_3_BR_CARD_SILVANA_ACAO_DBT_SBRAE_2025_EMP_FEM0115', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0103', '2025_3_BR_VÍDEO_MANIFESTO_ACAO_DBT_SBRAE_2025_EMP_FEM0111', '2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM']
+10:05:15 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:05:15 WARNING treat.utils.validations › [Validação] Coluna 'impressions' ausente em df_raw ou df_ok; pulando aggregate check
+10:05:15 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:05:15 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'pinterestAlcance': 991 linhas × 11 colunas (com cabeçalho) = 10,912 células
+10:05:16 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:16 INFO load.origin_writer › ✅ Write-back concluído para 'pinterestAlcance' (991 linhas × 11 colunas)
+10:05:16 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'Veiculo', 'post_comments', 'post_reactions', 'post_shares']
+10:05:16 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'pinterestAlcance': 991 linhas × 11 colunas (com cabeçalho) = 10,912 células
+10:05:18 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:18 INFO load.origin_writer › ✅ Write-back concluído para 'pinterestAlcance' (991 linhas × 11 colunas)
+10:05:18 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:05:18 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:05:18 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:05:19 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 1,980 células
+10:05:19 DEBUG __main__ › Aba 'pinterestAlcance' processada com sucesso
+10:05:20 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:20 WARNING treat.utils.validations › [Validação] Coluna 'campaign_name' vazia em 1 linha(s)
+10:05:20 WARNING treat.utils.validations › [Validação] 1 valor(es) de 'campaign_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_campaign_name): ['2025_3_INOVA PANTANAL_ALC__CPM']
+10:05:20 WARNING treat.utils.validations › [Validação] Coluna 'ad_group_name' inexistente em df_ok
+10:05:20 WARNING treat.utils.validations › [Validação] Coluna 'ad_name' vazia em 1 linha(s)
+10:05:20 WARNING treat.utils.validations › [Validação] Coluna 'utm_content' vazia em 1 linha(s)
+10:05:20 DEBUG root › Exemplo de mapeamentos de preview gerados para LinkedIn:
+10:05:20 DEBUG root › dbt_sbrae_2025_catalisa0000 -> https://www.instagram.com/p/DGdXuL7AGY0/#advertiser
+10:05:20 DEBUG root › dbt_sbrae_2025_catalisa0001 -> https://www.instagram.com/p/DGdXuL7AGY0/#advertiser
+10:05:20 DEBUG root › dbt_sbrae_2025_catalisa0002 -> https://www.instagram.com/p/DGgVgE6gMQ8/#advertiser
+10:05:20 DEBUG root › dbt_sbrae_2025_catalisa0003 -> https://www.instagram.com/p/DGdXuL7AGY0/#advertiser
+10:05:20 DEBUG root › dbt_sbrae_2025_catalisa0004 -> https://www.instagram.com/p/DGgVgE6gMQ8/#advertiser
+10:05:20 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:05:20 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:05:21 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:05:21 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:05:21 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:22 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:22 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values/%27BI_PARAMETRIZA%C3%87%C3%83O%27 HTTP/1.1" 200 None
+10:05:22 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:05:22 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 5596061 imp, 75081.83 cost
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'date' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'account_name' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'campaign_name' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'ad_name' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'campaign_id' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'start' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'end' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'objective' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'placement' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'utm_content' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'impressions' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'cost' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'link_clicks' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'video_play' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'video_watched_25' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'video_watched_50' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'video_watched_75' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'video_watched_100' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'post_reactions' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'post_shares' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'post_comments' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'Campanha' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'ID_Campanha' vazia em 1 linha(s): 278
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'URL_do_Anuncio' vazia em 95 linha(s): 10, 11, 12, 13, 19, 20, 21, 22, 28, 29, …
+10:05:22 WARNING treat.utils.validations › [Validação] Coluna 'ad_group_name' vazia em 1 linha(s): 278
+10:05:23 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg:batchUpdate HTTP/1.1" 200 None
+10:05:23 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'linkedinGeral': 279 linhas × 21 colunas (com cabeçalho) = 5,880 células
+10:05:24 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:24 INFO load.origin_writer › ✅ Write-back concluído para 'linkedinGeral' (279 linhas × 21 colunas)
+10:05:24 WARNING treat.treat_pipeline › [linkedinGeral] linhas sem objective: [278]
+10:05:24 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo', 'ad_group_name']
+10:05:24 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'linkedinGeral': 279 linhas × 21 colunas (com cabeçalho) = 5,880 células
+10:05:25 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:25 INFO load.origin_writer › ✅ Write-back concluído para 'linkedinGeral' (279 linhas × 21 colunas)
+10:05:25 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:05:25 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:05:25 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:05:27 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 780 células
+10:05:27 DEBUG __main__ › Aba 'linkedinGeral' processada com sucesso
+10:05:29 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:29 WARNING treat.utils.validations › [Validação] Coluna 'campaign_name' vazia em 1 linha(s)
+10:05:29 WARNING treat.utils.validations › [Validação] 1 valor(es) de 'campaign_name' fora da BI_PARAMETRIZAÇÃO (taxonomy_campaign_name): ['2025_3_INOVA PANTANAL_ALC__CPM']
+10:05:29 WARNING treat.utils.validations › [Validação] Coluna 'ad_group_name' inexistente em df_ok
+10:05:29 WARNING treat.utils.validations › [Validação] Coluna 'ad_name' inexistente em df_ok
+10:05:29 WARNING treat.utils.validations › [Validação] Coluna 'utm_content' vazia em 7354 linha(s)
+10:05:29 DEBUG treat.bi_param_utils › [BIParamLookup] coluna 'ad_name' ausente; skip fill_utm_content
+10:05:30 DEBUG root › Exemplo de mapeamentos de preview gerados para LinkedIn:
+10:05:30 DEBUG root › dbt_sbrae_2025_catalisa0000 -> https://www.instagram.com/p/DGdXuL7AGY0/#advertiser
+10:05:30 DEBUG root › dbt_sbrae_2025_catalisa0001 -> https://www.instagram.com/p/DGdXuL7AGY0/#advertiser
+10:05:30 DEBUG root › dbt_sbrae_2025_catalisa0002 -> https://www.instagram.com/p/DGgVgE6gMQ8/#advertiser
+10:05:30 DEBUG root › dbt_sbrae_2025_catalisa0003 -> https://www.instagram.com/p/DGdXuL7AGY0/#advertiser
+10:05:30 DEBUG root › dbt_sbrae_2025_catalisa0004 -> https://www.instagram.com/p/DGgVgE6gMQ8/#advertiser
+10:05:30 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:05:30 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:05:30 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:05:30 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:05:30 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:31 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:32 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values/%27BI_PARAMETRIZA%C3%87%C3%83O%27 HTTP/1.1" 200 None
+10:05:32 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:05:32 INFO treat.utils.validations › [Validação] Totais de impressions e cost conferem: 3018092 imp, 35368.55 cost
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'date' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'account_name' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'campaign_id' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'campaign_name' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'objective' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'start' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'end' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'impressions' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'cost' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'link_clicks' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'video_watched_100' vazia em 1 linha(s): 7353
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'utm_content' vazia em 7354 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'Campanha' vazia em 1984 linha(s): 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, …
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'ID_Campanha' vazia em 1984 linha(s): 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, …
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'URL_do_Anuncio' vazia em 7354 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'ad_name' vazia em 7354 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:05:32 WARNING treat.utils.validations › [Validação] Coluna 'ad_group_name' vazia em 7354 linha(s): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, …
+10:05:33 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg:batchUpdate HTTP/1.1" 200 None
+10:05:33 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'linkedinRegiao': 7354 linhas × 13 colunas (com cabeçalho) = 95,615 células
+10:05:37 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:37 INFO load.origin_writer › ✅ Write-back concluído para 'linkedinRegiao' (7354 linhas × 13 colunas)
+10:05:37 WARNING treat.treat_pipeline › [linkedinRegiao] linhas sem objective: [7353]
+10:05:37 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo', 'ad_group_name', 'ad_name', 'post_comments', 'post_reactions', 'post_shares']
+10:05:37 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'linkedinRegiao': 7354 linhas × 13 colunas (com cabeçalho) = 95,615 células
+10:05:42 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:42 INFO load.origin_writer › ✅ Write-back concluído para 'linkedinRegiao' (7354 linhas × 13 colunas)
+10:05:42 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:05:42 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:05:42 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:05:45 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 25,920 células
+10:05:45 DEBUG __main__ › Aba 'linkedinRegiao' processada com sucesso
+10:05:45 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:45 WARNING treat.utils.validations › [Validação] Coluna 'campaign_name' vazia em 1 linha(s)
+10:05:45 WARNING treat.utils.validations › [Validação] Coluna 'ad_group_name' inexistente em df_ok
+10:05:45 WARNING treat.utils.validations › [Validação] Coluna 'ad_name' inexistente em df_ok
+10:05:45 WARNING treat.utils.validations › [Validação] Coluna 'utm_content' vazia em 1 linha(s)
+10:05:45 DEBUG treat.bi_param_utils › [BIParamLookup] coluna 'ad_name' ausente; skip fill_utm_content
+10:05:45 DEBUG root › Exemplo de mapeamentos de preview gerados para LinkedIn:
+10:05:45 DEBUG root › dbt_sbrae_2025_catalisa0000 -> https://www.instagram.com/p/DGdXuL7AGY0/#advertiser
+10:05:45 DEBUG root › dbt_sbrae_2025_catalisa0001 -> https://www.instagram.com/p/DGdXuL7AGY0/#advertiser
+10:05:45 DEBUG root › dbt_sbrae_2025_catalisa0002 -> https://www.instagram.com/p/DGgVgE6gMQ8/#advertiser
+10:05:45 DEBUG root › dbt_sbrae_2025_catalisa0003 -> https://www.instagram.com/p/DGdXuL7AGY0/#advertiser
+10:05:45 DEBUG root › dbt_sbrae_2025_catalisa0004 -> https://www.instagram.com/p/DGgVgE6gMQ8/#advertiser
+10:05:45 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:05:45 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:05:46 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:05:46 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:05:46 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:47 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:47 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values/%27BI_PARAMETRIZA%C3%87%C3%83O%27 HTTP/1.1" 200 None
+10:05:47 DEBUG root › [aplicar_substituicoes_objetivo] Substituições aplicadas na coluna 'Objetivo'
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'cost' ausente em df_raw ou df_ok; pulando aggregate check
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'Veiculo' ausente em df_origin ou df_dest; pulando validação
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'date' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'account_name' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'campaign_name' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'campaign_id' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'objective' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'utm_content' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'start' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'end' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'reach' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'impressions' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'Campanha' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'ID_Campanha' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'URL_do_Anuncio' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'ad_name' vazia em 1 linha(s): 0
+10:05:47 WARNING treat.utils.validations › [Validação] Coluna 'ad_group_name' vazia em 1 linha(s): 0
+10:05:48 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg:batchUpdate HTTP/1.1" 200 None
+10:05:48 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'linkedinAlcance': 1 linhas × 10 colunas (com cabeçalho) = 20 células
+10:05:48 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:48 INFO load.origin_writer › ✅ Write-back concluído para 'linkedinAlcance' (1 linhas × 10 colunas)
+10:05:48 WARNING treat.treat_pipeline › [linkedinAlcance] linhas sem objective: [0]
+10:05:48 WARNING load.origin_writer › [write_back_origin] Ignorando colunas extras: ['Campanha', 'Engajamento_Total', 'ID', 'ID_Campanha', 'ID_Veiculo', 'URL_do_Anuncio', 'Veiculo', 'ad_group_name', 'ad_name', 'post_comments', 'post_reactions', 'post_shares']
+10:05:48 INFO load.origin_writer › ℹ️  Preparando write-back origin para 'linkedinAlcance': 1 linhas × 10 colunas (com cabeçalho) = 20 células
+10:05:51 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "POST /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate HTTP/1.1" 200 None
+10:05:51 INFO load.origin_writer › ✅ Write-back concluído para 'linkedinAlcance' (1 linhas × 10 colunas)
+10:05:51 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:05:51 WARNING py.warnings › /home/debrito/Documentos/etl_debrito/load/dest_writer.py:192: FutureWarning: DataFrame.applymap has been deprecated. Use DataFrame.map instead.
+  df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
+
+10:05:51 DEBUG googleapiclient.discovery › URL being requested: POST https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchUpdate?alt=json
+10:05:51 DEBUG google_auth_httplib2 › Making request: POST https://oauth2.googleapis.com/token
+10:05:52 INFO load.dest_writer › batchUpdate enviou 1 ranges, total 12 células
+10:05:52 DEBUG __main__ › Aba 'linkedinAlcance' processada com sucesso
+10:05:52 INFO __main__ › 🔸 GAGeral: apenas write-back de origem; destino será ignorado
+10:05:52 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:52 ERROR __main__ › Erro ao processar aba 'GAGeral': UTM_CONTENT(s) não mapeado(s) em BI_PARAMETRIZAÇÃO: ['sbrae_2025_psmn02'] (linhas: [6077, 6078, 6079, 6080, 6081, 6082, 6083, 6084, 6085, 6152])
+Traceback (most recent call last):
+  File "/tmp/ipykernel_60150/2611112964.py", line 59, in process_sheets
+    out = run_etl_for_sheet(
+          ^^^^^^^^^^^^^^^^^^
+  File "/tmp/ipykernel_60150/1418670537.py", line 48, in run_etl_for_sheet
+    df_ok = pipeline.run(df_raw)
+            ^^^^^^^^^^^^^^^^^^^^
+  File "/home/debrito/Documentos/etl_debrito/treat/treat_pipeline.py", line 187, in run
+    validate_utm_content_in_bi(df, df_bi)
+  File "/home/debrito/Documentos/etl_debrito/treat/utils/validations.py", line 144, in validate_utm_content_in_bi
+    raise RuntimeError(
+RuntimeError: UTM_CONTENT(s) não mapeado(s) em BI_PARAMETRIZAÇÃO: ['sbrae_2025_psmn02'] (linhas: [6077, 6078, 6079, 6080, 6081, 6082, 6083, 6084, 6085, 6152])
+10:05:52 INFO __main__ › ✅ Processamento de todas as abas concluído
+10:05:52 INFO __main__ › 🔍 Validando consistência de datas entre modelos …
+10:05:52 INFO treat.utils.validations › ✅ Nenhuma divergência de start/end entre modelos.
+10:05:52 INFO __main__ › ✅ Nenhuma divergência de start/end entre modelos.
+10:05:52 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['metaGeral!A:ZZ', 'metaIdade!A:ZZ', 'metaGenero!A:ZZ', 'metaRegiao!A:ZZ', 'metaAlcance!A:ZZ', 'tiktokGeral!A:ZZ', 'tiktokIdade!A:ZZ', 'tiktokGenero!A:ZZ', 'tiktokRegiao!A:ZZ', 'tiktokAlcance!A:ZZ', 'pinterestGeral!A:ZZ', 'pinterestGenero!A:ZZ', 'pinterestIdade!A:ZZ', 'pinterestRegiao!A:ZZ', 'pinterestAlcance!A:ZZ', 'linkedinGeral!A:ZZ', 'linkedinRegiao!A:ZZ', 'linkedinAlcance!A:ZZ', 'GAGeral!A:ZZ']
+10:05:52 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=metaGeral%21A%3AZZ&ranges=metaIdade%21A%3AZZ&ranges=metaGenero%21A%3AZZ&ranges=metaRegiao%21A%3AZZ&ranges=metaAlcance%21A%3AZZ&ranges=tiktokGeral%21A%3AZZ&ranges=tiktokIdade%21A%3AZZ&ranges=tiktokGenero%21A%3AZZ&ranges=tiktokRegiao%21A%3AZZ&ranges=tiktokAlcance%21A%3AZZ&ranges=pinterestGeral%21A%3AZZ&ranges=pinterestGenero%21A%3AZZ&ranges=pinterestIdade%21A%3AZZ&ranges=pinterestRegiao%21A%3AZZ&ranges=pinterestAlcance%21A%3AZZ&ranges=linkedinGeral%21A%3AZZ&ranges=linkedinRegiao%21A%3AZZ&ranges=linkedinAlcance%21A%3AZZ&ranges=GAGeral%21A%3AZZ&alt=json
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGeral!A1:AB620
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaIdade!A1:Q2068
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGenero!A1:T943
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaRegiao!A1:Q10529
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaAlcance!A1:N620
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGeral!A1:W176
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokIdade!A1:O776
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGenero!A1:O273
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokRegiao!A1:O3221
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokAlcance!A1:L136
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGeral!A1:U1009
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGenero!A1:M274
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestIdade!A1:M1117
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestRegiao!A1:M2551
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestAlcance!A1:K992
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinGeral!A1:U280
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinRegiao!A1:M7355
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinAlcance!A1:J2
+10:05:54 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: GAGeral!A1:J6223
+10:05:54 INFO extract.sheets_fetcher › 📡 batchGet 19 ranges
+10:05:54 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:05:54 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:05:54 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:05:54 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:05:55 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:55 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:55 INFO __main__ › 📊 Top 10 abas que mais ocupam células:
+10:05:55 INFO __main__ ›   • modeloRegiao: 207213×15 = 3,108,195 células
+10:05:55 INFO __main__ ›   • modeloIdade: 71495×15 = 1,072,425 células
+10:05:55 INFO __main__ ›   • LINKEDIN NEGOCIOS ALCANÇADOS: 11130×27 = 300,510 células
+10:05:55 INFO __main__ ›   • modeloAlcance: 17287×12 = 207,444 células
+10:05:55 INFO __main__ ›   • modeloGenero: 12919×15 = 193,785 células
+10:05:55 INFO __main__ ›   • metaPontoControle: 16049×12 = 192,588 células
+10:05:55 INFO __main__ ›   • metaRegiao: 10529×17 = 178,993 células
+10:05:55 INFO __main__ ›   • linkedinRegiao: 7355×13 = 95,615 células
+10:05:55 INFO __main__ ›   • GAGeral: 6223×10 = 62,230 células
+10:05:55 INFO __main__ ›   • SupermetricsQueries: 935×65 = 60,775 células
+10:05:55 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['metaGeral!A:ZZ', 'metaIdade!A:ZZ', 'metaGenero!A:ZZ', 'metaRegiao!A:ZZ', 'metaAlcance!A:ZZ', 'tiktokGeral!A:ZZ', 'tiktokIdade!A:ZZ', 'tiktokGenero!A:ZZ', 'tiktokRegiao!A:ZZ', 'tiktokAlcance!A:ZZ', 'pinterestGeral!A:ZZ', 'pinterestGenero!A:ZZ', 'pinterestIdade!A:ZZ', 'pinterestRegiao!A:ZZ', 'pinterestAlcance!A:ZZ', 'linkedinGeral!A:ZZ', 'linkedinRegiao!A:ZZ', 'linkedinAlcance!A:ZZ', 'GAGeral!A:ZZ']
+10:05:55 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=metaGeral%21A%3AZZ&ranges=metaIdade%21A%3AZZ&ranges=metaGenero%21A%3AZZ&ranges=metaRegiao%21A%3AZZ&ranges=metaAlcance%21A%3AZZ&ranges=tiktokGeral%21A%3AZZ&ranges=tiktokIdade%21A%3AZZ&ranges=tiktokGenero%21A%3AZZ&ranges=tiktokRegiao%21A%3AZZ&ranges=tiktokAlcance%21A%3AZZ&ranges=pinterestGeral%21A%3AZZ&ranges=pinterestGenero%21A%3AZZ&ranges=pinterestIdade%21A%3AZZ&ranges=pinterestRegiao%21A%3AZZ&ranges=pinterestAlcance%21A%3AZZ&ranges=linkedinGeral%21A%3AZZ&ranges=linkedinRegiao%21A%3AZZ&ranges=linkedinAlcance%21A%3AZZ&ranges=GAGeral%21A%3AZZ&alt=json
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGeral!A1:AB620
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaIdade!A1:Q2068
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGenero!A1:T943
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaRegiao!A1:Q10529
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaAlcance!A1:N620
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGeral!A1:W176
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokIdade!A1:O776
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGenero!A1:O273
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokRegiao!A1:O3221
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokAlcance!A1:L136
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGeral!A1:U1009
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGenero!A1:M274
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestIdade!A1:M1117
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestRegiao!A1:M2551
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestAlcance!A1:K992
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinGeral!A1:U280
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinRegiao!A1:M7355
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinAlcance!A1:J2
+10:05:57 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: GAGeral!A1:J6223
+10:05:57 INFO extract.sheets_fetcher › 📡 batchGet 19 ranges
+10:05:57 INFO treat.utils.validations › ✅ Nenhuma divergência de start/end entre modelos.
+10:05:57 INFO __main__ › ✅ Nenhuma divergência de start/end entre modelos.
+10:05:57 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:05:57 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:05:58 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:05:58 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:05:58 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:59 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:05:59 INFO __main__ › [(3108195, 'modeloRegiao', 207213, 15),
+ (1072425, 'modeloIdade', 71495, 15),
+ (300510, 'LINKEDIN NEGOCIOS ALCANÇADOS', 11130, 27),
+ (207444, 'modeloAlcance', 17287, 12),
+ (193785, 'modeloGenero', 12919, 15),
+ (192588, 'metaPontoControle', 16049, 12),
+ (178993, 'metaRegiao', 10529, 17),
+ (95615, 'linkedinRegiao', 7355, 13),
+ (62230, 'GAGeral', 6223, 10),
+ (60775, 'SupermetricsQueries', 935, 65),
+ (60346, 'modeloGeral', 2321, 26),
+ (48315, 'tiktokRegiao', 3221, 15),
+ (36000, 'kawaiGeral', 1000, 36),
+ (35156, 'metaIdade', 2068, 17),
+ (33163, 'pinterestRegiao', 2551, 13),
+ (32788, 'CONTEÚDO _MÍDIA', 1171, 28),
+ (28000, 'LEGENDA', 1000, 28),
+ (26000, 'sites', 1000, 26),
+ (26000, 'googleRegiao', 1000, 26),
+ (26000, 'googleIdade', 1000, 26),
+ (26000, 'googleGenero', 1000, 26),
+ (26000, 'cidade', 1000, 26),
+ (26000, 'adserver', 1000, 26),
+ (26000, 'MEDIUM', 1000, 26),
+ (26000, 'GAEventos', 1000, 26),
+ (26000, 'CATALISA', 1000, 26),
+ (26000, 'Alright genero', 1000, 26),
+ (26000, 'Alright dispositivo', 1000, 26),
+ (26000, 'Alright Impressões diária', 1000, 26),
+ (26000, 'Alright  faixa etária', 1000, 26),
+ (25974, 'SOURCE', 999, 26),
+ (25000, 'kwaiRegiao', 1000, 25),
+ (25000, 'googleGeral', 1000, 25),
+ (21189, 'pinterestGeral', 1009, 21),
+ (18860, 'metaGenero', 943, 20),
+ (17360, 'metaGeral', 620, 28),
+ (14521, 'pinterestIdade', 1117, 13),
+ (13029, 'BI_PARAMETRIZAÇÃO', 303, 43),
+ (12000, 'Cópia de tiktokRegiao', 480, 25),
+ (11640, 'tiktokIdade', 776, 15)]
+10:06:37 INFO __main__ › 🔍 Validando consistência de datas entre modelos …
+10:06:37 INFO treat.utils.validations › ✅ Nenhuma divergência de start/end entre modelos.
+10:06:37 INFO __main__ › ✅ Nenhuma divergência de start/end entre modelos.
+10:06:38 INFO extract.sheets_fetcher › 🔄 batchGet tentativa para ranges: ['metaGeral!A:ZZ', 'metaIdade!A:ZZ', 'metaGenero!A:ZZ', 'metaRegiao!A:ZZ', 'metaAlcance!A:ZZ', 'tiktokGeral!A:ZZ', 'tiktokIdade!A:ZZ', 'tiktokGenero!A:ZZ', 'tiktokRegiao!A:ZZ', 'tiktokAlcance!A:ZZ', 'pinterestGeral!A:ZZ', 'pinterestGenero!A:ZZ', 'pinterestIdade!A:ZZ', 'pinterestRegiao!A:ZZ', 'pinterestAlcance!A:ZZ', 'linkedinGeral!A:ZZ', 'linkedinRegiao!A:ZZ', 'linkedinAlcance!A:ZZ', 'GAGeral!A:ZZ']
+10:06:38 DEBUG googleapiclient.discovery › URL being requested: GET https://sheets.googleapis.com/v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg/values:batchGet?ranges=metaGeral%21A%3AZZ&ranges=metaIdade%21A%3AZZ&ranges=metaGenero%21A%3AZZ&ranges=metaRegiao%21A%3AZZ&ranges=metaAlcance%21A%3AZZ&ranges=tiktokGeral%21A%3AZZ&ranges=tiktokIdade%21A%3AZZ&ranges=tiktokGenero%21A%3AZZ&ranges=tiktokRegiao%21A%3AZZ&ranges=tiktokAlcance%21A%3AZZ&ranges=pinterestGeral%21A%3AZZ&ranges=pinterestGenero%21A%3AZZ&ranges=pinterestIdade%21A%3AZZ&ranges=pinterestRegiao%21A%3AZZ&ranges=pinterestAlcance%21A%3AZZ&ranges=linkedinGeral%21A%3AZZ&ranges=linkedinRegiao%21A%3AZZ&ranges=linkedinAlcance%21A%3AZZ&ranges=GAGeral%21A%3AZZ&alt=json
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGeral!A1:AB620
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaIdade!A1:Q2068
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaGenero!A1:T943
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaRegiao!A1:Q10529
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: metaAlcance!A1:N620
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGeral!A1:W176
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokIdade!A1:O776
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokGenero!A1:O273
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokRegiao!A1:O3221
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: tiktokAlcance!A1:L136
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGeral!A1:U1009
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestGenero!A1:M274
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestIdade!A1:M1117
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestRegiao!A1:M2551
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: pinterestAlcance!A1:K992
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinGeral!A1:U280
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinRegiao!A1:M7355
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: linkedinAlcance!A1:J2
+10:06:39 INFO extract.sheets_fetcher › 🔍 range completo retornado pela API: GAGeral!A1:J6223
+10:06:39 INFO extract.sheets_fetcher › 📡 batchGet 19 ranges
+10:06:39 DEBUG urllib3.util.retry › Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+10:06:39 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): oauth2.googleapis.com:443
+10:06:40 DEBUG urllib3.connectionpool › https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+10:06:40 DEBUG urllib3.connectionpool › Starting new HTTPS connection (1): sheets.googleapis.com:443
+10:06:40 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:06:41 DEBUG urllib3.connectionpool › https://sheets.googleapis.com:443 "GET /v4/spreadsheets/1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg?includeGridData=false HTTP/1.1" 200 None
+10:06:41 INFO __main__ › 📊 Top 10 abas que mais ocupam células:
+10:06:41 INFO __main__ ›   • modeloRegiao: 207213×15 = 3,108,195 células
+10:06:41 INFO __main__ ›   • modeloIdade: 71495×15 = 1,072,425 células
+10:06:41 INFO __main__ ›   • LINKEDIN NEGOCIOS ALCANÇADOS: 11130×27 = 300,510 células
+10:06:41 INFO __main__ ›   • modeloAlcance: 17287×12 = 207,444 células
+10:06:41 INFO __main__ ›   • modeloGenero: 12919×15 = 193,785 células
+10:06:41 INFO __main__ ›   • metaPontoControle: 16049×12 = 192,588 células
+10:06:41 INFO __main__ ›   • metaRegiao: 10529×17 = 178,993 células
+10:06:41 INFO __main__ ›   • linkedinRegiao: 7355×13 = 95,615 células
+10:06:41 INFO __main__ ›   • GAGeral: 6223×10 = 62,230 células
+10:06:41 INFO __main__ ›   • SupermetricsQueries: 935×65 = 60,775 células
