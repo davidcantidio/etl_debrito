@@ -15,6 +15,7 @@ ID_CONTENT_REPLACEMENTS: dict[str, str] = {
     "dbt_sbrae_2025_cer_pan0146": "dbt_sbrae_2025_pan0146",
     "dbt_sbrae_2025_cer_pan0155" : "dbt_sbrae_2025_cer_pan0154",
     "dbt_sbrae_2025_emp_fem0204" : "dbt_sbrae_2025_emp_fem0203",
+    "sbrae_2025_psmn02" : "sbrae_2025_psmn0282"
 }
 """Substituições específicas para o campo 'ID_Content'.
 
@@ -26,6 +27,7 @@ CAMPAIGN_NAME_REPLACEMENTS: dict[str, str] = {
     "TOPVIEW-20250321-Q-20250301460526-2025031002130": "2025_3_EMPREENDEDORISMO FEMININO_ALC_COMERCIALIZAÇÃO_CPM",
     "2025_3_INOVA CERRADO E PANTANAL_ALC__CPM":"2025_3_INOVA CERRADO E PANTANAL_ALC_COMERCIALIZAÇÃO_CPM",
     "2025_2_CATALISA ICT_TRAF__CPC":"2025_2_CATALISA ICT_TRAF_COMERCIALIZAÇÃO_CPC",
+    "2025_3_INOVA PANTANAL_ALC__CPM" : "2025_3_INOVA CERRADO E PANTANAL_ALC_COMERCIALIZAÇÃO_CPM"
     
 }
 """Substituições específicas para o campo 'Campaign name'.
