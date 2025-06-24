@@ -6,8 +6,9 @@ from .renomeacoes import (               # se criou renomeacoes.py
     renomeacao_metaGenero,
     renomeacao_metaAlcance,
     aplicar_substituicoes_objetivo,
-
 )
+from .datas import normalize_date_to_str_DD_M_YYYY
+from .write_dataframe_to_sheet import write_dataframe_to_sheet
 
 __all__ = [
     "gerar_id",
@@ -17,4 +18,6 @@ __all__ = [
     "renomeacao_metaGenero",
     "renomeacao_metaAlcance",
     "aplicar_substituicoes_objetivo",
+    "normalize_date_to_str_DD_M_YYYY",
+    "write_dataframe_to_sheet",
 ]

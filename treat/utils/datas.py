@@ -1,8 +1,15 @@
 # treat/utils/datas.py
 
 import pandas as pd
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Optional
+
+try:
+    from .datas_utils import transformar_para_date
+except ImportError:  # pragma: no cover - optional dependency
+    def transformar_para_date(val):
+        """Converte string/data para date, ou retorna None."""
+        return pd.to_datetime(val, errors="coerce").date()
 
 from treat.bi_param_utils import BIParamLookup
 
@@ -132,3 +139,29 @@ def unify_campaign_dates(
         df[end_col] = df[end_col].where(latest.isna(), latest_dates)
 
     return df
+
+
+def normalize_date_to_str_DD_M_YYYY(value) -> str:
+    """Normaliza ``value`` para a string ``DD/M/YYYY``.
+
+    Meses são exibidos sem zero à esquerda. Valores vazios retornam ``""``.
+    """
+    if value is None or value == "" or (isinstance(value, float) and pd.isna(value)):
+        return ""
+
+    if isinstance(value, pd.Timestamp):
+        value = value.date()
+
+    if isinstance(value, str):
+        try:
+            value = transformar_para_date(value)
+        except Exception:
+            return ""
+
+    if isinstance(value, datetime):
+        value = value.date()
+
+    if isinstance(value, date):
+        return f"{value.day:02d}/{value.month}/{value.year}"
+
+    return ""
