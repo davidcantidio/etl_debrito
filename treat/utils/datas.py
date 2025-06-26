@@ -2,7 +2,8 @@
 
 import pandas as pd
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Any
+
 
 try:
     from .datas_utils import transformar_para_date
@@ -165,3 +166,15 @@ def normalize_date_to_str_DD_M_YYYY(value) -> str:
         return f"{value.day:02d}/{value.month}/{value.year}"
 
     return ""
+
+
+def concat_period(start: Any, end: Any) -> str:
+    """
+    Gera um período formatado "DD/M/YYYY a DD/M/YYYY" a partir de duas datas,
+    ou string vazia se faltar um dos valores.
+    """
+    if not start or not end:
+        return ""
+    s = normalize_date_to_str_DD_M_YYYY(start)
+    e = normalize_date_to_str_DD_M_YYYY(end)
+    return f"{s} a {e}"

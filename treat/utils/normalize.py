@@ -198,3 +198,21 @@ def format_columns_to_comma_decimal(
             lambda x: f"{x:.{decimals}f}".replace(".", ",") if pd.notna(x) else ""
         )
     return df
+
+
+def normalize_vehicle(value: str) -> str:
+    """
+    Normaliza o nome do veículo:
+    - Facebook → FB
+    - Instagram → IG
+    - Caso contrário, devolve value.strip()
+    """
+    if not isinstance(value, str) or not value.strip():
+        return ""
+    v = value.strip().casefold()
+    if v.startswith("facebook"):
+        return "FB"
+    if v.startswith("instagram"):
+        return "IG"
+    return value.strip()
+

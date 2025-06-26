@@ -104,7 +104,9 @@ class SheetsFetcher:
         Constrói ranges a partir dos nomes de abas e realiza batchGet,
         retornando o payload em raw lists e atualizando o cache interno.
         """
-        ranges = [f"{name}!{self.col_range}" for name in sheet_names]
+        cleaned_names = [name.strip().strip("'") for name in sheet_names]
+        ranges = [f"{name}!{self.col_range}" for name in cleaned_names]
+
         resp = self._batch_get(ranges)
         if not resp.get("valueRanges"):
             raise RuntimeError("Sheets API retornou valueRanges vazio – quota ou planilha vazia?")

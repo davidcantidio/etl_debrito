@@ -1,23 +1,25 @@
 """
-extract  ── Camada de extração de dados Google Sheets
-=====================================================
+extract  ─ Camada de extração de dados Google Sheets
+====================================================
 
 Este módulo expõe:
 
-- read_df: helper simples para leitura de uma aba como DataFrame.
-- SheetsFetcher: classe avançada para batchGet, cache e write-back.
+- read_df : helper simples para ler UMA aba como pandas.DataFrame
+- SheetsFetcher : classe avançada (batchGet, cache, write-back)
 
 Uso rápido
 ----------
 
 from extract import read_df
-df = read_df(sheet_id="ID_DA_PLANILHA", tab="NOME_DA_ABA", header_row=0)
+df = read_df(sheet_id="ID_DA_PLANILHA",
+             tab="NOME_DA_ABA",
+             header_row=0)
 
 from extract import SheetsFetcher
 fetcher = SheetsFetcher(
     spreadsheet_id="ID_DA_PLANILHA",
-    creds_path="caminho/para/creds.json",
-    header_row=0
+    creds_path="creds.json",
+    header_row=0,
 )
 df2 = fetcher.get(["NOME_DA_ABA"])["NOME_DA_ABA"]
 """
@@ -31,20 +33,26 @@ import pandas as pd
 
 from .sheets_fetcher import SheetsFetcher
 
-
 __all__ = ["read_df", "SheetsFetcher"]
 
 
+# --------------------------------------------------------------------------- #
+# util interno                                                                #
+# --------------------------------------------------------------------------- #
 def _default_creds_path() -> str:
     """
-    Retorna o caminho do arquivo de credenciais de serviço.
+    Retorna o caminho do arquivo de credenciais.
 
-    Usa a variável de ambiente GOOGLE_CREDS_PATH, se definida;
-    caso contrário, retorna 'creds.json'.
+    Prioridade:
+    1. variável de ambiente GOOGLE_CREDS_PATH
+    2. arquivo 'creds.json' na raiz do projeto
     """
     return os.getenv("GOOGLE_CREDS_PATH", "creds.json")
 
 
+# --------------------------------------------------------------------------- #
+# API pública                                                                 #
+# --------------------------------------------------------------------------- #
 def read_df(
     *,
     sheet_id: str,
@@ -53,33 +61,46 @@ def read_df(
     creds_path: str | None = None,
 ) -> pd.DataFrame:
     """
-    Lê uma única aba de um Google Sheets e devolve como pandas.DataFrame.
+    Lê **uma única aba** de um Google Sheets em formato DataFrame.
 
     Parâmetros
     ----------
     sheet_id : str
-        ID da planilha (parte entre /d/ e /edit na URL).
+        ID da planilha (trecho entre `/d/` … `/edit` na URL).
     tab : str
-        Nome da aba a ser lida.
-    header_row : int, optional
-        Índice zero-based da linha de cabeçalho no Sheets.
-        Ex.: se o cabeçalho está na linha 5, passe header_row=4.
-        (default: 0)
-    creds_path : str | None, optional
-        Caminho para o arquivo JSON de credenciais de serviço.
-        Se None, usa _default_creds_path(). (default: None)
+        Nome exato da aba.
+    header_row : int, default 0
+        Linha (zero-based) que contém o cabeçalho.
+        Ex.: cabeçalho na linha 5 → header_row=4.
+    creds_path : str | None, default None
+        Caminho do JSON da service account; se None usa _default_creds_path().
 
     Retorno
     -------
-    pd.DataFrame
-        DataFrame com o conteúdo da aba. Linhas/colunas faltantes são
-        preenchidas com "" para manter retangularidade.
+    pandas.DataFrame
+        DataFrame com colunas rotuladas; células vazias preenchidas com "".
     """
-    creds_file = creds_path or _default_creds_path()
     fetcher = SheetsFetcher(
         spreadsheet_id=sheet_id,
-        creds_path=creds_file,
-        header_row=header_row,
+        creds_path=creds_path or _default_creds_path(),
+        header_row=0,  # buscamos tudo, ajustamos depois
     )
-    data = fetcher.get([tab])
-    return data.get(tab, pd.DataFrame())
+
+    raw_df = fetcher.get([tab])[tab]
+    if raw_df.empty:
+        return raw_df.copy()
+
+    # Se header_row é 0 basta retornar
+    if header_row == 0:
+        return raw_df.reset_index(drop=True)
+
+    if header_row >= len(raw_df):
+        raise ValueError(
+            f"header_row={header_row} fora do range (aba {tab} tem {len(raw_df)} linhas)"
+        )
+
+    new_header = raw_df.iloc[header_row].tolist()
+    body = raw_df.iloc[header_row + 1 :].copy()
+    body.columns = new_header
+    body.reset_index(drop=True, inplace=True)
+    return body
