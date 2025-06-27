@@ -68,14 +68,96 @@ def gerar_id(row: pd.Series) -> str:
 
 
 def make_id_ponto_de_controle(row: pd.Series) -> str:
+    """
+    Gera ID concatenando:
+      Periodo|Campanha|Veiculo|Link conteúdos impulsionados|
+      Agência|Editoria|Objetivo|Criativo
+    - Usa 'Criativo' se existir; caso contrário tenta 'key_creative'.
+    - Todos os campos são forçados a string.
+    """
+    criativo = (
+    row["Criativo"] if pd.notna(row.get("Criativo")) and row.get("Criativo") != "" 
+    else row.get("key_creative", "")
+)
+
     parts = [
-        row["Data"],
-        row["Campanha"],
-        row["Veiculo"],  # coluna Veiculo (sem acento) no índice 3
-        row["Link conteúdos impulsionados"],
         row["Periodo"],
+        row["Campanha"],
+        row["Veiculo"],
+        row["Link conteúdos impulsionados"],
         row["Agência"],
         row["Editoria"],
         row["Objetivo"],
+        criativo,
     ]
     return "|".join(str(p) for p in parts)
+
+def add_key_creative(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Gera coluna 'key_creative' com prioridade de escolha:
+      1. utm_content
+      2. ad_name
+      3. ad_group_name
+      4. ID_Campanha
+
+    Critério de aceite:
+      - Todos os registros devem receber um valor não vazio.
+      - Em caso de falta em todas as colunas-chave, será string vazia (asserta erro).
+    """
+    import numpy as _np
+
+    # monta condições: cada coluna existe e não é string vazia
+    conds = []
+    for col in ("utm_content", "ad_name", "ad_group_name", "ID_Campanha"):
+        if col in df.columns:
+            conds.append(df[col].notna() & df[col].astype(str).str.strip().ne(""))
+        else:
+            conds.append(False)
+
+    # escolhas correspondentes na mesma ordem
+    choices = [
+        df.get("utm_content", ""),
+        df.get("ad_name", ""),
+        df.get("ad_group_name", ""),
+        df.get("ID_Campanha", ""),
+    ]
+
+    # cria a coluna
+    df["key_creative"] = _np.select(conds, choices, default="")
+
+    # debug: preview e assert
+    print("Preview ‘key_creative’ (primeiras 5 linhas):")
+    print(df["key_creative"].head(5).tolist())
+    assert (df["key_creative"] != "").all(), (
+        "Há registros sem key_creative: verifique utm_content/ad_name/ad_group_name/ID_Campanha"
+    )
+
+    return df
+
+def dedupe_by_key_creative(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove linhas duplicadas com o mesmo `key_creative`, mantendo a primeira ocorrência.
+
+    Critério de aceite:
+      - O número de linhas resultante (`df_dedup`) deve ser menor ou igual ao original.
+      - Não deve alterar a ordem relativa das linhas remanescentes.
+    """
+    # cópia para debug
+    df_raw = df.copy()
+
+    # deduplicação
+    df_dedup = df_raw.drop_duplicates(subset="key_creative", keep="first")
+
+    # debug: relatório de redução
+    n_raw   = len(df_raw)
+    n_dedup = len(df_dedup)
+    print(f"Deduplicação por key_creative: {n_raw} → {n_dedup} linhas")
+    assert n_dedup <= n_raw, (
+        f"Após drop_duplicates, {n_dedup} linhas mas original tinha {n_raw}"
+    )
+
+    # mostra as primeiras 5 chaves para conferência
+    print("Preview das primeiras 5 key_creative únicas:")
+    print(df_dedup["key_creative"].head(5).tolist())
+
+    return df_dedup
