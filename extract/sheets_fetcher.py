@@ -104,23 +104,24 @@ class SheetsFetcher:
         Constrói ranges a partir dos nomes de abas e realiza batchGet,
         retornando o payload em raw lists e atualizando o cache interno.
         """
-        cleaned_names = [name.strip().strip("'") for name in sheet_names]
-        ranges = [f"{name}!{self.col_range}" for name in cleaned_names]
+        cleaned = [n.strip().strip("'") for n in sheet_names]
+        ranges = [f"{n}!{self.col_range}" for n in cleaned]
+        log.info("🧹 ranges normalizados: %s", ranges)
 
         resp = self._batch_get(ranges)
         if not resp.get("valueRanges"):
             raise RuntimeError("Sheets API retornou valueRanges vazio – quota ou planilha vazia?")
 
         payload: Dict[str, List[List[str]]] = {}
-        for name, vr in zip(sheet_names, resp["valueRanges"]):
+        for name, vr in zip(cleaned, resp["valueRanges"]):
             log.info("🔍 range completo retornado pela API: %s", vr.get("range"))
             original_key = name.strip()
-            returned_key = vr["range"].split("!", 1)[0].strip()
+            returned_key = vr["range"].split("!", 1)[0].strip().strip("'")
             if returned_key != original_key:
                 log.warning(
                     "Nome retornado pela API difere do solicitado: '%s' → '%s'",
                     original_key,
-                    returned_key,
+                    vr["range"].split("!", 1)[0].strip(),
                 )
             values = vr.get("values", [])
             payload[original_key] = values
@@ -134,7 +135,7 @@ class SheetsFetcher:
         Retorna dicionário {nome_aba: DataFrame|raw lists} conforme as_frame.
         Utiliza cache TTL para evitar leituras desnecessárias.
         """
-        names = [n.strip() for n in dict.fromkeys(sheet_names)]
+        names = [n.strip().strip("'") for n in dict.fromkeys(sheet_names)]
         key = tuple(sorted(names))
         now = time.time()
 
@@ -157,7 +158,7 @@ class SheetsFetcher:
 
     def get_cached(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
         """Retorna dados do cache sem acionar a API."""
-        names = [n.strip() for n in dict.fromkeys(sheet_names)]
+        names = [n.strip().strip("'") for n in dict.fromkeys(sheet_names)]
         key = tuple(sorted(names))
         if key not in self._cache:
             raise KeyError(f"Cache miss para {names}")
@@ -170,7 +171,8 @@ class SheetsFetcher:
         """
         Invalida o cache para as abas listadas e força recarregamento.
         """
-        key = tuple(sorted(sheet_names))
+        sanitized = [n.strip().strip("'") for n in sheet_names]
+        key = tuple(sorted(sanitized))
         self._cache.pop(key, None)
         _ = self.get(sheet_names, as_frame=False)  # força reload
 
@@ -200,4 +202,5 @@ class SheetsFetcher:
         Retorna objeto gspread.Worksheet para a aba informada,
         usando o cliente gspread inicializado em __init__.
         """
-        return self._gclient.open_by_key(self.spreadsheet_id).worksheet(sheet_name)
+        cleaned = sheet_name.strip().strip("'")
+        return self._gclient.open_by_key(self.spreadsheet_id).worksheet(cleaned)
