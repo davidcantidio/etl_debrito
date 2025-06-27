@@ -71,9 +71,9 @@ def make_id_ponto_de_controle(row: pd.Series) -> str:
     parts = [
         row["Data"],
         row["Campanha"],
-        row["Veiculo"],  # <- precisa existir SEM ACENTO
+        row["Veiculo"],  # coluna Veiculo (sem acento) no índice 3
         row["Link conteúdos impulsionados"],
-        row["Período"],
+        row["Periodo"],
         row["Agência"],
         row["Editoria"],
         row["Objetivo"],
