@@ -189,11 +189,15 @@ class SheetsFetcher:
         """
         if not raw:
             return pd.DataFrame()
+
+        # calcula o número máximo de colunas em TODO o range
+        max_cols = max(len(r) for r in raw)
+
         header, *body = raw
-        max_cols = len(header)
+        header = (header + [""] * (max_cols - len(header)))[:max_cols]
+
         normalized = [
-            row + [""] * (max_cols - len(row)) if len(row) < max_cols else row[:max_cols]
-            for row in body
+            (row + [""] * (max_cols - len(row)))[:max_cols] for row in body
         ]
         return pd.DataFrame(normalized, columns=[c.strip() for c in header])
 

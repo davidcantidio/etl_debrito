@@ -68,18 +68,14 @@ def gerar_id(row: pd.Series) -> str:
 
 
 def make_id_ponto_de_controle(row: pd.Series) -> str:
-    """
-    Concatena os campos transformados para gerar um ID único de deduplicação:
-    Data|Campanha|Veiculo|Link|Periodo|Agencia|Editoria|Objetivo.
-    """
     parts = [
-        row.get("Data", ""),
-        row.get("Campanha", ""),
-        row.get("Veiculo", ""),
-        row.get("Link conteúdos impulsionados", ""),
-        row.get("Período", ""),
-        row.get("Agência", ""),
-        row.get("Editoria", ""),
-        row.get("Objetivo (aumentar seguidores, melhorar engajamento, etc)", ""),
+        row["Data"],
+        row["Campanha"],
+        row["Veiculo"],  # <- precisa existir SEM ACENTO
+        row["Link conteúdos impulsionados"],
+        row["Período"],
+        row["Agência"],
+        row["Editoria"],
+        row["Objetivo"],
     ]
     return "|".join(str(p) for p in parts)

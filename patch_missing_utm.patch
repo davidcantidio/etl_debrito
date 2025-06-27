@@ -1,132 +1,246 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
-diff --git a/extract/sheets_fetcher.py b/extract/sheets_fetcher.py
-index 323eb3b7174a1baa62af439f0f5079616dcc079f..a53639a3c9304664666363da7e96fc5004594caf 100644
---- a/extract/sheets_fetcher.py
-+++ b/extract/sheets_fetcher.py
-@@ -82,115 +82,118 @@ class SheetsFetcher:
-                     includeGridData=False,
-                 ).execute()
-             )
-         return self._spreadsheet_meta
-     
+diff --git a/ponto_de_controle_writting.ipynb b/ponto_de_controle_writting.ipynb
+index 0cce8f53504b9d7b5a56c0851eec9c633168d02a..79779ffd45c35f2c457c74f050205b6e5778c3a0 100644
+--- a/ponto_de_controle_writting.ipynb
++++ b/ponto_de_controle_writting.ipynb
+@@ -77,57 +77,56 @@
+    "execution_count": null,
+    "id": "73580430",
+    "metadata": {},
+    "outputs": [],
+    "source": [
+     "# Filtro temporal & Data mínima – usado no filtro posterior\n",
+     "MIN_DATE = dt.date(2025, 6, 1)\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+    "execution_count": null,
+    "id": "ec81d7ea",
+    "metadata": {},
+    "outputs": [],
+    "source": [
+     "# Lista DEST_COLUMNS: declara lista com 11 colunas, ordem exata exigida\n",
+     "DEST_COLUMNS = [\n",
+     "    \"Data\",\n",
+     "    \"Campanha\",\n",
+     "    \"Veiculo\",\n",
+     "    \"Link conteúdos impulsionados\",\n",
+     "    \"Período\",\n",
+     "    \"Agência\",\n",
+     "    \"Editoria\",\n",
+-    "    \"Objetivo (aumentar seguidores, melhorar engajamento, etc)\",\n",
+-    "    \"Meta (número) (quantos seguidores, compartilhamentos, etc. previstos?)\",\n",
++    "    \"Objetivo\",\n",
++    "    \"Meta\",\n",
+     "    \"Status\",\n",
+     "    \"Resultado\",\n",
+     "]\n",
+-    "assert len(DEST_COLUMNS) == 11, f\"DEST_COLUMNS deve ter 11 colunas, mas tem {len(DEST_COLUMNS)}\"\n",
+-    "    "
++    "assert len(DEST_COLUMNS) == 11\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+    "execution_count": null,
+    "id": "b7693e85",
+    "metadata": {},
+    "outputs": [],
+    "source": [
+     "# Leitura da aba de origem – deve executar sem exceção se ORIGIN_SHEET_ID estiver definido\n",
+     "\"\"\"\n",
+     "Célula 2 – Leitura + filtro temporal da aba modeloGeral\n",
+     "- Lê df_origin com read_df()\n",
+     "- Converte coluna date para date_dt\n",
+     "- Filtra linhas >= MIN_DATE\n",
+     "- Garante colunas críticas e prepara df_origin\n",
+     "\"\"\"\n",
+     "df_origin = read_df(\n",
+     "    sheet_id=ORIGIN_SHEET_ID,\n",
+     "    tab=ORIGIN_TAB,\n",
+     "    header_row=0,\n",
+     ")"
+    ]
+   },
+   {
+@@ -201,51 +200,52 @@
+   {
+    "cell_type": "code",
+    "execution_count": null,
+    "id": "519e8d47",
+    "metadata": {},
+    "outputs": [],
+    "source": [
+     "# Normalizar coluna Data e dropar coluna date após criar Data para evitar conflito de nomes\n",
+     "df[\"Data\"] = df[\"date\"].apply(normalize_date_to_str_DD_M_YYYY)\n",
+     "df.drop(columns=[\"date\"], inplace=True)\n",
+     "\n",
+     "# Debug: mostrar os primeiros valores de 'Data' e conferir dtype\n",
+     "print(\"Preview 'Data':\")\n",
+     "print(df[\"Data\"].head())\n",
+     "print(f\"Tipo de coluna Data: {df['Data'].dtype}, total de linhas: {len(df)}\")\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+    "execution_count": null,
+    "id": "d916ab21",
+    "metadata": {},
+    "outputs": [],
+    "source": [
+     "# Normalizar Veiculo – aplicação de normalize_vehicle\n",
+-    "df[\"Veiculo\"] = df[\"Veiculo\"].apply(normalize_vehicle)\n"
++    "df[\"Veiculo\"] = df[\"Veiculo\"].apply(normalize_vehicle)\n",
++    "df.drop(columns=[\"Veículo\"], errors='ignore', inplace=True)\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+    "execution_count": null,
+    "id": "36e4143e",
+    "metadata": {},
+    "outputs": [],
+    "source": [
+     "# Gerar coluna Período com concat_period e dropar colunas auxiliares\n",
+     "df[\"Período\"] = df.apply(lambda r: concat_period(r.get(\"start\"), r.get(\"end\")), axis=1)\n",
+     "df.drop(columns=[\"start\", \"end\"], inplace=True)\n",
+     "\n",
+     "# Debug: conferir se a geração de 'Período' funcionou\n",
+     "print(\"Preview 'Período':\")\n",
+     "print(df[\"Período\"].head().tolist())\n",
+     "non_empty = df[\"Período\"].astype(bool).sum()\n",
+     "print(f\"Linhas com período não vazio: {non_empty} de {len(df)}\")\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+    "execution_count": null,
+    "id": "0af3b628",
+    "metadata": {},
+@@ -811,50 +811,52 @@
+       "dtype: int64\n"
+      ]
+     }
+    ],
+    "source": [
+     "# ---------------------------------------------------------------------------\n",
+     "# Leitura da aba de destino  “IMPULSIONAMENTOS 2025”\n",
+     "# ---------------------------------------------------------------------------\n",
+     "from extract import read_df   # helper já usado antes\n",
+     "\n",
+     "# 1 • Lê a aba usando cabeçalho real na linha 5 (zero-based 4)\n",
+     "df_dest = read_df(\n",
+     "    sheet_id=DEST_SHEET_ID,\n",
+     "    tab=DEST_TAB,\n",
+     "    header_row=HEAD_ROW_DEST - 1,   # HEAD_ROW_DEST = 5  → 4\n",
+     ")\n",
+     "\n",
+     "# 2 • Remove eventuais colunas duplicadas/vazias geradas pelo Sheets\n",
+     "if df_dest.columns.duplicated().any() or \"\" in df_dest.columns:\n",
+     "    print(\"⚠️  Cabeçalho continha rótulos duplicados ou vazios – normalizando…\")\n",
+     "    df_dest = df_dest.loc[:, ~df_dest.columns.duplicated()]           # remove duplicadas\n",
+     "    df_dest.rename(columns=lambda c: c if c else \"_blank\", inplace=True)\n",
+     "\n",
+     "# 3 • Mantém apenas as 11 colunas oficiais e preserva a ordem\n",
+     "df_dest = df_dest.reindex(columns=DEST_COLUMNS, fill_value=\"\")\n",
++    "if \"Veículo\" in df_dest.columns and \"Veiculo\" not in df_dest.columns:\n",
++    "    df_dest.rename(columns={\"Veículo\": \"Veiculo\"}, inplace=True)\n",
+     "\n",
+     "# 4 • Descarta linhas totalmente vazias (apenas bordas/formatação)\n",
+     "df_dest = df_dest.replace(\"\", pd.NA).dropna(how=\"all\").reset_index(drop=True)\n",
+     "\n",
+     "# 5 • Valida e mostra prévia\n",
+     "assert df_dest.columns.tolist() == DEST_COLUMNS, \\\n",
+     "    f\"Colunas inesperadas: {df_dest.columns.tolist()}\"\n",
+     "print(f\"Linhas válidas em df_dest: {len(df_dest)}\")\n",
+     "display(df_dest.head())\n",
+     "\n",
+     "# Agora df_dest está pronto para gerar __ID__, deduplicar e gravar\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+    "execution_count": null,
+    "id": "cee79bf7",
+    "metadata": {},
+    "outputs": [],
+    "source": [
+     "# 4.1 Debug avançado: inspecionar o “raw” do df_dest sem header para descobrir onde está o cabeçalho real\n",
+     "raw_dest = read_df(\n",
+     "    sheet_id=DEST_SHEET_ID,\n",
+     "    tab=DEST_TAB,\n",
+     "    header_row=0,     # força ler tudo como dados sem extrair header\n",
+@@ -885,26 +887,26 @@
+     "    raise RuntimeError(\"Não foi possível detectar automaticamente a linha de cabeçalho em df_dest\")\n"
+    ]
+   }
+  ],
+  "metadata": {
+   "kernelspec": {
+    "display_name": "venv",
+    "language": "python",
+    "name": "python3"
+   },
+   "language_info": {
+    "codemirror_mode": {
+     "name": "ipython",
+     "version": 3
+    },
+    "file_extension": ".py",
+    "mimetype": "text/x-python",
+    "name": "python",
+    "nbconvert_exporter": "python",
+    "pygments_lexer": "ipython3",
+    "version": "3.12.3"
+   }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+-}
++}
+\ No newline at end of file
+diff --git a/treat/utils/campos_calculados.py b/treat/utils/campos_calculados.py
+index 679755fd81e13dea5c129eea9ee0b0618bdf7248..27e37a119e2d256019a4171d30ff214a760e7fd7 100644
+--- a/treat/utils/campos_calculados.py
++++ b/treat/utils/campos_calculados.py
+@@ -53,33 +53,33 @@ def gerar_id(row: pd.Series) -> str:
+     """
+     def pick(*candidatos: str) -> str:
+         for c in candidatos:
+             if c in row and str(row[c]).strip():
+                 return str(row[c]).strip()
+         return ""
  
-     def _batch_get(self, ranges: List[str]) -> Dict[str, Any]:
-         """Executa batchGet com retry/back-off para código 429."""
-         log.info("🔄 batchGet tentativa para ranges: %s", ranges)
-         try:
-             return (
-                 self._service.spreadsheets()
-                 .values()
-                 .batchGet(spreadsheetId=self.spreadsheet_id, ranges=ranges)
-                 .execute()
-             )
-         except HttpError as e:
-             log.error("Sheets API HttpError: %s", e)
-             raise
+     parts = [
+         pick("date",      "Data"),
+         pick("Campanha"),               # só existe em PT mesmo
+         pick("impressions", "Impressoes"),
+         pick("cost",        "Investimento"),
+         pick("link_clicks", "Cliques_no_Link"),
+     ]
+     return "-".join(parts)
  
-     def _fetch_and_cache(self, sheet_names: List[str]) -> Dict[str, List[List[str]]]:
-         """
-         Constrói ranges a partir dos nomes de abas e realiza batchGet,
-         retornando o payload em raw lists e atualizando o cache interno.
-         """
--        ranges = [f"{name}!{self.col_range}" for name in sheet_names]
-+        cleaned = [n.strip().strip("'") for n in sheet_names]
-+        ranges = [f"{n}!{self.col_range}" for n in cleaned]
-+        log.info("🧹 ranges normalizados: %s", ranges)
-         resp = self._batch_get(ranges)
-         if not resp.get("valueRanges"):
-             raise RuntimeError("Sheets API retornou valueRanges vazio – quota ou planilha vazia?")
  
-         payload: Dict[str, List[List[str]]] = {}
--        for name, vr in zip(sheet_names, resp["valueRanges"]):
-+        for name, vr in zip(cleaned, resp["valueRanges"]):
-             log.info("🔍 range completo retornado pela API: %s", vr.get("range"))
-             original_key = name.strip()
-             returned_key = vr["range"].split("!", 1)[0].strip()
-             if returned_key != original_key:
-                 log.warning(
-                     "Nome retornado pela API difere do solicitado: '%s' → '%s'",
-                     original_key,
-                     returned_key,
-                 )
-             values = vr.get("values", [])
-             payload[original_key] = values
-             if values:
-                 self._headers[original_key] = [c.strip() for c in values[0]]
-         return payload
- 
-     def get(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
-         """
-         Lê em lote as abas listadas em sheet_names.
-         Retorna dicionário {nome_aba: DataFrame|raw lists} conforme as_frame.
-         Utiliza cache TTL para evitar leituras desnecessárias.
-         """
--        names = [n.strip() for n in dict.fromkeys(sheet_names)]
-+        names = [n.strip().strip("'") for n in dict.fromkeys(sheet_names)]
-         key = tuple(sorted(names))
-         now = time.time()
- 
-         if key in self._cache and now - self._cache[key][0] < self._cache_ttl:
-             raw = self._cache[key][1]
-             log.info("📥 Cache hit para %s", key)
-         else:
-             raw = self._fetch_and_cache(names)
-             self._cache[key] = (now, raw)
-             log.info("📡 batchGet %d ranges", len(names))
- 
-         for tab, values in raw.items():
-             if tab not in self._headers and values:
-                 self._headers[tab] = [c.strip() for c in values[0]]
- 
-         if not as_frame:
-             return {n: raw.get(n, []) for n in names}
- 
-         return {n: self._as_dataframe(raw.get(n, [])) for n in names}
- 
-     def get_cached(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
-         """Retorna dados do cache sem acionar a API."""
--        names = [n.strip() for n in dict.fromkeys(sheet_names)]
-+        names = [n.strip().strip("'") for n in dict.fromkeys(sheet_names)]
-         key = tuple(sorted(names))
-         if key not in self._cache:
-             raise KeyError(f"Cache miss para {names}")
-         raw = self._cache[key][1]
-         if not as_frame:
-             return {n: raw.get(n, []) for n in names}
-         return {n: self._as_dataframe(raw.get(n, [])) for n in names}
- 
-     def refresh(self, sheet_names: Iterable[str]):
-         """
-         Invalida o cache para as abas listadas e força recarregamento.
-         """
--        key = tuple(sorted(sheet_names))
-+        sanitized = [n.strip().strip("'") for n in sheet_names]
-+        key = tuple(sorted(sanitized))
-         self._cache.pop(key, None)
-         _ = self.get(sheet_names, as_frame=False)  # força reload
- 
-     @property
-     def header_cache(self) -> Dict[str, List[str]]:
-         """Retorna cabeçalhos já carregados em memória."""
-         return dict(self._headers)
- 
-     @staticmethod
-     def _as_dataframe(raw: List[List[str]]) -> pd.DataFrame:
-         """
-         Converte raw lists (header + body) em pandas.DataFrame,
-         preenchendo linhas/colunas faltantes com strings vazias.
-         """
-         if not raw:
-             return pd.DataFrame()
-         header, *body = raw
-         max_cols = len(header)
-         normalized = [
-             row + [""] * (max_cols - len(row)) if len(row) < max_cols else row[:max_cols]
-             for row in body
-         ]
-         return pd.DataFrame(normalized, columns=[c.strip() for c in header])
- 
-     def open_worksheet(self, sheet_name: str):
+ def make_id_ponto_de_controle(row: pd.Series) -> str:
+     """
+     Concatena os campos transformados para gerar um ID único de deduplicação:
+     Data|Campanha|Veiculo|Link|Periodo|Agencia|Editoria|Objetivo.
+     """
+     parts = [
+         row.get("Data", ""),
+         row.get("Campanha", ""),
+-        row.get("Veiculo", ""),
++        row.get("Veiculo", ""),  # coluna padronizada sem acento
+         row.get("Link conteúdos impulsionados", ""),
+         row.get("Período", ""),
+         row.get("Agência", ""),
+         row.get("Editoria", ""),
+         row.get("Objetivo (aumentar seguidores, melhorar engajamento, etc)", ""),
+     ]
+-    return "|".join(str(p) for p in parts)
+\ No newline at end of file
++    return "|".join(str(p) for p in parts)
  
 EOF
 )
