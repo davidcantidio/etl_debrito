@@ -1,0 +1,30 @@
+name: 🎨 Python Formatting Check (black)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  black-check:
+    name: Run black --check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 🐍 Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 📦 Install black
+        run: |
+          python -m pip install --upgrade pip
+          pip install black
+
+      - name: ✅ Check code style with black
+        run: |
+          black --check . --exclude '(venv|env|__pycache__|\.ipynb_checkpoints)'
