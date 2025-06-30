@@ -67,30 +67,32 @@ def gerar_id(row: pd.Series) -> str:
     return "-".join(parts)
 
 
+
 def make_id_ponto_de_controle(row: pd.Series) -> str:
+    """Gera identificador concatenando campos chave.
+
+    Concatena ``Periodo|Campanha|Veiculo|Link conteúdos impulsionados|Agência|Editoria|Objetivo|criativo``.
+    O valor ``criativo`` vem da coluna ``Criativo`` ou ``key_creative``.
+    Valores nulos são convertidos para string vazia antes de juntar.
     """
-    Gera ID concatenando:
-      Periodo|Campanha|Veiculo|Link conteúdos impulsionados|
-      Agência|Editoria|Objetivo|Criativo
-    - Usa 'Criativo' se existir; caso contrário tenta 'key_creative'.
-    - Todos os campos são forçados a string.
-    """
-    criativo = (
-    row["Criativo"] if pd.notna(row.get("Criativo")) and row.get("Criativo") != "" 
-    else row.get("key_creative", "")
-)
+
+    criativo = row.get("Criativo") or row.get("key_creative", "")
+
+    def safe(val):
+        return str(val) if pd.notna(val) else ""
 
     parts = [
-        row["Periodo"],
-        row["Campanha"],
-        row["Veiculo"],
-        row["Link conteúdos impulsionados"],
-        row["Agência"],
-        row["Editoria"],
-        row["Objetivo"],
-        criativo,
+        safe(row.get("Periodo")),
+        safe(row.get("Campanha")),
+        safe(row.get("Veiculo")),
+        safe(row.get("Link conteúdos impulsionados")),
+        safe(row.get("Agência")),
+        safe(row.get("Editoria")),
+        safe(row.get("Objetivo")),
+        safe(criativo),
     ]
-    return "|".join(str(p) for p in parts)
+    return "|".join(parts)
+
 
 def add_key_creative(df: pd.DataFrame) -> pd.DataFrame:
     """
