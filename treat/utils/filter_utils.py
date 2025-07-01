@@ -1,7 +1,7 @@
+import logging
+
 import pandas as pd
 from utils.filter_lists import CAMPAIGN_NAME_FILTER_LIST
-import logging
-from typing import List
 
 
 def remove_zero_impressoes(df: pd.DataFrame) -> pd.DataFrame:

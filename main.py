@@ -1,7 +1,9 @@
 # main.py
 
 import os
+
 import yaml
+
 from extract.sheets_fetcher import SheetsFetcher
 from treat.meta import treat_meta  # Exemplo de função de treat
 

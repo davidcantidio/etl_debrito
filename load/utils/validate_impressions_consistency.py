@@ -1,6 +1,8 @@
 # validate_impressions_consistency.py
-import pandas as pd
 from typing import Sequence
+
+import pandas as pd
+
 from extract.sheets_fetcher import SheetsFetcher
 
 

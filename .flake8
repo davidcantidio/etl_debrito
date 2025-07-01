@@ -1,0 +1,20 @@
+[flake8]
+# Define o limite de colunas como o do Black (88)
+max-line-length = 88
+
+# Ignora o E203 (conflito com Black, OK segundo Guido van Rossum)
+extend-ignore = E203
+
+# Ignora pastas e arquivos temporários
+exclude =
+    .venv,
+    venv,
+    env,
+    __pycache__,
+    .git,
+    *.pyc,
+    build,
+    dist
+
+
+baseline = .flake8-baseline         

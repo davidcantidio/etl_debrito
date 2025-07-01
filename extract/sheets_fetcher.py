@@ -1,24 +1,18 @@
 # File: extract/sheets_fetcher.py
 
-import os
-import time
 import logging
+import time
 from typing import Any, Dict, Iterable, List, Tuple
 
 import pandas as pd
 from google.api_core.exceptions import TooManyRequests
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
+from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
+                      wait_exponential)
 
-from treat.utils.get_google_client import (
-    get_google_client,
-)  # retorna um cliente gspread
+from treat.utils.get_google_client import \
+    get_google_client  # retorna um cliente gspread
 
 log = logging.getLogger(__name__)
 

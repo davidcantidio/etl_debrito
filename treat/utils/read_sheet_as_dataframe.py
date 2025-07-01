@@ -10,8 +10,8 @@ def read_sheet_as_dataframe_range(
     garantindo que todas as linhas tenham o mesmo tamanho, preenchendo com ''
     ou cortando ao máximo.
     """
-    from googleapiclient.errors import HttpError
     import pandas as pd
+    from googleapiclient.errors import HttpError
 
     try:
         sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)

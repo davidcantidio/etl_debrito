@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import logging
 import time  # ← ESQUECEU de importar
+
 import pandas as pd
 
 from treat.bi_param_utils import BIParamLookup
-from treat.utils.normalize import extract_meta_platform_from_placement
 from treat.utils.campanha_mapper import buscar_mapping
+from treat.utils.normalize import extract_meta_platform_from_placement
 
 log = logging.getLogger(__name__)
 

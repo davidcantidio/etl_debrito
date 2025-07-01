@@ -5,6 +5,7 @@ from typing import Optional
 
 import pandas as pd
 from gspread_dataframe import set_with_dataframe
+
 from extract.sheets_fetcher import SheetsFetcher
 
 log = logging.getLogger(__name__)

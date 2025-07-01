@@ -1,12 +1,13 @@
 # creative_mappging.py
 
 import logging
+import unicodedata
+
 import pandas as pd
 from gspread.utils import rowcol_to_a1
 from utils.get_google_client import get_google_client
-from utils.google_sheets import CREDS_PATH as creds_path, SPREADSHEET_ID
-from utils.normalize import normalize_columns
-import unicodedata
+from utils.google_sheets import CREDS_PATH as creds_path
+from utils.google_sheets import SPREADSHEET_ID
 
 
 def _normalize(s: str) -> str:

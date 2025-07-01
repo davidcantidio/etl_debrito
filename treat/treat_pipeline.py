@@ -23,56 +23,38 @@ from __future__ import annotations
 import builtins
 import logging
 from typing import Callable, Dict, List, Optional
-from treat.utils.normalize import normalize_age, normalize_gender  # novo import
+
 import pandas as pd
 from gspread import Worksheet
 
 from extract.sheets_fetcher import SheetsFetcher
+from load.dest_writer import (DESTINATION_SHEETS, _infer_data_type,
+                              collect_dest_payload, flush_payloads,
+                              prefetch_meta)
 from load.origin_writer import write_back_origin
-from treat.utils.sheets_cache import get_worksheet
-from treat.utils.datas import (
-    converter_data,
-    fill_missing_start_end_from_params,
-    unify_campaign_dates,
-)
-from treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge import (
-    merge_pinterest_dimension as pin_merge,
-)
+from treat.bi_param_utils import (BIParamLookup, enrich_with_bi_parametrizacao,
+                                  fill_objective_from_bi)
 from treat.platforms import dispatch
-from treat.utils.preprocess_utils import (
-    preprocess_origin,
-    assign_vehicle_and_id,
-    get_sibling_sheet,
-)
-from treat.utils.atribuicoes_via_lookup import SourceLookup
-from treat.bi_param_utils import (
-    BIParamLookup,
-    enrich_with_bi_parametrizacao,
-    fill_objective_from_bi,
-)
-from treat.utils.renomeacoes import (
-    renomear_colunas_origem_para_modelo,
-    aplicar_substituicoes_objetivo,
-    renomeacao_geral,
-    renomeacao_metaGenero,
-    renomeacao_metaIdade,
-)
-from treat.utils.campos_calculados import gerar_id, calcular_engajamento_total
-from load.dest_writer import (
-    DESTINATION_SHEETS,
-    _infer_data_type,
-    collect_dest_payload,
-    flush_payloads,
-    prefetch_meta,
-)
-from treat.utils.validations import (
-    check_required_columns,
-    validate_aggregates,
-    validate_columns,
-    validate_utm_content_in_bi,
-    validate_taxonomy_consistency,
-    validate_impressions_by_platform,
-)
+from treat.utils.campos_calculados import calcular_engajamento_total, gerar_id
+from treat.utils.datas import (converter_data,
+                               fill_missing_start_end_from_params,
+                               unify_campaign_dates)
+from treat.utils.merges.pinterest.pinterest_dimension_pin_id_merge import \
+    merge_pinterest_dimension as pin_merge
+from treat.utils.normalize import (normalize_age,  # novo import
+                                   normalize_gender)
+from treat.utils.preprocess_utils import (assign_vehicle_and_id,
+                                          preprocess_origin)
+from treat.utils.renomeacoes import (aplicar_substituicoes_objetivo,
+                                     renomeacao_geral, renomeacao_metaGenero,
+                                     renomeacao_metaIdade,
+                                     renomear_colunas_origem_para_modelo)
+from treat.utils.sheets_cache import get_worksheet
+from treat.utils.validations import (check_required_columns,
+                                     validate_aggregates, validate_columns,
+                                     validate_impressions_by_platform,
+                                     validate_taxonomy_consistency,
+                                     validate_utm_content_in_bi)
 
 log = logging.getLogger(__name__)
 

@@ -7,10 +7,11 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from treat.treat_pipeline import execute_pipeline, TreatPipeline
-from load import dest_writer
-import treat.treat_pipeline as pipeline
 from googleapiclient import discovery
+
+import treat.treat_pipeline as pipeline
+from load import dest_writer
+from treat.treat_pipeline import TreatPipeline, execute_pipeline
 
 
 class DummyFetcher:

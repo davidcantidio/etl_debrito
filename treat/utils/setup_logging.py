@@ -1,7 +1,7 @@
 # utils/setup_logging.py
 
 import logging
-from logging import StreamHandler, FileHandler, Formatter
+from logging import FileHandler, Formatter, StreamHandler
 from typing import Optional
 
 

@@ -1,6 +1,7 @@
 # utils/numeracao.py
-import pandas as pd
 from typing import List, Optional
+
+import pandas as pd
 
 
 def next_numbers(

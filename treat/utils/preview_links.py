@@ -1,7 +1,7 @@
 import logging
-import pandas as pd
+
 import numpy as np
-import logging
+import pandas as pd
 
 
 def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:

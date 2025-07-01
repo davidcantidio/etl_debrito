@@ -11,19 +11,17 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from decimal import Decimal, ROUND_DOWN
+from decimal import ROUND_DOWN, Decimal
 from math import floor
 from typing import Dict, List, Tuple, Union
 
 import pandas as pd
-
+from utils.get_google_client import get_google_client
 # -------------------------------------------------------------------- #
 # Dependências auxiliares de Sheets
 # -------------------------------------------------------------------- #
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
-from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
-
 
 # -------------------------------------------------------------------- #
 # 0) Conjunto ÚNICO de métricas usadas em Meta‑Idade
@@ -113,7 +111,7 @@ def get_placements(df: pd.DataFrame) -> List[str]:
 def compute_pesos_impressao(
     row: pd.Series, placements: List[str]
 ) -> Tuple[Dict[str, int], int]:
-    log = logging.getLogger("common_meta.compute_pesos_impressao")
+    logging.getLogger("common_meta.compute_pesos_impressao")
     pesos = {pl: max(int(row.get(f"{pl}_Impressions", 0)), 0) for pl in placements}
     if all(v == 0 for v in pesos.values()):
         top_pl, _ = max(

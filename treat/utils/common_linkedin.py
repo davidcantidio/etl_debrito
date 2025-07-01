@@ -4,12 +4,8 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
-from utils.get_google_client import get_google_client
-from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
-from utils.normalize import normalize_columns, normalize_parametrizacao_values
+from utils.creative_mapping import get_ad_name_from_utm_content
 from utils.preview_links import generate_linkedin_ad_preview_link_from_lookup
-from utils.creative_mapping import load_ad_name_mapping, get_ad_name_from_utm_content
-from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 
 
 def carregar_mapeamentos_linkedin():
@@ -21,11 +17,13 @@ def carregar_mapeamentos_linkedin():
     e, portanto, usamos header_row_index=0.
     """
     import logging
-    from utils.get_google_client import get_google_client
-    from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
-    from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
-    from utils.normalize import normalize_columns, normalize_parametrizacao_values
+
     from utils.creative_mapping import load_ad_name_mapping
+    from utils.get_google_client import get_google_client
+    from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+    from utils.normalize import (normalize_columns,
+                                 normalize_parametrizacao_values)
+    from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 
     logging.info("Carregando mapeamentos do LinkedIn (preview e criativo)...")
 

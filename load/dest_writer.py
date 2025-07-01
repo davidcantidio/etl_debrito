@@ -21,16 +21,10 @@ from typing import Dict, Iterable, List, Optional, Set
 import numpy as np
 import pandas as pd
 from google.oauth2.service_account import Credentials
-from treat.utils.sheets_cache import get_worksheet as _get_worksheet
 from googleapiclient.discovery import build
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from extract.sheets_fetcher import SheetsFetcher
+from treat.utils.sheets_cache import get_worksheet as _get_worksheet
 from treat.utils.validations import validate_columns
 
 log = logging.getLogger(__name__)
@@ -71,9 +65,7 @@ def prefetch_meta(fetcher: SheetsFetcher, spreadsheet_id: str) -> None:
     Depois disso, os caches globais _HEADERS e _EXISTING_IDS estão prontos
     para uso em write_back_destination, sem novas leituras.
     """
-    global _HEADERS, _EXISTING_IDS
     if _HEADERS:
-        # já realizou prefetch nesta sessão
         return
 
     abas = list(DESTINATION_SHEETS.values())

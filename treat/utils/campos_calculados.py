@@ -1,5 +1,6 @@
-import pandas as pd
 import logging
+
+import pandas as pd
 
 
 def calcular_engajamento_total(df: pd.DataFrame) -> pd.DataFrame:

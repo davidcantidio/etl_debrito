@@ -1,9 +1,9 @@
 # treat/utils/datas.py
 
-import pandas as pd
 from datetime import date, datetime
-from typing import Optional, Any
+from typing import Any
 
+import pandas as pd
 
 try:
     from .datas_utils import transformar_para_date

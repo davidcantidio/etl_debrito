@@ -1,7 +1,8 @@
 # treat/platforms/linkedin.py
 
-import pandas as pd
 from typing import Any, Dict, Optional
+
+import pandas as pd
 
 
 def _init_preview_column(df: pd.DataFrame) -> pd.DataFrame:
@@ -57,7 +58,8 @@ def transform_linkedin(df: pd.DataFrame, lookup: Optional[Any] = None) -> pd.Dat
     - lookup.get_linkedin_ad_name_map() fornece o mapeamento utm_content → novo ad_name.
     """
     # Importa dinamicamente para evitar dependência circular
-    from treat.utils.preview_links import generate_linkedin_ad_preview_link_from_lookup
+    from treat.utils.preview_links import \
+        generate_linkedin_ad_preview_link_from_lookup
 
     # 1) Cria/garante a coluna de preview
     df = _init_preview_column(df)

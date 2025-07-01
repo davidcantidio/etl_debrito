@@ -1,11 +1,11 @@
 import logging
 import time as _time
-from typing import Any, Dict, List, Optional, Tuple, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
 import pandas as pd
 from gspread.utils import rowcol_to_a1
 
 from treat.utils.get_google_client import get_google_client
-from treat.utils.normalize import normalize_columns
 
 log = logging.getLogger(__name__)
 

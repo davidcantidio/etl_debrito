@@ -1,5 +1,6 @@
-import pandas as pd
 from typing import Optional
+
+import pandas as pd
 
 from treat.utils.geo_normalize import normalize_region
 from treat.utils.substitute_origin_values import apply_all_origin_substitutions

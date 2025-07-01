@@ -1,6 +1,7 @@
 # File: treat/platforms/tiktok.py
 
 import pandas as pd
+
 from treat.utils.preview_links import generate_tiktok_ad_preview_link
 
 

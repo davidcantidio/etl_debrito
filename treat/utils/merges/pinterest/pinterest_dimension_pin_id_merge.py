@@ -12,6 +12,7 @@ from math import floor
 from typing import Dict, List, Tuple
 
 import pandas as pd
+
 from treat.utils.normalize import convert_numeric_columns
 
 log = logging.getLogger(__name__)

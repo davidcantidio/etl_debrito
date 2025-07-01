@@ -12,20 +12,16 @@ Para adicionar nova aba/plataforma:
 """
 
 from __future__ import annotations
-from typing import Dict
-import pandas as pd
+
 import logging
+from typing import Dict
+
+import pandas as pd
 
 from treat.preprocess_utils import preprocess_origin
-
 from treat.treat_pipeline import TreatPipeline
-from treat.utils.renomeacoes import (
-    renomeacao_geral,
-    renomeacao_metaGenero,
-    renomeacao_metaIdade,
-    # renomeacao_tiktok_genero,
-    # renomeacao_pinterest_idade,
-)
+from treat.utils.renomeacoes import (  # renomeacao_tiktok_genero,; renomeacao_pinterest_idade,
+    renomeacao_geral, renomeacao_metaGenero, renomeacao_metaIdade)
 
 log = logging.getLogger(__name__)
 

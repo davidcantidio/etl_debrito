@@ -7,10 +7,9 @@ Nenhuma rotina deste módulo faz chamadas à API do Google Sheets.
 from __future__ import annotations
 
 import datetime as _dt
-import logging
 import re
 import unicodedata
-from typing import List, Optional
+from typing import Optional, Any
 
 import pandas as pd
 
@@ -46,6 +45,41 @@ def converter_data(df: pd.DataFrame, coluna: str) -> pd.DataFrame:
 # Normalização de textos
 # ----------------------------------------------------------------------
 
+
+def normalize_nome(val: Any) -> str:
+    """
+    Padroniza rótulos de dimensão (idade, gênero, região, placement...).
+
+    - Converte para string
+    - Remove acentos
+    - Converte para minúsculas
+    - Tira espaços extras, quebras de linha, non-breaking spaces
+    - Substitui separadores estranhos (–, —, /) por hífen simples
+    - Remove parênteses, colchetes e textos auxiliares
+    """
+    if val is None:
+        return ""
+
+    # 1) força str e strip
+    txt = str(val).strip()
+
+    # 2) normaliza unicode e remove acentos
+    txt = unicodedata.normalize("NFKD", txt)
+    txt = "".join(ch for ch in txt if not unicodedata.combining(ch))
+
+    # 3) converte para lower case
+    txt = txt.lower()
+
+    # 4) substitui separadores por "-"
+    txt = re.sub(r"[–—/]", "-", txt)
+
+    # 5) remove parênteses e conteúdo opcional
+    txt = re.sub(r"\s*\(.*?\)", "", txt)
+
+    # 6) colapsa espaços múltiplos
+    txt = re.sub(r"\s+", " ", txt).strip()
+
+    return txt
 
 def _strip_lower_noaccent(s: str) -> str:
     """strip → lower → remove acentos."""

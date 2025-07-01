@@ -1,20 +1,19 @@
 # treat/utils/preprocess_utils.py
 
 import re
+from typing import Dict, Optional
+
 import pandas as pd
-from typing import Optional, Dict
 from gspread import Worksheet
 
-from treat.utils.geo_normalize import normalize_region
-from treat.utils.substitute_origin_values import apply_all_origin_substitutions
-from treat.utils.atribuicoes_via_lookup import (
-    atribuir_veiculo_e_id_meta,
-    atribuir_veiculo_por_prefixo,
-    atribuir_id_veiculo_generico,
-    SourceLookup,
-)
 from extract.sheets_fetcher import SheetsFetcher
 from treat.bi_param_utils import BIParamLookup
+from treat.utils.atribuicoes_via_lookup import (SourceLookup,
+                                                atribuir_id_veiculo_generico,
+                                                atribuir_veiculo_e_id_meta,
+                                                atribuir_veiculo_por_prefixo)
+from treat.utils.geo_normalize import normalize_region
+from treat.utils.substitute_origin_values import apply_all_origin_substitutions
 
 __all__ = [
     "apply_origin_substitutions",

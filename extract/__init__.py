@@ -27,7 +27,6 @@ df2 = fetcher.get(["NOME_DA_ABA"])["NOME_DA_ABA"]
 from __future__ import annotations
 
 import os
-from typing import Any
 
 import pandas as pd
 

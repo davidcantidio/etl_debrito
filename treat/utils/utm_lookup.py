@@ -1,5 +1,6 @@
-import pandas as pd
 import logging
+
+import pandas as pd
 
 
 def load_utm_mapping() -> dict[str, dict[str, str]]:
@@ -8,8 +9,8 @@ def load_utm_mapping() -> dict[str, dict[str, str]]:
     { utm_content_lower -> {"START": start_date_str, "END": end_date_str} }.
     """
     from utils.get_google_client import get_google_client
-    from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
     from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+    from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 
     logger = logging.getLogger("load_utm_mapping")
     logger.debug("Loading UTM mapping from BI_PARAMETRIZAÇÃO")

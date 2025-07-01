@@ -1,5 +1,6 @@
 import logging
 from typing import Dict
+
 import pandas as pd
 
 # Mapeamento de objetivos de campanha para nomes padronizados

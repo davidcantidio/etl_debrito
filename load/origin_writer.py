@@ -1,7 +1,7 @@
 # load/origin_writer.py
 
-import logging
 import builtins
+import logging
 from typing import Optional
 
 import pandas as pd

@@ -1,20 +1,18 @@
 # utils/common/meta/region_placements_merge.py
 
 from __future__ import annotations
+
 import logging
 from collections import Counter
 from math import floor
 from typing import Dict, List, Tuple
 
 import pandas as pd
-from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+from utils.geo_normalize import (carregar_caches_padrao, limpeza_basica,
+                                 obter_estado_de_regiao)
 from utils.get_google_client import get_google_client
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
-from utils.geo_normalize import (
-    carregar_caches_padrao,
-    limpeza_basica,
-    obter_estado_de_regiao,
-)
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)

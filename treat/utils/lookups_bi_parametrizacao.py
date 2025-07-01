@@ -7,16 +7,16 @@ antes de dividirmos em treat/common/.
 
 import logging
 import time
-import pandas as pd
 import unicodedata
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, date
+
+import pandas as pd
 from gspread import Worksheet
-from gspread.utils import rowcol_to_a1
 from utils.get_google_client import get_google_client
-from utils.normalize import normalize_columns, normalize_campaign_series
-from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+from utils.normalize import normalize_campaign_series, normalize_columns
+from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 
 log = logging.getLogger(__name__)
 

@@ -1,10 +1,9 @@
 from typing import Any
 from typing import Literal as L
 
-from typing_extensions import deprecated
-
 import numpy as np
 from numpy._typing import ArrayLike, NDArray, _ShapeLike
+from typing_extensions import deprecated
 
 from ._helper import integer_types as integer_types
 

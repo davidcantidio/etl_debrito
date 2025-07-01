@@ -7,12 +7,8 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from load.dest_writer import (
-    _EXISTING_IDS,
-    _HEADERS,
-    DESTINATION_SHEETS,
-    write_back_batch,
-)
+from load.dest_writer import (_EXISTING_IDS, _HEADERS, DESTINATION_SHEETS,
+                              write_back_batch)
 
 
 @pytest.mark.unit

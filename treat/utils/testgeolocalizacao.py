@@ -1,9 +1,7 @@
 import json
-from geo_normalize import (
-    carregar_cache_estados,
-    carregar_cache_municipios,
-    obter_estado_de_regiao,
-)
+
+from geo_normalize import (carregar_cache_estados, carregar_cache_municipios,
+                           obter_estado_de_regiao)
 
 # Caminhos para os arquivos de cache
 path_cache_estados = "utils/cache_estados.json"

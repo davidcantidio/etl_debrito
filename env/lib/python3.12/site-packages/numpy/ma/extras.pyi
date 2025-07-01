@@ -1,6 +1,5 @@
-from _typeshed import Incomplete
-
 import numpy as np
+from _typeshed import Incomplete
 from numpy.lib._function_base_impl import average
 from numpy.lib._index_tricks_impl import AxisConcatenator
 

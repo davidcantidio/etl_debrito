@@ -1,10 +1,12 @@
 import logging
-import pandas as pd
-from typing import List, Sequence, Any, Dict
-from treat.bi_param_utils import BIParamLookup  # ajuste conforme seu projeto
 import math
-import numpy as np
 from collections import defaultdict
+from typing import Any, Dict, List, Sequence
+
+import numpy as np
+import pandas as pd
+
+from treat.bi_param_utils import BIParamLookup  # ajuste conforme seu projeto
 
 log = logging.getLogger(__name__)
 

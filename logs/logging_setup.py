@@ -1,7 +1,6 @@
 import logging
 import pathlib
 import sys
-import warnings
 
 # ── Caminho para o diretório de logs ────────────────────────────────────────
 LOG_DIR = pathlib.Path("/home/debrito/Documentos/etl_debrito/logs")

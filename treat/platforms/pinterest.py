@@ -1,5 +1,6 @@
 # treat/platforms/pinterest.py
 import pandas as pd
+
 from treat.utils.preview_links import build_pinterest_preview_link
 
 

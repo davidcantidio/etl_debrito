@@ -8,6 +8,7 @@ precisar – não há dependência circular.
 from __future__ import annotations
 
 from typing import Dict, Tuple
+
 import gspread
 
 from treat.utils.get_google_client import get_google_client

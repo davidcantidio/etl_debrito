@@ -7,20 +7,18 @@ pelo pipeline.  Nenhuma nova autenticação é feita aqui.
 """
 
 from __future__ import annotations
+
 import itertools
 import logging
-from typing import Iterable, List, Dict, Mapping, Optional
+from typing import Dict, Iterable, List, Mapping
 
 import pandas as pd
-from gspread.utils import rowcol_to_a1
 from gspread import Worksheet
+from gspread.utils import rowcol_to_a1
 
 from treat.utils.substitutions_lists import (  # listas continuam no projeto
-    ID_CONTENT_REPLACEMENTS,
-    CAMPAIGN_NAME_REPLACEMENTS,
-    AD_GROUP_NAME_REPLACEMENTS,
-    AD_NAME_REPLACEMENTS,
-)
+    AD_GROUP_NAME_REPLACEMENTS, AD_NAME_REPLACEMENTS,
+    CAMPAIGN_NAME_REPLACEMENTS, ID_CONTENT_REPLACEMENTS)
 
 __all__ = ["apply_all_origin_substitutions"]
 

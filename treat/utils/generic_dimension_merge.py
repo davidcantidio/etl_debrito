@@ -1,13 +1,14 @@
-from collections import Counter
 import logging
-from typing import List, Dict, Tuple
-import pandas as pd
-from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
-from utils.get_google_client import get_google_client
-from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
-from utils.normalize import parse_decimal_str_to_float, format_float_to_decimal_str
+from collections import Counter
 from math import floor
+from typing import Dict, List, Tuple
 
+import pandas as pd
+from utils.get_google_client import get_google_client
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
+from treat.utils.normalize import no   # novo import
+from treat.utils.normalize import normalize_nome
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -280,7 +281,7 @@ def distribute_dimension_metrics(
 
         # Distribuições por métrica
         dist: Dict[str, Dict[str, float | int]] = {}
-        dist["cost"] = _distribute_cost(float(row["cost"]), pesos)
+        dist["cost"] = _distribute_costs(float(row["cost"]), pesos)
 
         for m in ("impressions", "Link clicks", "Video watches at 100%"):
             dist[m] = _distribute_counts(int(row[m]), pesos)
