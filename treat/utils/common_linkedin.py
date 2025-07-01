@@ -1,6 +1,7 @@
 # common_linkedin.py
 
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 
 from utils.get_google_client import get_google_client
@@ -35,12 +36,14 @@ def carregar_mapeamentos_linkedin():
         SPREADSHEET_ID,
         sheet_name="BI_PARAMETRIZAÇÃO",
         range_str="A2:ZZ",
-        header_row_index=0
+        header_row_index=0,
     )
 
     # Normaliza os nomes das colunas (isso converte para minúsculo, remove quebras de linha e acentuação)
     df_parametrizacao.columns = normalize_columns(df_parametrizacao.columns)
-    logging.debug(f"[DEBUG] Colunas após normalização: {df_parametrizacao.columns.tolist()}")
+    logging.debug(
+        f"[DEBUG] Colunas após normalização: {df_parametrizacao.columns.tolist()}"
+    )
 
     # Aplica normalização dos valores nos campos de parametrização
     df_parametrizacao = normalize_parametrizacao_values(df_parametrizacao)
@@ -60,7 +63,9 @@ def buscar_nome_criativo_com_log(utm_content, mapping_criativo):
     utm_str = str(utm_content).strip()
     nome = get_ad_name_from_utm_content(utm_str, mapping_criativo)
     if not nome:
-        logging.debug(f"[LinkedIn] utm_content '{utm_str}' NÃO encontrado no mapping_criativo.")
+        logging.debug(
+            f"[LinkedIn] utm_content '{utm_str}' NÃO encontrado no mapping_criativo."
+        )
     return nome
 
 
@@ -77,7 +82,6 @@ def preparar_kwargs_linkedin() -> dict:
 
 
 def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
-    
     """
     Preenche as colunas 'Nome_do_Anuncio' e 'Nome_do_Conjunto_de_Anuncio' no DataFrame de LinkedIn.
     - 'Nome_do_Anuncio' recebe o valor presente na coluna 'ID_Content'
@@ -86,11 +90,13 @@ def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
 
     Se algum valor em 'ID_Content' não tiver correspondência, é feito log de aviso.
     """
-    
+
     df = df.copy()
 
     if "ID_Content" not in df.columns:
-        raise KeyError("A coluna 'ID_Content' não foi encontrada no DataFrame após renomeação.")
+        raise KeyError(
+            "A coluna 'ID_Content' não foi encontrada no DataFrame após renomeação."
+        )
 
     # 'Nome_do_Anuncio' recebe diretamente o valor de 'ID_Content'
     df["Nome_do_Anuncio"] = df["ID_Content"]
@@ -98,9 +104,13 @@ def preencher_nomes_anuncio_linkedin(df, mapping_criativo):
     df["Nome_do_Conjunto_de_Anuncio"] = df["ID_Content"].map(mapping_criativo)
 
     # Log de valores de ID_Content que não tiveram correspondência
-    utms_nao_mapeados = df[df["Nome_do_Conjunto_de_Anuncio"].isna()]["ID_Content"].dropna().unique()
+    utms_nao_mapeados = (
+        df[df["Nome_do_Conjunto_de_Anuncio"].isna()]["ID_Content"].dropna().unique()
+    )
     if len(utms_nao_mapeados) > 0:
-        logging.warning("ID_Content sem correspondência em BI_PARAMETRIZAÇÃO (LinkedIn):")
+        logging.warning(
+            "ID_Content sem correspondência em BI_PARAMETRIZAÇÃO (LinkedIn):"
+        )
         for utm in utms_nao_mapeados[:10]:
             logging.warning(f"- {utm}")
 

@@ -15,7 +15,7 @@ import pandas as pd
 from gspread.utils import rowcol_to_a1
 from gspread import Worksheet
 
-from treat.utils.substitutions_lists import (          # listas continuam no projeto
+from treat.utils.substitutions_lists import (  # listas continuam no projeto
     ID_CONTENT_REPLACEMENTS,
     CAMPAIGN_NAME_REPLACEMENTS,
     AD_GROUP_NAME_REPLACEMENTS,
@@ -32,7 +32,7 @@ _REPLACEMENT_SPECS: list[tuple[str, Mapping[str, str]]] = [
     ("ad_name", AD_NAME_REPLACEMENTS),
 ]
 
-_MAX_CELLS_PER_BATCH = 10_000           # segurança – 10 k células ≅ 5 MiB
+_MAX_CELLS_PER_BATCH = 10_000  # segurança – 10 k células ≅ 5 MiB
 # ---------------------------------------------------------------------------
 
 
@@ -113,8 +113,16 @@ def apply_all_origin_substitutions(
 
         # log de amostra
         sample_before = df.loc[mask, col_name].head(3).to_list()
-        sample_after = [mapping_norm[_normalize_series(pd.Series([v]))[0]] for v in sample_before]
-        log.debug("[%s] %d alterações. Ex.: %s → %s", col_name, n_changes, sample_before, sample_after)
+        sample_after = [
+            mapping_norm[_normalize_series(pd.Series([v]))[0]] for v in sample_before
+        ]
+        log.debug(
+            "[%s] %d alterações. Ex.: %s → %s",
+            col_name,
+            n_changes,
+            sample_before,
+            sample_after,
+        )
 
         # aplica no DataFrame
         df.loc[mask, col_name] = s_norm[mask].map(mapping_norm)
@@ -124,7 +132,10 @@ def apply_all_origin_substitutions(
             try:
                 col_idx = header_lc.index(col_name.lower()) + 1
             except ValueError:
-                log.warning("[subst] coluna '%s' não existe no header – skip write-back", col_name)
+                log.warning(
+                    "[subst] coluna '%s' não existe no header – skip write-back",
+                    col_name,
+                )
                 continue
 
             updates.extend(

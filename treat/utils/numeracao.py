@@ -1,7 +1,8 @@
 # utils/numeracao.py
 import pandas as pd
 
-def gerar_numeracao(df, df_destino=None, linha_insercao=2, coluna='Numero'):
+
+def gerar_numeracao(df, df_destino=None, linha_insercao=2, coluna="Numero"):
     """
     Gera uma numeração sequencial para as linhas de um DataFrame de novos dados,
     levando em conta a numeração já existente na planilha (df_destino).
@@ -15,7 +16,7 @@ def gerar_numeracao(df, df_destino=None, linha_insercao=2, coluna='Numero'):
         df_destino (pandas.DataFrame, opcional): DataFrame já existente na planilha, contendo a coluna de numeração.
         linha_insercao (int, opcional): Valor base caso df_destino esteja vazio (por exemplo, 2 se a linha 1 for cabeçalho).
         coluna (str, opcional): Nome da coluna onde a numeração será inserida. Padrão é 'Numero'.
-    
+
     Retorna:
         pandas.DataFrame: O DataFrame com a coluna de numeração atualizada.
     """
@@ -29,7 +30,7 @@ def gerar_numeracao(df, df_destino=None, linha_insercao=2, coluna='Numero'):
                 break
         if col_dest:
             # Converte os valores para numérico
-            serie = pd.to_numeric(df_destino[col_dest], errors='coerce')
+            serie = pd.to_numeric(df_destino[col_dest], errors="coerce")
             ultimo = serie.max()
             if pd.notna(ultimo):
                 numero_inicial = int(ultimo) + 1

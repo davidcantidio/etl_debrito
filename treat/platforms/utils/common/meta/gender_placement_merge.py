@@ -70,14 +70,12 @@ def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
     id_vars = ["ad_id", "date"]
     value_vars = [c for c in df_placement.columns if c not in id_vars + ["placement"]]
 
-    pivot_df = (
-        df_placement.pivot_table(
-            index=id_vars,
-            columns="placement",
-            values=value_vars,
-            aggfunc="sum",
-            fill_value=0,
-        )
+    pivot_df = df_placement.pivot_table(
+        index=id_vars,
+        columns="placement",
+        values=value_vars,
+        aggfunc="sum",
+        fill_value=0,
     )
     # remove o name do eixo de colunas
     pivot_df.columns.name = None
@@ -86,16 +84,22 @@ def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
     return pivot_df.reset_index()
 
 
-def merge_placement_and_gender_data(df_gender: pd.DataFrame, df_place: pd.DataFrame) -> pd.DataFrame:
+def merge_placement_and_gender_data(
+    df_gender: pd.DataFrame, df_place: pd.DataFrame
+) -> pd.DataFrame:
     return pd.merge(df_gender, df_place, on=["ad_id", "date"], how="inner")
 
 
 # --------------------- REDISTRIBUIÇÃO DE MÉTRICAS --------------------- #
 def get_placements(df: pd.DataFrame) -> List[str]:
-    return sorted({c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_Impressions")})
+    return sorted(
+        {c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_Impressions")}
+    )
 
 
-def compute_pesos_impressao(row: pd.Series, placements: List[str]) -> Tuple[Dict[str, int], int]:
+def compute_pesos_impressao(
+    row: pd.Series, placements: List[str]
+) -> Tuple[Dict[str, int], int]:
     pesos = {pl: max(int(row.get(f"{pl}_Impressions", 0)), 0) for pl in placements}
 
     # se todos zero → define peso 1 para placement com maior métrica absoluta
@@ -161,7 +165,7 @@ def distribute_gender_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
             cols = [f"{pl}_{m}" for pl in placements if f"{pl}_{m}" in df_in.columns]
             df_in[m] = df_in[cols].sum(axis=1)
 
-    output_rows: list[dict] = []         # <-- agora declarado
+    output_rows: list[dict] = []  # <-- agora declarado
 
     for _, row in df_in.iterrows():
         pesos, _ = compute_pesos_impressao(row, placements)
@@ -178,8 +182,8 @@ def distribute_gender_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
             output_rows.append(
                 {
                     "ad_id": row["ad_id"],
-                    "date":  row["date"],
-                    "":   row["gender"],
+                    "date": row["date"],
+                    "": row["gender"],
                     "_Plataforma": pl,
                     **{m: dist[m][pl] for m in METRICAS},
                 }

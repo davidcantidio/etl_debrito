@@ -36,16 +36,18 @@ def _read_sheet(sheet: str) -> pd.DataFrame:
 # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
 def load_and_prepare_meta_age_data() -> pd.DataFrame:
     df = _read_sheet("metaIdade")  # Carrega os dados da aba 'metaIdade'
-    
+
     # Verificação de dados consistentes antes de qualquer transformação
-    df = df.dropna(subset=["ad_id", "date", "impressions", "cost"])  # Garante que não haja NaN nessas colunas essenciais
-    
+    df = df.dropna(
+        subset=["ad_id", "date", "impressions", "cost"]
+    )  # Garante que não haja NaN nessas colunas essenciais
+
     # 0) Strip em todos os nomes de coluna
     df.columns = df.columns.str.strip()
-    
+
     # 1) Remove registros com dados ausentes em colunas críticas
     df = df.dropna(subset=["ad_id", "date", "age"])  # Garante que 'age' está presente
-    
+
     # 2) Converte cost (pode vir como 'cost' ou 'cost' etc) - busca case-insensitive
     cost_col = next((c for c in df.columns if c.lower() == "cost"), None)
     if cost_col:
@@ -55,18 +57,19 @@ def load_and_prepare_meta_age_data() -> pd.DataFrame:
         s = s.str.replace(",", ".", regex=False)
         df[cost_col] = pd.to_numeric(s, errors="coerce").fillna(0)
         df.rename(columns={cost_col: "cost"}, inplace=True)
-    
+
     # 3) Outras métricas
     for col in ["impressions", "link_clicks", "video_watched_100"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    
+
     # Verifique se 'age' está presente
-    if 'age' not in df.columns:
+    if "age" not in df.columns:
         logging.error("A coluna 'age' não foi encontrada na aba 'metaIdade'.")
         raise KeyError("A coluna 'age' não foi encontrada na aba 'metaIdade'.")
-    
+
     return df
+
 
 def load_and_prepare_meta_placement_data() -> pd.DataFrame:
     return _read_sheet("metaGeral").dropna(subset=["ad_id", "date"])
@@ -75,6 +78,7 @@ def load_and_prepare_meta_placement_data() -> pd.DataFrame:
 # ------------------------------ PIVOTS -------------------------------- #
 def pivot_meta_age_data(df: pd.DataFrame) -> pd.DataFrame:
     return df.groupby(["ad_id", "date", "age"], as_index=False)[METRICAS].sum()
+
 
 def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
     id_vars = ["ad_id", "date"]
@@ -89,17 +93,20 @@ def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
     )
 
     # Após o pivotamento, garantir que as colunas com métricas sejam numéricas
-    pivot_df = pivot_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+    pivot_df = pivot_df.apply(pd.to_numeric, errors="coerce").fillna(0)
 
     pivot_df.columns.name = None
     pivot_df.columns = [f"{pl}_{m}" for m, pl in pivot_df.columns]
     return pivot_df.reset_index()
 
-def merge_placement_and_age_data(df_age: pd.DataFrame, df_place: pd.DataFrame) -> pd.DataFrame:
+
+def merge_placement_and_age_data(
+    df_age: pd.DataFrame, df_place: pd.DataFrame
+) -> pd.DataFrame:
     df_merged = pd.merge(df_age, df_place, on=["ad_id", "date"], how="inner")
-    
+
     # Verificação para garantir que a coluna 'age' foi incluída no merge
-    if 'age' not in df_merged.columns:
+    if "age" not in df_merged.columns:
         logging.error("A coluna 'age' não foi incluída após o merge.")
         raise KeyError("A coluna 'age' não foi incluída após o merge.")
 
@@ -108,10 +115,14 @@ def merge_placement_and_age_data(df_age: pd.DataFrame, df_place: pd.DataFrame) -
 
 # --------------------- REDISTRIBUIÇÃO DE MÉTRICAS --------------------- #
 def get_placements(df: pd.DataFrame) -> List[str]:
-    return sorted({c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_impressions")})
+    return sorted(
+        {c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_impressions")}
+    )
 
 
-def compute_pesos_impressao(row: pd.Series, placements: List[str]) -> Tuple[Dict[str, int], int]:
+def compute_pesos_impressao(
+    row: pd.Series, placements: List[str]
+) -> Tuple[Dict[str, int], int]:
     pesos = {pl: max(int(row.get(f"{pl}_impressions", 0)), 0) for pl in placements}
 
     # se todos zero → define peso 1 para placement com maior métrica absoluta
@@ -180,7 +191,7 @@ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
             df_in[m] = df_in[cols].sum(axis=1)
 
     # Garantir que as colunas de métricas sejam numéricas antes de qualquer operação de distribuição
-    df_in[METRICAS] = df_in[METRICAS].apply(pd.to_numeric, errors='coerce').fillna(0)
+    df_in[METRICAS] = df_in[METRICAS].apply(pd.to_numeric, errors="coerce").fillna(0)
 
     output_rows: list[dict] = []
 
@@ -212,10 +223,13 @@ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
         soma_in, soma_out = df_in[m].sum(), df_out[m].sum()
         tol = 0.01 if m == "cost" else 0
         if abs(soma_in - soma_out) > tol:
-            raise AssertionError(f"Soma global divergente em '{m}': {soma_in} → {soma_out}")
+            raise AssertionError(
+                f"Soma global divergente em '{m}': {soma_in} → {soma_out}"
+            )
 
     log.info("✅ distribute_age_metrics — %s linhas", len(df_out))
     return df_out
+
 
 # --------------------------- re‐exports --------------------------- #
 __all__ = [

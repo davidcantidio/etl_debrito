@@ -2,7 +2,7 @@ import json
 from geo_normalize import (
     carregar_cache_estados,
     carregar_cache_municipios,
-    obter_estado_de_regiao
+    obter_estado_de_regiao,
 )
 
 # Caminhos para os arquivos de cache
@@ -38,7 +38,7 @@ valores_para_teste = [
     "Bogotá D.C. Metropolitan Area",
     "Greater Belem",
     "Vitoria, Brazil Metropolitan Area",
-    "State of Piaui"
+    "State of Piaui",
 ]
 
 # Dicionário para guardar os resultados

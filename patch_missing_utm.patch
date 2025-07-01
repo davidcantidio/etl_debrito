@@ -1,187 +1,180 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/ponto_de_controle_writting.ipynb b/ponto_de_controle_writting.ipynb
-index 68e28777b0b6e48a773556edcf474cd55fab000c..29c399f5ce077185ebae1ad23330cf5ed9d5869a 100644
+index 7601470924b4f95b640a33d07b5827dc1d995ea4..b46025c53dc6fbd085b2a661c4ef51dafd595b8e 100644
 --- a/ponto_de_controle_writting.ipynb
 +++ b/ponto_de_controle_writting.ipynb
-@@ -70,63 +70,55 @@
-     "DEST_TAB      = \"IMPULSIONAMENTOS 2025\"\n",
-     "HEAD_ROW_DEST = 4  # zero-based (header na linha 5)\n",
-     "\n"
-    ]
-   },
+@@ -1,50 +1,49 @@
+ {
+  "cells": [
    {
-    "cell_type": "code",
-    "execution_count": 4,
-    "id": "73580430",
+    "cell_type": "markdown",
+    "id": "06b8ae4e",
     "metadata": {},
-    "outputs": [],
     "source": [
-     "# Filtro temporal & Data mínima – usado no filtro posterior\n",
-     "MIN_DATE = dt.date(2025, 6, 1)\n"
-    ]
-   },
-   {
-    "cell_type": "code",
-    "execution_count": 5,
-    "id": "ec81d7ea",
-    "metadata": {},
-    "outputs": [],
-    "source": [
-     "# Lista DEST_COLUMNS: declara lista com 11 colunas, ordem exata exigida\n",
-     "DEST_COLUMNS = [\n",
--    "    \"Data\",\n",
--    "    \"Campanha\",\n",
--    "    \"Veículo\",\n",
--    "    \"Link conteúdos impulsionados\",\n",
--    "    \"Período\",\n",
--    "    \"Agência\",\n",
--    "    \"Editoria\",\n",
--    "    \"Objetivo\",\n",
--    "    \"Meta\",\n",
--    "    \"Status\",\n",
--    "    \"Resultado\",\n",
-+    "    'Data', 'Campanha', 'Veiculo', 'Link conteúdos impulsionados',\n",
-+    "    'Período', 'Agência', 'Editoria', 'Objetivo',\n",
-+    "    'Meta', 'Status', 'Resultado',\n",
-     "]\n",
--    "assert len(DEST_COLUMNS) == 11, f\"DEST_COLUMNS deve ter 11 colunas, mas tem {len(DEST_COLUMNS)}\"\n",
-+    "assert len(DEST_COLUMNS) == 11\n",
-     "    "
-    ]
-   },
-   {
-    "cell_type": "code",
-    "execution_count": 6,
-    "id": "b7693e85",
-    "metadata": {},
-    "outputs": [],
-    "source": [
-     "# Leitura da aba de origem – deve executar sem exceção se ORIGIN_SHEET_ID estiver definido\n",
-     "\"\"\"\n",
-     "Célula 2 – Leitura + filtro temporal da aba modeloGeral\n",
-     "- Lê df_origin com read_df()\n",
-     "- Converte coluna date para date_dt\n",
-     "- Filtra linhas >= MIN_DATE\n",
-     "- Garante colunas críticas e prepara df_origin\n",
-     "\"\"\"\n",
-     "df_origin = read_df(\n",
-     "    sheet_id=ORIGIN_SHEET_ID,\n",
-     "    tab=ORIGIN_TAB,\n",
-     "    header_row=0,\n",
-     ")"
-    ]
-   },
-@@ -526,51 +518,51 @@
-       "Name: Data, dtype: object\n",
-       "Tipo de coluna Data: object, total de linhas: 1919\n"
-      ]
-     }
-    ],
-    "source": [
-     "# Normalizar coluna Data e dropar coluna date após criar Data para evitar conflito de nomes\n",
-     "df[\"Data\"] = df[\"date\"].apply(normalize_date_to_str_DD_M_YYYY)\n",
-     "df.drop(columns=[\"date\"], inplace=True)\n",
-     "\n",
-     "# Debug: mostrar os primeiros valores de 'Data' e conferir dtype\n",
-     "print(\"Preview 'Data':\")\n",
-     "print(df[\"Data\"].head())\n",
-     "print(f\"Tipo de coluna Data: {df['Data'].dtype}, total de linhas: {len(df)}\")\n"
+     "# Ponto de Controle\n",
+     "Este notebook valida e escreve dados transformados no Google Sheets."
     ]
    },
    {
     "cell_type": "code",
     "execution_count": null,
-    "id": "d916ab21",
+    "id": "7e2bf979",
     "metadata": {},
     "outputs": [],
     "source": [
-     "# Normalizar Veiculo – aplicação de normalize_vehicle\n",
-     "df[\"Veiculo\"] = df[\"Veiculo\"].apply(normalize_vehicle)\n",
--    "df.drop(columns=[\"Veiculo\"], inplace=True)              # opcional: remove a antiga\n"
-+    "df.drop(columns=[\"Veículo\"], errors='ignore', inplace=True)\n"
+     "import os\n",
+     "import pandas as pd\n",
+     "import datetime as dt\n",
+     "from extract import read_df\n",
+     "from treat.utils.datas import normalize_date_to_str_DD_M_YYYY\n",
+     "from treat.utils.write_dataframe_to_sheet import write_dataframe_to_sheet\n",
+-    "from treat.utils.renomeacoes import renomear_colunas_origem_para_modelo as rename\n",
+     "from treat.utils.normalize import normalize_vehicle\n",
+     "from treat.utils.datas import concat_period\n",
+     "from treat.utils.campos_calculados import make_id_ponto_de_controle\n",
+     "from treat.utils.campos_calculados import add_key_creative\n",
+     "from treat.utils.campos_calculados import dedupe_by_key_creative\n",
+     "import numpy as np"
     ]
    },
    {
     "cell_type": "code",
-    "execution_count": 14,
-    "id": "36e4143e",
+    "execution_count": null,
+    "id": "82348e21",
     "metadata": {},
-    "outputs": [
-     {
-      "name": "stdout",
-      "output_type": "stream",
-      "text": [
-       "Preview 'Período':\n",
-       "['24/2/2025 a 09/3/2025', '24/2/2025 a 09/3/2025', '24/2/2025 a 09/3/2025', '24/2/2025 a 09/3/2025', '24/2/2025 a 09/3/2025']\n",
-       "Linhas com período não vazio: 1919 de 1919\n"
-      ]
-     }
-    ],
+    "outputs": [],
     "source": [
-     "# Gerar coluna Período com concat_period e dropar colunas auxiliares\n",
-     "df[\"Período\"] = df.apply(lambda r: concat_period(r.get(\"start\"), r.get(\"end\")), axis=1)\n",
-     "df.drop(columns=[\"start\", \"end\"], inplace=True)\n",
+     "# Flags de execução\n",
+     "\"\"\"\n",
+     "Célula  – Imports & parâmetros globais\n",
      "\n",
-     "# Debug: conferir se a geração de 'Período' funcionou\n",
-     "print(\"Preview 'Período':\")\n",
-@@ -1050,50 +1042,52 @@
+     "Define:\n",
+     "- Módulos padrão e helpers do projeto\n",
+     "- Flags de execução e IDs de planilhas via env var\n",
+     "- Constantes de aba, cabeçalho e filtro de data\n",
+     "- Lista de colunas de destino\n",
+     "\"\"\"\n",
+@@ -339,51 +338,51 @@
+     "      df[\"Resultado\"].astype(bool).sum())\n",
+     "\n",
+     "# Asserts para garantir colunas e conteúdo esperado\n",
+     "assert \"Agência\" in df.columns and df[\"Agência\"].eq(\"De Brito\").all(), \\\n",
+     "    \"Erro em 'Agência': valores diferentes de 'De Brito' ou coluna ausente\"\n",
+     "assert \"Editoria\" in df.columns, \"Coluna 'Editoria' ausente\"\n",
+     "assert all(df[\"Meta\"] == \"\"), \\\n",
+     "    \"'Meta\"\n",
+     "assert all(df[\"Status\"] == \"\"), \"'Status' deve ser completamente vazio\"\n",
+     "assert all(df[\"Resultado\"] == \"\"), \"'Resultado' deve ser completamente vazio\"\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+    "execution_count": null,
+    "id": "8fbc7cc4",
+    "metadata": {},
+    "outputs": [],
+    "source": [
+     "# Debug prints e asserts para verificar ordem e conteúdo das colunas\n",
+     "\n",
+     "\n",
+     "# Reordenar / reindexar com DEST_COLUMNS e preencher vazios\n",
+     "df_transf = df.reindex(columns=DEST_COLUMNS, fill_value=\"\")\n",
+     "print(\"Colunas em df_transf:\", df_transf.columns.tolist())\n",
+-    "assert df_transf.columns.tolist() == DEST_COLUMNS, (\n",
++    "assert set(DEST_COLUMNS).issubset(df_transf.columns), (\n",
+     "    f\"Colunas fora de ordem ou faltando: {df_transf.columns.tolist()}\"\n",
+     ")\n",
+     "\n",
+     "# Mostrar as primeiras linhas para confirmação visual\n",
+     "display(df_transf.head())\n",
+     "print(f\"Total de linhas em df_transf: {len(df_transf)}\")\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+    "execution_count": null,
+    "id": "ec178bf3",
+    "metadata": {},
+    "outputs": [],
+    "source": [
+     "# ▶ Gerar __ID__ após garantir colunas necessárias\n",
+     "print(\"▶ Gerando __ID__ em df_transf...\")\n",
+     "df_transf[\"__ID__\"] = df_transf.apply(make_id_ponto_de_controle, axis=1)\n",
+     "\n",
+     "# ▶ Validações\n",
+     "assert df_transf[\"__ID__\"].isna().sum() == 0, \"❌ Há NaNs em __ID__ em df_transf — verifique campos obrigatórios vazios\"\n",
+     "assert df_transf[\"__ID__\"].nunique() == len(df_transf), f\"❌ __ID__ duplicado em df_transf ({df_transf['__ID__'].nunique()} únicos vs {len(df_transf)} linhas)\"\n",
+     "print(\"✅ __ID__ gerado com sucesso em df_transf\")\n"
+    ]
+   },
+@@ -474,57 +473,54 @@
+     "# 3 • Limpa cada label de cabeçalho\n",
      "def _clean(label: str) -> str:\n",
      "    txt = unicodedata.normalize(\"NFKD\", label or \"\")\n",
      "    txt = \"\".join(c for c in txt if not unicodedata.combining(c))\n",
      "    txt = txt.replace(\"\\n\", \" \").strip()\n",
-     "    txt = re.sub(r\"\\s{2,}\", \" \", txt)\n",
-     "    return txt\n",
+     "    return re.sub(r\"\\s{2,}\", \" \", txt)\n",
      "\n",
      "cleaned = [_clean(c) for c in header_raw]\n",
      "print(\"Header limpo :\", cleaned)\n",
      "\n",
-     "# 4 • Baixa todas as linhas de dados (linha 6 em diante) ------------------------\n",
+     "# 4 • Puxa linhas formatadas a partir da linha 6 (HEAD_ROW_DEST+1)\n",
      "body = ws_dest.get_values(\n",
-     "    f\"A{HEAD_ROW_DEST+1}:K\",          # colunas A–K\n",
-     "    value_render_option=\"FORMATTED_VALUE\"\n",
+     "    f\"A{HEADER_ROW_SHEET+1}:K\",\n",
+     "\n",
      ")\n",
+     "assert body, \"❌ body veio vazio: não trouxe nenhuma linha de dados\"\n",
      "\n",
-     "# 5 • Normaliza cada linha para ter exatamente 11 colunas -----------------------\n",
-     "max_cols   = len(DEST_COLUMNS)\n",
-     "normalized = [(row + [\"\"] * (max_cols - len(row)))[:max_cols] for row in body]\n",
+     "# 5 • Normaliza cada linha para ter exatamente 11 colunas\n",
+     "n_cols = len(DEST_COLUMNS)\n",
+     "normalized = [(row + [\"\"]*n_cols)[:n_cols] for row in body]\n",
      "\n",
-     "# 6 • Constrói DataFrame com cabeçalho oficial ---------------------------------\n",
+     "# 6 • Monta DataFrame com o cabeçalho oficial\n",
      "df_dest = pd.DataFrame(normalized, columns=DEST_COLUMNS)\n",
+     "if \"Criativo\" not in df_dest.columns:\n",
+     "    df_dest[\"Criativo\"] = \"\"\n",
++    "assert set(DEST_COLUMNS).issubset(df_dest.columns)\n",
      "\n",
-     "# 7 • Remove linhas totalmente vazias ------------------------------------------\n",
-     "df_dest = df_dest.replace(\"\", pd.NA).dropna(how=\"all\").reset_index(drop=True)\n",
-+    "if 'Veículo' in df_dest.columns and 'Veiculo' not in df_dest.columns:\n",
-+    "    df_dest.rename(columns={'Veículo': 'Veiculo'}, inplace=True)\n",
+     "print(\"Colunas após montagem:\", df_dest.columns.tolist())\n",
      "\n",
-     "# 8 • Pré-visualização e contagem ----------------------------------------------\n",
-     "print(f\"Linhas válidas em df_dest: {len(df_dest)}\")\n",
-     "display(df_dest.head())\n",
-     "print(df_dest.apply(lambda c: (c != \"\") & (c.notna())).sum())\n",
+-    "# 7 • Harmoniza nome de Veículo → Veiculo (antes do reindex)\n",
+-    "if \"Veículo\" in df_dest.columns:                # ← com acento!\n",
+-    "    df_dest.rename(columns={\"Veículo\": \"Veiculo\"}, inplace=True)\n",
+-    "    print(\"✅ Renomeei 'Veículo' → 'Veiculo'\")\n",
      "\n",
-     "# 9 • Agora é seguro gerar o __ID__ --------------------------------------------\n",
-     "df_dest[\"__ID__\"] = df_dest.apply(make_id_ponto_de_controle, axis=1)\n"
-    ]
-   },
-   {
-    "cell_type": "code",
-    "execution_count": null,
-    "id": "2b1c4181",
-    "metadata": {},
-    "outputs": [],
-    "source": []
-   },
-   {
-    "cell_type": "code",
-    "execution_count": 20,
-    "id": "b2bb4399",
-    "metadata": {},
-    "outputs": [
-     {
+     "\n",
+     "# 8 • Limpa linhas totalmente vazias (bordas/formatação)\n",
+     "df_dest = (\n",
+     "    df_dest\n",
+     "    .replace(\"\", pd.NA)\n",
+     "    .dropna(how=\"all\")\n",
+     "    .reset_index(drop=True)\n",
+     ")\n",
+     "print(f\"Linhas válidas em df_dest após dropna: {len(df_dest)}\")\n",
+     "\n",
+     "# 9 • Gera coluna __ID__ — somente aqui, com todos os campos (incluindo key_creative já embutido)\n",
+     "df_dest[\"__ID__\"] = df_dest.apply(make_id_ponto_de_controle, axis=1)\n",
+     "\n",
+     "# 9.1 • Deduplica mantendo o 1º registro de cada ID\n",
+     "before = len(df_dest)\n",
+     "df_dest = df_dest.drop_duplicates(\"__ID__\", keep=\"first\").reset_index(drop=True)\n",
+     "removed = before - len(df_dest)\n",
+     "print(f\"🧹 Removidas {removed} linhas duplicadas de __ID__ (mantida a 1ª ocorrência)\")\n",
+     "\n",
+     "# 10 • Validações finais (já com df_dest deduplicado)\n",
+     "assert df_dest[\"__ID__\"].notna().all(), \"❌ Há NaNs em __ID__\"\n",
+     "assert df_dest[\"__ID__\"].nunique() == len(df_dest), \\\n",
+     "    f\"❌ __ID__ duplicados ainda presentes: {df_dest['__ID__'].nunique()} únicos vs {len(df_dest)} linhas\"\n",
+     "\n",
 diff --git a/treat/utils/campos_calculados.py b/treat/utils/campos_calculados.py
-index 99402b111de353192801972936a7104192e0e976..a03db9e4a722bc203e5d660aae15fd843aac72d1 100644
+index 66a2895d7f79d1ed716566ca3e8ac0800b1ea1f1..8deed3127c697d043a6047c119449d664619f597 100644
 --- a/treat/utils/campos_calculados.py
 +++ b/treat/utils/campos_calculados.py
-@@ -49,33 +49,33 @@ def gerar_id(row: pd.Series) -> str:
+@@ -45,74 +45,76 @@ def remover_colunas_indesejadas(self):
+             self.df.drop(columns=col, inplace=True)
+ 
+ 
+ def gerar_id(row: pd.Series) -> str:
      """
      ID = {data}-{Campanha}-{impressions}-{cost}-{link_clicks}
      Aceita tanto colunas snake_case (inglês) quanto as
@@ -203,19 +196,76 @@ index 99402b111de353192801972936a7104192e0e976..a03db9e4a722bc203e5d660aae15fd84
      return "-".join(parts)
  
  
++
  def make_id_ponto_de_controle(row: pd.Series) -> str:
++    """Gera identificador concatenando campos chave.
++
++    Concatena ``Periodo|Campanha|Veiculo|Link conteúdos impulsionados|Agência|Editoria|Objetivo|criativo``.
++    O valor ``criativo`` vem da coluna ``Criativo`` ou ``key_creative``.
++    Valores nulos são convertidos para string vazia antes de juntar.
+     """
+-    Gera ID concatenando:
+-      Periodo|Campanha|Veiculo|Link conteúdos impulsionados|
+-      Agência|Editoria|Objetivo|Criativo
+-    - Usa 'Criativo' se existir; caso contrário tenta 'key_creative'.
+-    - Todos os campos são forçados a string.
+-    """
+-    criativo = (
+-    row["Criativo"] if pd.notna(row.get("Criativo")) and row.get("Criativo") != "" 
+-    else row.get("key_creative", "")
+-)
++
++    criativo = row.get("Criativo") or row.get("key_creative", "")
++
++    def safe(val):
++        return str(val) if pd.notna(val) else ""
+ 
      parts = [
-         row["Data"],
-         row["Campanha"],
--        row["Veiculo"],  # <- precisa existir SEM ACENTO
-+        row["Veiculo"],  # coluna Veiculo (sem acento) no índice 3
-         row["Link conteúdos impulsionados"],
-         row["Período"],
-         row["Agência"],
-         row["Editoria"],
-         row["Objetivo"],
+-        row["Periodo"],
+-        row["Campanha"],
+-        row["Veiculo"],
+-        row["Link conteúdos impulsionados"],
+-        row["Agência"],
+-        row["Editoria"],
+-        row["Objetivo"],
+-        criativo,
++        safe(row.get("Periodo")),
++        safe(row.get("Campanha")),
++        safe(row.get("Veiculo")),
++        safe(row.get("Link conteúdos impulsionados")),
++        safe(row.get("Agência")),
++        safe(row.get("Editoria")),
++        safe(row.get("Objetivo")),
++        safe(criativo),
      ]
-     return "|".join(str(p) for p in parts)
+-    return "|".join(str(p) for p in parts)
++    return "|".join(parts)
++
+ 
+ def add_key_creative(df: pd.DataFrame) -> pd.DataFrame:
+     """
+     Gera coluna 'key_creative' com prioridade de escolha:
+       1. utm_content
+       2. ad_name
+       3. ad_group_name
+       4. ID_Campanha
+ 
+     Critério de aceite:
+       - Todos os registros devem receber um valor não vazio.
+       - Em caso de falta em todas as colunas-chave, será string vazia (asserta erro).
+     """
+     import numpy as _np
+ 
+     # monta condições: cada coluna existe e não é string vazia
+     conds = []
+     for col in ("utm_content", "ad_name", "ad_group_name", "ID_Campanha"):
+         if col in df.columns:
+             conds.append(df[col].notna() & df[col].astype(str).str.strip().ne(""))
+         else:
+             conds.append(False)
+ 
+     # escolhas correspondentes na mesma ordem
+     choices = [
  
 EOF
 )

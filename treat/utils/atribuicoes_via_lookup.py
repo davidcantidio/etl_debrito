@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-import time   # ← ESQUECEU de importar
+import time  # ← ESQUECEU de importar
 import pandas as pd
 
 from treat.bi_param_utils import BIParamLookup
@@ -11,12 +11,12 @@ from treat.utils.campanha_mapper import buscar_mapping
 log = logging.getLogger(__name__)
 
 PLATFORM_TO_VEICULO = {
-    "tiktok":    "TikTok",
-    "linkedin":  "LinkedIn",
+    "tiktok": "TikTok",
+    "linkedin": "LinkedIn",
     "pinterest": "Pinterest",
-    "twitter":   "Twitter",
-    "youtube":   "YouTube",
-    "facebook":  "Facebook",   # normalize a chave para lowercase
+    "twitter": "Twitter",
+    "youtube": "YouTube",
+    "facebook": "Facebook",  # normalize a chave para lowercase
     "instagram": "Instagram",
     # adicione outros conforme necessário
 }
@@ -32,6 +32,7 @@ class SourceLookup:
     Carrega a aba 'SOURCE' **apenas uma vez** (cache + TTL),
     mas usando o SheetsFetcher em vez de gspread direto.
     """
+
     _df: pd.DataFrame | None = None
     _last_load: float = 0
     _TTL = 60 * 10  # 10 minutos
@@ -56,10 +57,7 @@ class SourceLookup:
             # Normaliza a coluna “Descrição da Mídia” para lowercase
             if "Descrição da Mídia" in df_source.columns:
                 df_source["Descrição da Mídia"] = (
-                    df_source["Descrição da Mídia"]
-                    .astype(str)
-                    .str.strip()
-                    .str.lower()
+                    df_source["Descrição da Mídia"].astype(str).str.strip().str.lower()
                 )
                 cls._df = df_source
             else:
@@ -78,19 +76,16 @@ class SourceLookup:
         if cls._df is None or cls._df.empty:
             return {}
         # Constrói o mapeamento final
-        return dict(zip(
-            cls._df["Descrição da Mídia"],
-            cls._df["ID_Veiculo"]
-        ))
+        return dict(zip(cls._df["Descrição da Mídia"], cls._df["ID_Veiculo"]))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) ID_VEICULO GENÉRICO
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def atribuir_id_veiculo_generico(
-    df: pd.DataFrame,
-    source_map: dict[str, str]
+    df: pd.DataFrame, source_map: dict[str, str]
 ) -> pd.DataFrame:
     """
     Usa o dicionário source_map para preencher a coluna 'ID_Veiculo' a partir de 'Veiculo'.
@@ -103,22 +98,19 @@ def atribuir_id_veiculo_generico(
 
     # Mapeia cada valor de 'Veiculo' (em lowercase) para o ID correspondente
     df["ID_Veiculo"] = (
-        df["Veiculo"].astype(str)
-        .str.strip()
-        .str.lower()
-        .map(source_map)
-        .fillna("")
+        df["Veiculo"].astype(str).str.strip().str.lower().map(source_map).fillna("")
     )
 
     return df
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2) META – inferir Veiculo e ID_Veiculo a partir de placement
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def atribuir_veiculo_e_id_meta(
-    df: pd.DataFrame,
-    source_map: dict[str, str]
+    df: pd.DataFrame, source_map: dict[str, str]
 ) -> pd.DataFrame:
     """
     Cria/atualiza as colunas 'Veiculo' e 'ID_Veiculo' usando a coluna 'placement' do Meta.
@@ -135,28 +127,33 @@ def atribuir_veiculo_e_id_meta(
     # Só faz algo se houver a coluna 'placement'
     if "placement" in df.columns:
         # Preenche a coluna 'Veiculo' a partir de 'placement'
-        df["Veiculo"] = df["placement"].apply(
-            lambda p: extract_meta_platform_from_placement(p) if isinstance(p, str) else ""
-        ).fillna("")
-
-        # Converter para minúsculo e buscar no source_map
-        df["ID_Veiculo"] = (
-            df["Veiculo"].astype(str)
-            .str.strip()
-            .str.lower()
-            .map(source_map)
+        df["Veiculo"] = (
+            df["placement"]
+            .apply(
+                lambda p: (
+                    extract_meta_platform_from_placement(p)
+                    if isinstance(p, str)
+                    else ""
+                )
+            )
             .fillna("")
         )
 
+        # Converter para minúsculo e buscar no source_map
+        df["ID_Veiculo"] = (
+            df["Veiculo"].astype(str).str.strip().str.lower().map(source_map).fillna("")
+        )
+
     return df
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3) LINKEDIN / TWITTER – veiculo via Criativo
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def atribuir_veiculo_por_criativo(
-    df: pd.DataFrame,
-    bi_lookup: BIParamLookup
+    df: pd.DataFrame, bi_lookup: BIParamLookup
 ) -> pd.DataFrame:
     """
     Lookup de 'Ad name' → 'Veiculo' usando o mapeamento cached em BIParamLookup.
@@ -169,12 +166,12 @@ def atribuir_veiculo_por_criativo(
     # Tenta obter o dicionário raw_map = {CRIATIVO_EMMAIÚSCULO: ("VeiculoNome",)}
     try:
         raw_map = bi_lookup._map_columns(
-            key_kw="criativo",
-            val_kws=["veículos"],
-            upper_keys=True
+            key_kw="criativo", val_kws=["veículos"], upper_keys=True
         )
     except KeyError:
-        log.warning("Colunas 'CRIATIVO' ou 'VEÍCULOS' não encontradas em BI_PARAMETRIZAÇÃO.")
+        log.warning(
+            "Colunas 'CRIATIVO' ou 'VEÍCULOS' não encontradas em BI_PARAMETRIZAÇÃO."
+        )
         raw_map = {}
 
     # Converte raw_map para um dict simples {criativo_lower: veiculo_nome}
@@ -191,9 +188,7 @@ def atribuir_veiculo_por_criativo(
 
     # Preenche 'Veiculo' mapeando 'Ad name' (lower/strip) → mapping
     df["Veiculo"] = (
-        df["Ad name"].astype(str).str.strip().str.lower()
-        .map(mapping)
-        .fillna("")
+        df["Ad name"].astype(str).str.strip().str.lower().map(mapping).fillna("")
     )
 
     return df
@@ -202,6 +197,7 @@ def atribuir_veiculo_por_criativo(
 # ─────────────────────────────────────────────────────────────────────────────
 # 4) PINTEREST – replica campaign_name em colunas destino
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def preencher_campos_com_campanha(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -227,6 +223,7 @@ def preencher_campos_com_campanha(df: pd.DataFrame) -> pd.DataFrame:
 # 5) Campanha – parametrização genérica
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def aplicar_parametrizacao_campanha(
     df: pd.DataFrame,
     mapping_campanha: dict[str, str],
@@ -251,9 +248,7 @@ def aplicar_parametrizacao_campanha(
 
 
 def atribuir_veiculo_por_prefixo(
-    df: pd.DataFrame,
-    prefixo: str,
-    source_map: dict[str, str]
+    df: pd.DataFrame, prefixo: str, source_map: dict[str, str]
 ) -> pd.DataFrame:
     """
     Define 'Veiculo' com base em um prefixo fixo e preenche 'ID_Veiculo' usando source_map.
@@ -272,14 +267,11 @@ def atribuir_veiculo_por_prefixo(
 
     # Preenche 'ID_Veiculo' usando source_map
     df["ID_Veiculo"] = (
-        df["Veiculo"].astype(str)
-        .str.strip()
-        .str.lower()
-        .map(source_map)
-        .fillna("")
+        df["Veiculo"].astype(str).str.strip().str.lower().map(source_map).fillna("")
     )
 
     return df
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ALIASES PARA COMPATIBILIDADE (nomes antigos)

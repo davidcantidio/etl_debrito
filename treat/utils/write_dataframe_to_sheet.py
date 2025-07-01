@@ -29,11 +29,16 @@ def write_dataframe_to_sheet(
         log.info("DataFrame vazio: nada a gravar em '%s'.", sheet_name)
         return
 
-    google_credentials_json = google_credentials_json or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    google_credentials_json = google_credentials_json or os.getenv(
+        "GOOGLE_SERVICE_ACCOUNT_JSON"
+    )
     if not google_credentials_json:
         raise ValueError("Missing Google credentials JSON")
 
-    scopes = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    scopes = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
     creds_info = json.loads(google_credentials_json)
     creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
     client = gspread.authorize(creds)
@@ -55,4 +60,3 @@ def write_dataframe_to_sheet(
     total_cols = df.shape[1]
     ws.resize(rows=total_rows, cols=total_cols)
     log.info("Gravados %d registros em '%s'", df.shape[0], sheet_name)
-

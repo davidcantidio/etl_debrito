@@ -3,6 +3,7 @@
 import pandas as pd
 from treat.utils.preview_links import generate_tiktok_ad_preview_link
 
+
 def transform_tiktok(df: pd.DataFrame, lookup=None) -> pd.DataFrame:
     """
     Aplica o preview de anúncios do TikTok:

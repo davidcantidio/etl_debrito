@@ -54,7 +54,7 @@ _MANDATORY: Tuple[str, ...] = (
 # Layout desejado para cada dimensão  (já inclui os obrigatórios)
 _FINAL_ORDER: dict[str, List[str]] = {
     "age": [
-                "date",
+        "date",
         *_MANDATORY,
         "Campanha",
         "ad_group_name",
@@ -77,7 +77,6 @@ _FINAL_ORDER: dict[str, List[str]] = {
         "campaign_name",
         "pin_id",
     ],
-
     "region": [
         "Numero",
         "date",
@@ -92,6 +91,7 @@ _FINAL_ORDER: dict[str, List[str]] = {
         "pin_id",
     ],
 }
+
 
 # --------------------------------------------------------------------- #
 #  Helpers                                                              #
@@ -130,7 +130,7 @@ def _dist_int_total(valor: int, pesos: Dict[str, float]) -> Dict[str, int]:
     resto = valor - sum(base.values())
     if resto:
         frac = {k: bruto[k] - base[k] for k in pesos}
-        for k in sorted(frac, key=frac.get, reverse=True)[: resto]:
+        for k in sorted(frac, key=frac.get, reverse=True)[:resto]:
             base[k] += 1
     return base
 
@@ -147,7 +147,6 @@ def _prepare_general(df: pd.DataFrame) -> pd.DataFrame:
     # Garante coluna 'utm_content' vazia se inexistente na origem
     if "utm_content" not in df.columns:
         df["utm_content"] = ""
-    
 
     # 🔑 normaliza chaves antes do dropna
     for c in ("campaign_id", "date"):
@@ -189,24 +188,21 @@ def _prepare_dimension(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
 
     df = df.dropna(subset=["campaign_id", "date"]).reset_index(drop=True)
 
-
     if "campaign_id" in df.columns:
-         df["campaign_id"] = df["campaign_id"].astype(str).str.strip()
+        df["campaign_id"] = df["campaign_id"].astype(str).str.strip()
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
     if dim_col in df.columns:
         df[dim_col] = df[dim_col].astype(str).str.strip()
-
-
 
     # ── 4) Coerce as métricas para numérico (sem descartar linhas) ─
     df = _coerce_numeric(df, _METRICS)
     keep = {"campaign_id", "date", dim_col, *_METRICS}
     df = df[[c for c in df.columns if c in keep]]
 
-
     log.info("📊 %s → %d linhas após _prepare_dimension", dim_col, len(df))
     return df, dim_col
+
 
 # --------------------------------------------------------------------- #
 #  Cálculo de pesos por pin                                             #
@@ -226,13 +222,15 @@ def _build_weights(df_gen: pd.DataFrame) -> Dict[Tuple[str, str], Dict[str, floa
                 base = pd.Series(0.0, index=grp["pin_id"])
         weights[(cid, dt)] = base.to_dict()
     return weights
+
+
 # --------------------------------------------------------------------- #
 #  Merge principal                                                      #
 # --------------------------------------------------------------------- #
 def merge_pinterest_dimension(
     *, df_general: pd.DataFrame, df_dimension: pd.DataFrame
 ) -> pd.DataFrame:
-    
+
     # 1) normalização
     df_gen = _prepare_general(df_general)
     df_dim, dim_col = _prepare_dimension(df_dimension)
@@ -252,18 +250,19 @@ def merge_pinterest_dimension(
         .set_index("pin_id")
     )
     meta_campaign = (
-        df_gen[[
-            "campaign_id",
-            "account_name",
-            "Veiculo",
-            "ID_Veiculo",
-            "ID_Campanha",
-            "Campanha",
-            "objective",
-        ]]
+        df_gen[
+            [
+                "campaign_id",
+                "account_name",
+                "Veiculo",
+                "ID_Veiculo",
+                "ID_Campanha",
+                "Campanha",
+                "objective",
+            ]
+        ]
         .drop_duplicates("campaign_id")
         .set_index("campaign_id")
-
     )
 
     # 3) pesos por pin
@@ -318,14 +317,13 @@ def merge_pinterest_dimension(
         validate="many_to_one",
     )
 
-     # preenche valores ausentes das colunas BI
+    # preenche valores ausentes das colunas BI
     for c in meta_campaign.columns:
         if c in df.columns:
             if pd.api.types.is_numeric_dtype(meta_campaign[c]):
                 df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
             else:
                 df[c] = df[c].fillna("Não identificado")
-
 
     if "campaign_id" in df.columns:
         df["campaign_id"] = df["campaign_id"].astype(str).str.strip()
@@ -343,9 +341,7 @@ def merge_pinterest_dimension(
                 if o == 0:
                     continue
                 if abs(o - d) / o > 0.001:
-                    log.warning(
-                        "Divergência %s em %s: %s vs %s", m, idx, o, d
-                    )
+                    log.warning("Divergência %s em %s: %s vs %s", m, idx, o, d)
         log.info("Validação de soma concluída para %d grupos", len(orig_tot))
     except Exception as exc:
         log.warning("Validação de soma falhou: %s", exc)
@@ -363,5 +359,6 @@ def merge_pinterest_dimension(
 
     log.info("✅ merge_pinterest_dimension – %d linhas (%s)", len(df), dim_col)
     return df
+
 
 __all__ = ["merge_pinterest_dimension"]

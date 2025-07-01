@@ -8,11 +8,14 @@ from typing import Optional, Any
 try:
     from .datas_utils import transformar_para_date
 except ImportError:  # pragma: no cover - optional dependency
+
     def transformar_para_date(val):
         """Converte string/data para date, ou retorna None."""
         return pd.to_datetime(val, errors="coerce").date()
 
+
 from treat.bi_param_utils import BIParamLookup
+
 
 def fill_missing_start_end_from_params(
     df: pd.DataFrame,
@@ -47,7 +50,7 @@ def fill_missing_start_end_from_params(
         coluna_start=coluna_start,
         coluna_end=coluna_end,
         sheet_name=None,
-        write_back=False
+        write_back=False,
     )
 
     return df_result

@@ -19,7 +19,7 @@ def setup_logging() -> None:
     Deve ser chamada **antes** do seu código (no seu entrypoint).
     """
     # Formato de log
-    fmt    = "%(asctime)s %(levelname)s %(name)s › %(message)s"
+    fmt = "%(asctime)s %(levelname)s %(name)s › %(message)s"
     datefmt = "%H:%M:%S"
 
     root = logging.getLogger()
@@ -64,7 +64,7 @@ def get_logger(name: str) -> logging.Logger:
     """
     Retorna um logger já configurado.
     Em cada módulo do seu pipeline, faça:
-    
+
         from logging_setup import get_logger
         logger = get_logger(__name__)
     """

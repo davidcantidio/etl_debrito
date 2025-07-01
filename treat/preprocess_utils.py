@@ -29,12 +29,7 @@ def normalize_region_column(
         return df
     out = df.copy()
     dst = output_col or col_name
-    out[dst] = (
-        out[col_name]
-        .astype(str)
-        .str.strip()
-        .apply(normalize_region)
-    )
+    out[dst] = out[col_name].astype(str).str.strip().apply(normalize_region)
     logger.debug(
         "[geo] region normalizada em %s (n=%d linhas)",
         df.attrs.get("sheet_name", "UNKNOWN"),
@@ -47,11 +42,7 @@ def apply_origin_substitutions(df: pd.DataFrame) -> pd.DataFrame:
     """
     Executa todas as transformações de texto “origem → padrão” sem gravar no Sheets.
     """
-    return apply_all_origin_substitutions(
-        df,
-        write_back=False,
-        inplace=False
-    )
+    return apply_all_origin_substitutions(df, write_back=False, inplace=False)
 
 
 def preprocess_origin(df: pd.DataFrame) -> pd.DataFrame:

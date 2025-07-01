@@ -1,4 +1,4 @@
-#trat.utils.geo_normalize
+# trat.utils.geo_normalize
 
 import json
 import os
@@ -8,7 +8,9 @@ from typing import Any, Tuple
 
 def carregar_caches_padrao() -> Tuple[dict, dict]:
     path_estados = os.path.join(os.path.dirname(__file__), "cache_estados.json")
-    path_municipios = os.path.join(os.path.dirname(__file__), "cache_municipios_estados.json")
+    path_municipios = os.path.join(
+        os.path.dirname(__file__), "cache_municipios_estados.json"
+    )
 
     cache_estados = carregar_cache_estados(path_estados)
     cache_municipios = carregar_cache_municipios(path_municipios)
@@ -26,6 +28,7 @@ def normalize_string(s: str) -> str:
 
 # -----------------------------------------------------------------------------
 
+
 def carregar_cache_estados(path_cache_estados: str) -> dict:
     if not os.path.exists(path_cache_estados):
         return {}
@@ -42,6 +45,7 @@ def carregar_cache_municipios(path_cache_municipios: str) -> dict:
 
 # -----------------------------------------------------------------------------
 
+
 def limpeza_basica(regiao_bruta: Any) -> str:
     if not isinstance(regiao_bruta, str):
         return ""
@@ -56,15 +60,18 @@ def limpeza_basica(regiao_bruta: Any) -> str:
     texto = texto.replace("Greater ", "")
     texto = texto.replace(" metropolitan area", "")
     if texto.lower().endswith(" area"):
-        texto = texto[:-len(" area")].strip()
+        texto = texto[: -len(" area")].strip()
     if texto.lower().endswith(" metro"):
-        texto = texto[:-len(" metro")].strip()
+        texto = texto[: -len(" metro")].strip()
     return texto.strip()
 
 
 # -----------------------------------------------------------------------------
 
-def obter_estado_de_regiao(regiao: Any, cache_municipios: dict, cache_estados: dict) -> str:
+
+def obter_estado_de_regiao(
+    regiao: Any, cache_municipios: dict, cache_estados: dict
+) -> str:
     if not isinstance(regiao, str):
         return "Não identificado"
     r = regiao.strip().lower()
@@ -73,17 +80,17 @@ def obter_estado_de_regiao(regiao: Any, cache_municipios: dict, cache_estados: d
     # limpeza e padronização para lookup
     r = (
         r.replace("brazil: ", "")
-         .replace("state of ", "")
-         .replace("(state)", "")
-         .replace("greater ", "")
-         .replace("federal district", "distrito federal")
-         .replace(" metropolitan area", "")
-         .replace(", brazil metropolitan area", "")
-         .replace(" brazil", "")
-         .replace(" area", "")
-         .replace(" metro", "")
-         .replace(",", "")
-         .strip()
+        .replace("state of ", "")
+        .replace("(state)", "")
+        .replace("greater ", "")
+        .replace("federal district", "distrito federal")
+        .replace(" metropolitan area", "")
+        .replace(", brazil metropolitan area", "")
+        .replace(" brazil", "")
+        .replace(" area", "")
+        .replace(" metro", "")
+        .replace(",", "")
+        .strip()
     )
     chave = normalize_string(r)
     # tentativa com estados
@@ -98,6 +105,7 @@ def obter_estado_de_regiao(regiao: Any, cache_municipios: dict, cache_estados: d
 # -----------------------------------------------------------------------------
 # Carrega caches apenas uma vez
 CACHE_ESTADOS, CACHE_MUNICIPIOS = carregar_caches_padrao()
+
 
 def normalize_region(regiao_bruta: Any) -> str:
     """

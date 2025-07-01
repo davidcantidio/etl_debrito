@@ -3,6 +3,7 @@ import datetime
 import pandas as pd
 from treat.utils.sheets_cache import get_worksheet
 
+
 def _col_idx_to_letter(idx: int) -> str:
     """Converte índice 1-based em letra A1 (1→A, 27→AA)."""
     letters = ""
@@ -10,6 +11,7 @@ def _col_idx_to_letter(idx: int) -> str:
         idx, rem = divmod(idx - 1, 26)
         letters = chr(65 + rem) + letters
     return letters
+
 
 def write_back_df(
     df: pd.DataFrame,
@@ -47,7 +49,7 @@ def write_back_df(
     m = re.match(r"([A-Z]+)", a1_range.upper())
     first_col = m.group(1) if m else "A"
     # Encontra índice numérico da primeira coluna (A→1, B→2, …)
-    first_idx = sum((ord(c) - 64) * (26 ** i) for i, c in enumerate(reversed(first_col)))
+    first_idx = sum((ord(c) - 64) * (26**i) for i, c in enumerate(reversed(first_col)))
     last_idx = first_idx + n_cols - 1
     last_col = _col_idx_to_letter(last_idx)
 

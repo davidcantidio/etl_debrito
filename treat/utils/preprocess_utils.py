@@ -40,8 +40,8 @@ def normalize_region_column(
 ) -> pd.DataFrame:
     """
     Se existir a coluna *col_name*, normaliza cada valor geográfico usando
-    ``geo_normalize.normalize_region``.  
-    - Se *output_col* for fornecido, grava o resultado nessa nova coluna;  
+    ``geo_normalize.normalize_region``.
+    - Se *output_col* for fornecido, grava o resultado nessa nova coluna;
       caso contrário, sobrescreve *col_name*.
     """
     if col_name not in df.columns:
@@ -49,12 +49,7 @@ def normalize_region_column(
 
     dst = output_col or col_name
     out = df.copy()
-    out[dst] = (
-        out[col_name]
-        .astype(str)
-        .str.strip()
-        .apply(normalize_region)
-    )
+    out[dst] = out[col_name].astype(str).str.strip().apply(normalize_region)
     return out
 
 

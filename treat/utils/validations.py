@@ -9,7 +9,6 @@ from collections import defaultdict
 log = logging.getLogger(__name__)
 
 
-
 def _json_ready(obj):
     if obj is None:
         return None
@@ -45,11 +44,13 @@ def check_required_columns(
     optional_cols : colunas que PODEM ficar vazias (ex: URL_do_Anuncio).
     zero_valid_cols : colunas numéricas cujo valor 0 é considerado “preenchido”.
     """
-    optional_cols   = optional_cols or []
+    optional_cols = optional_cols or []
     zero_valid_cols = zero_valid_cols or []
 
     # 1) detecta linhas completamente em branco (exceto optional_cols)
-    emptiness = df.isna() | df.astype(str).apply(lambda s: s.str.strip().isin(["", "nan"]))
+    emptiness = df.isna() | df.astype(str).apply(
+        lambda s: s.str.strip().isin(["", "nan"])
+    )
     cols_for_blank = [c for c in df.columns if c not in optional_cols]
     fully_blank_rows = emptiness[cols_for_blank].all(axis=1)
 
@@ -62,10 +63,7 @@ def check_required_columns(
         if col in zero_valid_cols:
             mask_empty = serie.isna() | (serie.astype(str).str.strip() == "")
         else:
-            mask_empty = (
-                serie.isna() |
-                serie.astype(str).str.strip().isin(["", "nan"])
-            )
+            mask_empty = serie.isna() | serie.astype(str).str.strip().isin(["", "nan"])
 
         mask_empty &= ~fully_blank_rows
 
@@ -76,13 +74,16 @@ def check_required_columns(
                 preview += ", …"
             log.warning(
                 "[Validação] Coluna '%s' vazia em %d linha(s): %s",
-                col, len(linhas), preview
+                col,
+                len(linhas),
+                preview,
             )
 
 
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 def validate_columns(df: pd.DataFrame, expected_cols: List[str], stage: str):
     """
@@ -120,7 +121,7 @@ def validate_utm_content_in_bi(
     df_raw: pd.DataFrame,
     df_bi: pd.DataFrame,
     *,
-    bi_utm_cols: Sequence[str] = ("utm_content_raw", "utm_content")
+    bi_utm_cols: Sequence[str] = ("utm_content_raw", "utm_content"),
 ) -> None:
     """
     Garante que todo utm_content de df_raw exista em df_bi.
@@ -168,7 +169,9 @@ def validate_utm_content_with_lookup(
     cols = {c.strip().lower(): c for c in df_param.columns}
     bi_col = cols.get("utm_content_raw") or cols.get("utm_content")
     if not bi_col:
-        print("[VALIDATION] não encontrei coluna 'utm_content[_raw]' em BI_PARAMETRIZAÇÃO.")
+        print(
+            "[VALIDATION] não encontrei coluna 'utm_content[_raw]' em BI_PARAMETRIZAÇÃO."
+        )
         return
 
     bi_utms = set(df_param[bi_col].astype(str).str.strip())
@@ -208,39 +211,37 @@ def validate_aggregates(
     for col in (impressions_col, cost_col):
         if col not in df_raw.columns or col not in df_ok.columns:
             log.warning(
-                "[Validação] Coluna '%s' ausente em df_raw ou df_ok; pulando aggregate check", 
-                col
+                "[Validação] Coluna '%s' ausente em df_raw ou df_ok; pulando aggregate check",
+                col,
             )
             return
 
     # converte para numérico (substui vírgula decimal)
     def to_num(s: pd.Series) -> pd.Series:
         return pd.to_numeric(
-            s.astype(str).str.replace(",", ".", regex=False),
-            errors="coerce"
+            s.astype(str).str.replace(",", ".", regex=False), errors="coerce"
         ).fillna(0)
 
     raw_imp = to_num(df_raw[impressions_col]).sum()
-    ok_imp  = to_num(df_ok[impressions_col]).sum()
+    ok_imp = to_num(df_ok[impressions_col]).sum()
     raw_cost = to_num(df_raw[cost_col]).sum()
-    ok_cost  = to_num(df_ok[cost_col]).sum()
+    ok_cost = to_num(df_ok[cost_col]).sum()
 
     errs: list[str] = []
     if not math.isclose(raw_imp, ok_imp, rel_tol=tol, abs_tol=tol):
-        errs.append(
-            f"impressions: raw={raw_imp:.2f} vs ok={ok_imp:.2f}"
-        )
+        errs.append(f"impressions: raw={raw_imp:.2f} vs ok={ok_imp:.2f}")
     if not math.isclose(raw_cost, ok_cost, rel_tol=tol, abs_tol=tol):
-        errs.append(
-            f"cost      : raw={raw_cost:.2f} vs ok={ok_cost:.2f}"
-        )
+        errs.append(f"cost      : raw={raw_cost:.2f} vs ok={ok_cost:.2f}")
 
     if errs:
         msg = "Divergência nos totais:\n  " + "\n  ".join(errs)
         raise RuntimeError(msg)
     else:
-        log.info("[Validação] Totais de impressions e cost conferem: %d imp, %.2f cost",
-                 raw_imp, raw_cost)
+        log.info(
+            "[Validação] Totais de impressions e cost conferem: %d imp, %.2f cost",
+            raw_imp,
+            raw_cost,
+        )
 
 
 def validate_taxonomy_consistency(
@@ -255,10 +256,10 @@ def validate_taxonomy_consistency(
 
     # 1) Mapear nome do campo de origem → nome da coluna na BI
     bi_col_map = {
-        "campaign_name":       "taxonomy_campaign_name",
-        "ad_group_name":       "taxonomy_ad_group_name",  # ajuste conforme existir
-        "ad_name":             "taxonomy_ad_name",
-        "utm_content":         "utm_content",
+        "campaign_name": "taxonomy_campaign_name",
+        "ad_group_name": "taxonomy_ad_group_name",  # ajuste conforme existir
+        "ad_name": "taxonomy_ad_name",
+        "utm_content": "utm_content",
     }
 
     report: Dict[str, Dict[str, Any]] = {}
@@ -267,9 +268,7 @@ def validate_taxonomy_consistency(
     bi_sets: Dict[str, set] = {}
     for orig_col, bi_col in bi_col_map.items():
         if bi_col in df_bi.columns:
-            bi_sets[orig_col] = set(
-                df_bi[bi_col].astype(str).str.strip().str.lower()
-            )
+            bi_sets[orig_col] = set(df_bi[bi_col].astype(str).str.strip().str.lower())
 
     # 3) Para cada coluna de origem, faça a checagem
     for orig_col, bi_col in bi_col_map.items():
@@ -289,7 +288,9 @@ def validate_taxonomy_consistency(
             empty = (series_raw.str.strip() == "").sum()
             col_report["empty_count"] = empty
             if empty:
-                log.warning("[Validação] Coluna '%s' vazia em %d linha(s)", orig_col, empty)
+                log.warning(
+                    "[Validação] Coluna '%s' vazia em %d linha(s)", orig_col, empty
+                )
 
             # 3.4) Comparação com o set correto da BI
             bi_set = bi_sets.get(orig_col, set())
@@ -299,7 +300,11 @@ def validate_taxonomy_consistency(
                 preview = unknown[:20]
                 log.warning(
                     "[Validação] %d valor(es) de '%s' fora da BI_PARAMETRIZAÇÃO (%s): %s%s",
-                    len(unknown), orig_col, bi_col, preview, " …" if len(unknown) > 20 else ""
+                    len(unknown),
+                    orig_col,
+                    bi_col,
+                    preview,
+                    " …" if len(unknown) > 20 else "",
                 )
             col_report["unknown_values"] = unknown
 
@@ -316,8 +321,8 @@ def validate_no_blank_cells(
 ) -> None:
     """
     Verifica se há células vazias em *todas* as colunas, exceto as listadas em
-    ``allow_blank_cols``.  
-    - Logs `WARNING` por coluna com células vazias.  
+    ``allow_blank_cols``.
+    - Logs `WARNING` por coluna com células vazias.
     - Se quiser tornar “fatal”, troque `log.warning`→`log.error` ou levante
       `ValueError`.
     """
@@ -332,13 +337,13 @@ def validate_no_blank_cells(
         if n_blank:
             where = f" ({context})" if context else ""
             log.warning(
-                "[Validação]%s Coluna '%s' vazia em %d linha(s)",
-                where, col, n_blank
+                "[Validação]%s Coluna '%s' vazia em %d linha(s)", where, col, n_blank
             )
+
 
 def _norm_date(val: str | pd.Timestamp) -> str | None:
     """YYYY-MM-DD normalizado ou None se vazio/indefinido."""
-    if pd.isna(val):                       # NaN / NaT
+    if pd.isna(val):  # NaN / NaT
         return None
     s = str(val).strip()
     if not s or s.lower() in ("", "nan", "nat"):
@@ -346,10 +351,11 @@ def _norm_date(val: str | pd.Timestamp) -> str | None:
     try:
         return pd.to_datetime(s).date().isoformat()
     except Exception:
-        return s           # assume string já está ok (conta como valor)
+        return s  # assume string já está ok (conta como valor)
+
 
 def validate_consistent_dates_across_models(
-    dest_dfs: Dict[str, pd.DataFrame]
+    dest_dfs: Dict[str, pd.DataFrame],
 ) -> pd.DataFrame:
     """
     Para cada par (Campanha, Veiculo), verifica se há mais de um valor distinto
@@ -368,7 +374,7 @@ def validate_consistent_dates_across_models(
 
     # estruturas temporárias para coletar todos os valores
     starts = defaultdict(lambda: defaultdict(set))
-    ends   = defaultdict(lambda: defaultdict(set))
+    ends = defaultdict(lambda: defaultdict(set))
 
     # 1) coleta todos os valores de every row
     for aba, df in dest_dfs.items():
@@ -387,7 +393,10 @@ def validate_consistent_dates_across_models(
             if len(valid) > 1:
                 log.warning(
                     "[Consistência Datas] Aba %s: campanha=%r, veículo=%r tem múltiplos start: %s",
-                    aba, camp, veic, valid
+                    aba,
+                    camp,
+                    veic,
+                    valid,
                 )
                 prob.append(("aba", aba, camp, veic, valid, {""}))
     for (camp, veic), per_aba in ends.items():
@@ -396,32 +405,47 @@ def validate_consistent_dates_across_models(
             if len(valid) > 1:
                 log.warning(
                     "[Consistência Datas] Aba %s: campanha=%r, veículo=%r tem múltiplos end: %s",
-                    aba, camp, veic, valid
+                    aba,
+                    camp,
+                    veic,
+                    valid,
                 )
                 prob.append(("aba", aba, camp, veic, set(), valid))
 
     # 3) valida entre abas
     for key in set(starts) | set(ends):
         camp, veic = key
-        all_starts = {v for per in starts[key].values() for v in per if pd.notna(v) and str(v).strip()}
-        all_ends   = {v for per in ends[key].values()   for v in per if pd.notna(v) and str(v).strip()}
+        all_starts = {
+            v
+            for per in starts[key].values()
+            for v in per
+            if pd.notna(v) and str(v).strip()
+        }
+        all_ends = {
+            v
+            for per in ends[key].values()
+            for v in per
+            if pd.notna(v) and str(v).strip()
+        }
         if len(all_starts) > 1 or len(all_ends) > 1:
             aba_str = ",".join(sorted(starts[key].keys() | ends[key].keys()))
             log.warning(
                 "[Consistência Datas] Entre abas: campanha=%r, veículo=%r tem inconsistência start/end em %s",
-                camp, veic, aba_str
+                camp,
+                veic,
+                aba_str,
             )
             prob.append(("entre-abas", aba_str, camp, veic, all_starts, all_ends))
 
     # monta DataFrame de problemas
     check = pd.DataFrame(
-        prob,
-        columns=["nível", "aba", "Campanha", "Veiculo", "start", "end"]
+        prob, columns=["nível", "aba", "Campanha", "Veiculo", "start", "end"]
     )
 
     if check.empty:
         log.info("✅ Nenhuma divergência de start/end entre modelos.")
     return check
+
 
 def validate_impressions_by_platform(
     df_origin: pd.DataFrame,
@@ -443,7 +467,10 @@ def validate_impressions_by_platform(
         )
         return {}
 
-    if impressions_col not in df_origin.columns or impressions_col not in df_dest.columns:
+    if (
+        impressions_col not in df_origin.columns
+        or impressions_col not in df_dest.columns
+    ):
         log.warning(
             "[Validação] Coluna '%s' ausente em df_origin ou df_dest; pulando validação",
             impressions_col,
@@ -458,13 +485,13 @@ def validate_impressions_by_platform(
 
     origin_imp = (
         df_origin.assign(_imp=_to_num(df_origin[impressions_col]))
-        .groupby(df_origin[platform_col].astype(str))
-        ["_imp"].sum()
+        .groupby(df_origin[platform_col].astype(str))["_imp"]
+        .sum()
     )
     dest_imp = (
         df_dest.assign(_imp=_to_num(df_dest[impressions_col]))
-        .groupby(df_dest[platform_col].astype(str))
-        ["_imp"].sum()
+        .groupby(df_dest[platform_col].astype(str))["_imp"]
+        .sum()
     )
 
     platforms = sorted(set(origin_imp.index) | set(dest_imp.index))

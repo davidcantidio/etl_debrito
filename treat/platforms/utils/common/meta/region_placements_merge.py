@@ -10,7 +10,11 @@ import pandas as pd
 from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
-from utils.geo_normalize import carregar_caches_padrao, limpeza_basica, obter_estado_de_regiao
+from utils.geo_normalize import (
+    carregar_caches_padrao,
+    limpeza_basica,
+    obter_estado_de_regiao,
+)
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
@@ -20,6 +24,7 @@ METRICAS: List[str] = ["Impressions", "Link clicks", "cost", "Video watches at 1
 # ------------------------------- CACHE -------------------------------- #
 _client = get_google_client(CREDS_PATH)
 _cache: dict[str, pd.DataFrame] = {}
+
 
 def _read_sheet(sheet: str) -> pd.DataFrame:
     if sheet not in _cache:
@@ -32,6 +37,7 @@ def _read_sheet(sheet: str) -> pd.DataFrame:
         )
     return _cache[sheet].copy()
 
+
 # ------------------------- PREPARAÇÃO DE DADOS ------------------------ #
 def load_and_prepare_meta_region_data() -> pd.DataFrame:
     """
@@ -41,10 +47,11 @@ def load_and_prepare_meta_region_data() -> pd.DataFrame:
     # 1) Leitura e strip de colunas
     client = get_google_client(CREDS_PATH)
     df = read_sheet_as_dataframe_range(
-        client, SPREADSHEET_ID,
+        client,
+        SPREADSHEET_ID,
         sheet_name="metaRegiao",
         range_str="A1:ZZ",
-        header_row_index=0
+        header_row_index=0,
     )
     df.columns = df.columns.str.strip()
     log.debug("Colunas após strip: %s", list(df.columns))
@@ -104,9 +111,14 @@ def load_and_prepare_meta_region_data() -> pd.DataFrame:
     for m in METRICAS:
         if m in df.columns:
             df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
-    log.debug("Colunas métricas convertidas para numérico: %s", [m for m in METRICAS if m in df.columns])
+    log.debug(
+        "Colunas métricas convertidas para numérico: %s",
+        [m for m in METRICAS if m in df.columns],
+    )
 
     return df
+
+
 def load_and_prepare_meta_placement_data() -> pd.DataFrame:
     """
     Lê a aba 'metaGeral' e remove linhas sem ad_id ou date.
@@ -115,12 +127,14 @@ def load_and_prepare_meta_placement_data() -> pd.DataFrame:
     df.columns = df.columns.str.strip()
     return df.dropna(subset=["ad_id", "date"])
 
+
 # ------------------------------ PIVOTS -------------------------------- #
 def pivot_meta_region_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Agrupa métricas por ad_id, date e Estado.
     """
     return df.groupby(["ad_id", "date", "Estado"], as_index=False)[METRICAS].sum()
+
 
 def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
     """
@@ -139,6 +153,7 @@ def pivot_meta_placement_data(df_placement: pd.DataFrame) -> pd.DataFrame:
     pivot_df.columns = [f"{pl}_{m}" for m, pl in pivot_df.columns]
     return pivot_df.reset_index()
 
+
 def merge_placement_and_region_data(
     df_region: pd.DataFrame,
     df_place: pd.DataFrame,
@@ -148,14 +163,20 @@ def merge_placement_and_region_data(
     """
     return pd.merge(df_region, df_place, on=["ad_id", "date"], how="inner")
 
+
 # --------------------- REDISTRIBUIÇÃO DE MÉTRICAS --------------------- #
 def get_placements(df: pd.DataFrame) -> List[str]:
     """
     Extrai a lista de placements únicos (baseado em colunas que terminam em _Impressions).
     """
-    return sorted({c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_Impressions")})
+    return sorted(
+        {c.rsplit("_", 1)[0] for c in df.columns if c.endswith("_Impressions")}
+    )
 
-def compute_pesos_impressao(row: pd.Series, placements: List[str]) -> Tuple[Dict[str, int], int]:
+
+def compute_pesos_impressao(
+    row: pd.Series, placements: List[str]
+) -> Tuple[Dict[str, int], int]:
     """
     Calcula pesos de impressão por placement; se todos zero, dá peso 1 ao placement com maior métrica.
     """
@@ -163,13 +184,15 @@ def compute_pesos_impressao(row: pd.Series, placements: List[str]) -> Tuple[Dict
     if not any(pesos.values()):
         top = max(
             placements,
-            key=lambda pl: max(abs(float(row.get(f"{pl}_{m}", 0))) for m in METRICAS)
+            key=lambda pl: max(abs(float(row.get(f"{pl}_{m}", 0))) for m in METRICAS),
         )
         pesos[top] = 1
     return pesos, sum(pesos.values())
 
+
 def _floor_cents(v: float) -> float:
     return floor(v * 100) / 100.0
+
 
 def _distribuir_cost(valor: float, pesos: Dict[str, int]) -> Dict[str, float]:
     """
@@ -187,6 +210,7 @@ def _distribuir_cost(valor: float, pesos: Dict[str, int]) -> Dict[str, float]:
             base[pl] += 0.01
     return {pl: round(v, 2) for pl, v in base.items()}
 
+
 def _distribuir_contagem(valor: int, pesos: Dict[str, int]) -> Dict[str, int]:
     """
     Distribui contagens (impressions, clicks, etc.) proporcionalmente.
@@ -203,8 +227,10 @@ def _distribuir_contagem(valor: int, pesos: Dict[str, int]) -> Dict[str, int]:
             base[pl] += 1
     return base
 
+
 # contador global de “casos especiais”
 DISTRIBUICAO_LOGS: Counter[str] = Counter()
+
 
 def distribute_region_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
     """
@@ -219,7 +245,9 @@ def distribute_region_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
         if m not in df_in.columns:
             cols = [f"{pl}_{m}" for pl in placements if f"{pl}_{m}" in df_in.columns]
             df_in[m] = df_in[cols].sum(axis=1)
-    log.debug("DataFrame antes da distribuição (primeiras 3 linhas):\n%s", df_in.head(3))
+    log.debug(
+        "DataFrame antes da distribuição (primeiras 3 linhas):\n%s", df_in.head(3)
+    )
 
     output_rows: list[dict] = []
     for idx, row in df_in.iterrows():
@@ -228,18 +256,28 @@ def distribute_region_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
             log.debug("Linha %d - pesos: %s", idx, pesos)
         dist = {
             "cost": _distribuir_cost(float(row["cost"]), pesos),
-            **{m: _distribuir_contagem(int(row[m]), pesos) for m in METRICAS if m != "cost"}
+            **{
+                m: _distribuir_contagem(int(row[m]), pesos)
+                for m in METRICAS
+                if m != "cost"
+            },
         }
         if idx < 3:
-            log.debug("Linha %d - distribuição: %s", idx, {pl: {m: dist[m][pl] for m in METRICAS} for pl in placements})
+            log.debug(
+                "Linha %d - distribuição: %s",
+                idx,
+                {pl: {m: dist[m][pl] for m in METRICAS} for pl in placements},
+            )
         for pl in placements:
-            output_rows.append({
-                "ad_id":       row["ad_id"],
-                "date":        row["date"],
-                "Estado":      row["Estado"],
-                "_Plataforma": pl,
-                **{m: dist[m][pl] for m in METRICAS},
-            })
+            output_rows.append(
+                {
+                    "ad_id": row["ad_id"],
+                    "date": row["date"],
+                    "Estado": row["Estado"],
+                    "_Plataforma": pl,
+                    **{m: dist[m][pl] for m in METRICAS},
+                }
+            )
 
     df_out = pd.DataFrame(output_rows)
     log.debug("DataFrame após distribuição (primeiras 3 linhas):\n%s", df_out.head(3))
@@ -255,6 +293,7 @@ def distribute_region_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
 
     log.info("✅ distribute_region_metrics — %s linhas", len(df_out))
     return df_out
+
 
 __all__ = [
     "METRICAS",

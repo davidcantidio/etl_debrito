@@ -2,6 +2,7 @@
 import math
 import numpy as np
 
+
 def _to_json_safe(x):
     if x is None:
         return None
@@ -21,6 +22,7 @@ def _to_json_safe(x):
         cls = list if isinstance(x, (list, tuple)) else set
         return cls(_to_json_safe(v) for v in x)
     return str(x)
+
 
 def json_safe(obj):
     """Recursivamente converte obj em tipos JSON‐nativos (int, float, str, None, list, dict)."""

@@ -1,17 +1,19 @@
-#creative_mappging.py
+# creative_mappging.py
 
 import logging
 import pandas as pd
 from gspread.utils import rowcol_to_a1
 from utils.get_google_client import get_google_client
 from utils.google_sheets import CREDS_PATH as creds_path, SPREADSHEET_ID
-from utils.normalize import normalize_columns 
+from utils.normalize import normalize_columns
 import unicodedata
+
 
 def _normalize(s: str) -> str:
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c))
     return s.strip().lower().replace("\n", " ")
+
 
 def load_ad_name_mapping(df_parametrizacao: pd.DataFrame) -> dict[str, str]:
     """
@@ -28,13 +30,14 @@ def load_ad_name_mapping(df_parametrizacao: pd.DataFrame) -> dict[str, str]:
 
     missing = {"utm_content", "CRIATIVO"} - set(df_norm.columns)
     if missing:
-        logging.warning("[load_ad_name_mapping] faltam colunas: %s", ", ".join(sorted(missing)))
+        logging.warning(
+            "[load_ad_name_mapping] faltam colunas: %s", ", ".join(sorted(missing))
+        )
         return {}
 
-    mapping = (df_norm[["utm_content", "CRIATIVO"]]
-               .dropna()
-               .astype(str)
-               .applymap(str.strip))          # remove espaços
+    mapping = (
+        df_norm[["utm_content", "CRIATIVO"]].dropna().astype(str).applymap(str.strip)
+    )  # remove espaços
     return dict(zip(mapping["utm_content"], mapping["CRIATIVO"]))
 
 
@@ -94,7 +97,8 @@ def get_utm_content_from_ad_name(
                         col_idx = header_lc.index(coluna_destino.lower()) + 1
                     except ValueError:
                         log.warning(
-                            "Coluna '%s' não encontrada no header; pulando write-back", coluna_destino
+                            "Coluna '%s' não encontrada no header; pulando write-back",
+                            coluna_destino,
                         )
                         continue
                     cell = rowcol_to_a1(idx + 2, col_idx)
@@ -104,7 +108,8 @@ def get_utm_content_from_ad_name(
         worksheet.batch_update(updates, value_input_option="RAW")
         log.info(
             "[get_utm_content_from_ad_name] %d células atualizadas em '%s'",
-            len(updates), coluna_destino
+            len(updates),
+            coluna_destino,
         )
 
     return df

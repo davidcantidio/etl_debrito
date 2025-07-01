@@ -46,6 +46,7 @@ def converter_data(df: pd.DataFrame, coluna: str) -> pd.DataFrame:
 # Normalização de textos
 # ----------------------------------------------------------------------
 
+
 def _strip_lower_noaccent(s: str) -> str:
     """strip → lower → remove acentos."""
     cleaned = s.strip().lower()
@@ -60,10 +61,7 @@ def normalize_campaign_name(value):
 
 def normalize_campaign_series(series: pd.Series) -> pd.Series:
     """Normaliza Series de nomes de campanha (strip/lower/rem. acentos)."""
-    return (
-        series.astype(str)
-        .map(_strip_lower_noaccent)
-    )
+    return series.astype(str).map(_strip_lower_noaccent)
 
 
 def normalize_columns(columns: pd.Index) -> pd.Index:
@@ -94,6 +92,7 @@ def normalize_parametrizacao_values(
 # Veículo / Placement
 # ----------------------------------------------------------------------
 
+
 def extract_meta_platform_from_placement(placement: str) -> str:
     """
     Infere o veículo (“Facebook” ou “Instagram”) a partir do texto de placement.
@@ -114,6 +113,7 @@ def extract_meta_platform_from_placement(placement: str) -> str:
 # ----------------------------------------------------------------------
 # Demográfico
 # ----------------------------------------------------------------------
+
 
 def normalize_gender(value) -> str:
     """Mapeia valores de gênero para ‘Homem’ / ‘Mulher’ / ‘Não classificado’."""
@@ -158,12 +158,13 @@ def normalize_age(valor) -> str:
 # Números
 # ----------------------------------------------------------------------
 
+
 def _clean_numeric_series(s: pd.Series) -> pd.Series:
     """Converte strings br/pt 1.234,56 → 1234.56 (float)."""
     s = s.astype(str)
-    s = s.str.replace("\u00a0", "", regex=False)           # NB-space
+    s = s.str.replace("\u00a0", "", regex=False)  # NB-space
     s = s.str.replace(r"\.(?=\d{3}(?:\.|,))", "", regex=True)  # separ. milhar
-    s = s.str.replace(",", ".", regex=False)               # decimal
+    s = s.str.replace(",", ".", regex=False)  # decimal
     return pd.to_numeric(s, errors="coerce").fillna(0)
 
 
@@ -181,7 +182,9 @@ def convert_numeric_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFram
             continue
 
         # Coluna duplicada (DataFrame de colunas repetidas)
-        cleaned_parts = [_clean_numeric_series(obj.iloc[:, i]) for i in range(obj.shape[1])]
+        cleaned_parts = [
+            _clean_numeric_series(obj.iloc[:, i]) for i in range(obj.shape[1])
+        ]
         out[col] = pd.concat(cleaned_parts, axis=1).sum(axis=1)
         out = out.loc[:, ~out.columns.duplicated(keep="first")]
     return out
@@ -215,4 +218,3 @@ def normalize_vehicle(value: str) -> str:
     if v.startswith("instagram"):
         return "IG"
     return value.strip()
-

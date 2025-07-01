@@ -1,8 +1,8 @@
 """
 Funções utilitárias comuns aos ETLs do **Meta Ads** (Idade, Gênero, Região …).
 
-•  carrega as abas *metaIdade* e *metaGeral* do Google‑Sheets  
-•  faz pivôs por placement / age  
+•  carrega as abas *metaIdade* e *metaGeral* do Google‑Sheets
+•  faz pivôs por placement / age
 •  contém o algoritmo `distribute_age_metrics` – totalmente testado em
    `tests/test_meta_idade_algoritmo_extra.py`
 """
@@ -12,16 +12,16 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from decimal import Decimal, ROUND_DOWN
-from math      import floor
-from typing    import Dict, List, Tuple, Union
+from math import floor
+from typing import Dict, List, Tuple, Union
 
 import pandas as pd
 
 # -------------------------------------------------------------------- #
 # Dependências auxiliares de Sheets
 # -------------------------------------------------------------------- #
-from utils.google_sheets          import CREDS_PATH, SPREADSHEET_ID
-from utils.get_google_client      import get_google_client
+from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
+from utils.get_google_client import get_google_client
 from utils.read_sheet_as_dataframe import read_sheet_as_dataframe_range
 
 
@@ -38,7 +38,7 @@ METRICAS: List[str] = [
 # -------------------------------------------------------------------- #
 # 1) Carregamento e preparação das abas de origem
 # -------------------------------------------------------------------- #
-_CLIENT = get_google_client(CREDS_PATH)   #  re‑usa a sessão
+_CLIENT = get_google_client(CREDS_PATH)  #  re‑usa a sessão
 
 
 def _read_sheet(sheet_name: str) -> pd.DataFrame:
@@ -78,7 +78,7 @@ def pivot_meta_age_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def pivot_meta_placement_data(df: pd.DataFrame) -> pd.DataFrame:
     """Coloca métricas por placement no formato `<placement>_<metric>`."""
-    id_vars   = ["Ad ID", "Date"]
+    id_vars = ["Ad ID", "Date"]
     value_vars = [c for c in df.columns if c not in id_vars + ["Placement"]]
 
     df_piv = df.pivot_table(
@@ -117,8 +117,11 @@ def compute_pesos_impressao(
     pesos = {pl: max(int(row.get(f"{pl}_Impressions", 0)), 0) for pl in placements}
     if all(v == 0 for v in pesos.values()):
         top_pl, _ = max(
-            ((pl, abs(float(row.get(f"{pl}_{m}", 0))))
-             for pl in placements for m in METRICAS),
+            (
+                (pl, abs(float(row.get(f"{pl}_{m}", 0))))
+                for pl in placements
+                for m in METRICAS
+            ),
             key=lambda t: t[1],
             default=(placements[0], 0),
         )
@@ -170,11 +173,11 @@ def _distribute_proportional(
     if metric == "Cost":
         base = {pl: _floor_cents(quots[pl]) for pl in placements}
         resto = round(valor - sum(base.values()), 2)
-        inc   = 0.01
+        inc = 0.01
     else:
         base = {pl: int(floor(quots[pl])) for pl in placements}
         resto = int(round(valor - sum(base.values())))
-        inc   = 1
+        inc = 1
 
     if resto > 0:
         frac = {pl: quots[pl] - base[pl] for pl in placements}
@@ -205,9 +208,9 @@ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
     # Garante métricas totais se não existirem
     for m in METRICAS:
         if m not in df_in.columns:
-            df_in[m] = df_in[[f"{pl}_{m}" for pl in P if f"{pl}_{m}" in df_in.columns]].sum(
-                axis=1
-            )
+            df_in[m] = df_in[
+                [f"{pl}_{m}" for pl in P if f"{pl}_{m}" in df_in.columns]
+            ].sum(axis=1)
 
     out_rows: list[dict] = []
 
@@ -225,8 +228,8 @@ def distribute_age_metrics(df_in: pd.DataFrame) -> pd.DataFrame:
         for pl in P:
             rec = {
                 "Ad ID": row["Ad ID"],
-                "Date":  row["Date"],
-                "Age":   row["Age"],
+                "Date": row["Date"],
+                "Age": row["Age"],
                 "_Plataforma": pl,
                 **{m: dist_metric[m][pl] for m in METRICAS},
             }

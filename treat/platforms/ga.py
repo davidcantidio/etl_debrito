@@ -1,5 +1,6 @@
-#treat.platforms.ga
+# treat.platforms.ga
 import pandas as pd
+
 
 def transform_ga(df: pd.DataFrame, lookup=None) -> pd.DataFrame:
     """

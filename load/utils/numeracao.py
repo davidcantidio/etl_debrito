@@ -4,9 +4,7 @@ from typing import List, Optional
 
 
 def next_numbers(
-    df_dest: Optional[pd.DataFrame],
-    count: int,
-    column: str = "Numero"
+    df_dest: Optional[pd.DataFrame], count: int, column: str = "Numero"
 ) -> List[int]:
     """
     Gera uma lista de números sequenciais iniciando após o maior valor presente
@@ -31,7 +29,7 @@ def next_numbers(
                 col_dest = col
                 break
         if col_dest:
-            serie = pd.to_numeric(df_dest[col_dest], errors='coerce')
+            serie = pd.to_numeric(df_dest[col_dest], errors="coerce")
             max_val = serie.max()
             if pd.notna(max_val):
                 start = int(max_val) + 1
@@ -41,9 +39,7 @@ def next_numbers(
 
 
 def gerar_numeracao(
-    df: pd.DataFrame,
-    df_destino: Optional[pd.DataFrame] = None,
-    coluna: str = "Numero"
+    df: pd.DataFrame, df_destino: Optional[pd.DataFrame] = None, coluna: str = "Numero"
 ) -> pd.DataFrame:
     """
     Adiciona ao DataFrame uma coluna de numeração sequencial usando next_numbers.

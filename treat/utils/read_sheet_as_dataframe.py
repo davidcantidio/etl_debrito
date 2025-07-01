@@ -3,7 +3,7 @@ def read_sheet_as_dataframe_range(
     spreadsheet_id: str,
     sheet_name: str,
     range_str: str = "A1:ZZ",
-    header_row_index: int = 0
+    header_row_index: int = 0,
 ):
     """
     Lê um intervalo específico (ex.: 'A1:AM') e converte em DataFrame,

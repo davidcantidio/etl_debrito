@@ -23,7 +23,7 @@ from __future__ import annotations
 import builtins
 import logging
 from typing import Callable, Dict, List, Optional
-from treat.utils.normalize import normalize_age, normalize_gender       # novo import
+from treat.utils.normalize import normalize_age, normalize_gender  # novo import
 import pandas as pd
 from gspread import Worksheet
 
@@ -88,7 +88,9 @@ class TreatPipeline:
         mapping_renomeacao: Dict[str, str],
         *,
         write_back: bool = True,
-        subs_objetivo_fn: Callable[[pd.DataFrame], pd.DataFrame] = aplicar_substituicoes_objetivo,
+        subs_objetivo_fn: Callable[
+            [pd.DataFrame], pd.DataFrame
+        ] = aplicar_substituicoes_objetivo,
     ) -> None:
         self.creds_path = creds_path
         self.spreadsheet_id = spreadsheet_id
@@ -108,7 +110,9 @@ class TreatPipeline:
 
         # Worksheet de origem (apenas se vamos fazer write-back)
         self.worksheet_origem: Optional[Worksheet] = (
-            get_worksheet(creds_path, spreadsheet_id, sheet_name) if write_back else None
+            get_worksheet(creds_path, spreadsheet_id, sheet_name)
+            if write_back
+            else None
         )
 
         # Cache interno para “abas irmãs” (ex.: pinterestGeral)
@@ -154,25 +158,31 @@ class TreatPipeline:
         if lower in {"pinterestidade", "pinterestgenero", "pinterestregiao"}:
             # 3a) grava correções na própria aba-origem
             df_orig_to_write = df[orig_cols]
-            validate_columns(df_orig_to_write, orig_cols,
-                            stage=f"Origem {self.sheet_name}")
+            validate_columns(
+                df_orig_to_write, orig_cols, stage=f"Origem {self.sheet_name}"
+            )
             write_back_origin(
-                df_raw        = df_raw,
-                df_ok         = df_orig_to_write,
-                creds_path    = self.creds_path,
-                spreadsheet_id= self.spreadsheet_id,
-                write_back    = self.write_back,
-                dry_run       = False,
-                worksheet     = self.worksheet_origem,
+                df_raw=df_raw,
+                df_ok=df_orig_to_write,
+                creds_path=self.creds_path,
+                spreadsheet_id=self.spreadsheet_id,
+                write_back=self.write_back,
+                dry_run=False,
+                worksheet=self.worksheet_origem,
                 skip_if_written=True,
-                header=self.fetcher.header_cache.get(self.sheet_name, df_raw.columns.tolist()),
+                header=self.fetcher.header_cache.get(
+                    self.sheet_name, df_raw.columns.tolist()
+                ),
             )
 
             # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache global)
             import builtins
+
             df_geral = getattr(builtins, "_pinterest_geral_tratado", None)
             if df_geral is None:
-                raise RuntimeError("pinterestGeral não foi processado antes da dimensão.")
+                raise RuntimeError(
+                    "pinterestGeral não foi processado antes da dimensão."
+                )
 
             # 3c) merge demográfico (gera modeloIdade/Genero/Regiao)
             df = pin_merge(df_general=df_geral, df_dimension=df)
@@ -205,7 +215,9 @@ class TreatPipeline:
         # ───────────────────────────────────────────────────────────────
         # 7) Preenche start/end em memória
         # ───────────────────────────────────────────────────────────────
-        df = fill_missing_start_end_from_params(df, lookup=self.bi_lookup, inplace=False)
+        df = fill_missing_start_end_from_params(
+            df, lookup=self.bi_lookup, inplace=False
+        )
 
         # ───────────────────────────────────────────────────────────────
         # 7a) Uniformiza datas por campaign_name
@@ -216,7 +228,10 @@ class TreatPipeline:
         # 8) Atribuição de Veiculo + ID_Veiculo (lookup BI)
         # ───────────────────────────────────────────────────────────────
         df = assign_vehicle_and_id(
-            df, sheet_name=self.sheet_name, fetcher=self.fetcher, bi_lookup=self.bi_lookup
+            df,
+            sheet_name=self.sheet_name,
+            fetcher=self.fetcher,
+            bi_lookup=self.bi_lookup,
         )
 
         # ───────────────────────────────────────────────────────────────
@@ -235,25 +250,34 @@ class TreatPipeline:
         # ───────────────────────────────────────────────────────────────
         if lower == "pinterestgeral":
             import builtins
+
             builtins._pinterest_geral_tratado = df.copy()
 
         # ───────────────────────────────────────────────────────────────
         # 11) Validação de agregados
         # ───────────────────────────────────────────────────────────────
         validate_aggregates(df_raw, df)
-        self._last_impressions_report = validate_impressions_by_platform(
-            df_raw, df
-        )
+        self._last_impressions_report = validate_impressions_by_platform(df_raw, df)
 
         # ───────────────────────────────────────────────────────────────
         # 12) Checagem de colunas obrigatórias
         # ───────────────────────────────────────────────────────────────
         ZERO_OK = [
-            "impressions", "cost", "link_clicks", "video_play",
-            "video_watches_25", "video_watches_50", "video_watches_75",
-            "video_watched_100", "post_reactions", "post_shares", "post_comments",
+            "impressions",
+            "cost",
+            "link_clicks",
+            "video_play",
+            "video_watches_25",
+            "video_watches_50",
+            "video_watches_75",
+            "video_watched_100",
+            "post_reactions",
+            "post_shares",
+            "post_comments",
         ]
-        check_required_columns(df, optional_cols=["URL_do_Anúncio"], zero_valid_cols=ZERO_OK)
+        check_required_columns(
+            df, optional_cols=["URL_do_Anúncio"], zero_valid_cols=ZERO_OK
+        )
 
         # ───────────────────────────────────────────────────────────────
         # 13) Write-back das correções na aba-origem (padrão)
@@ -275,16 +299,18 @@ class TreatPipeline:
                 write_back=self.write_back,
                 dry_run=False,
                 skip_if_written=True,
-                header=self.fetcher.header_cache.get(self.sheet_name, df_raw.columns.tolist()),
+                header=self.fetcher.header_cache.get(
+                    self.sheet_name, df_raw.columns.tolist()
+                ),
             )
 
         # ───────────────────────────────────────────────────────────────
         # 14) Renomeia colunas para o modelo destino + cálculos finais
         # ───────────────────────────────────────────────────────────────
         df = renomear_colunas_origem_para_modelo(df, self.mapping)
-        if "age" in df.columns:                                
+        if "age" in df.columns:
             df["age"] = df["age"].apply(normalize_age)
-                # ➡︎ Normaliza somente se a coluna estiver presente
+            # ➡︎ Normaliza somente se a coluna estiver presente
         if "gender" in df.columns:
             df["gender"] = df["gender"].apply(normalize_gender)
         df = calcular_engajamento_total(df)
@@ -294,13 +320,17 @@ class TreatPipeline:
         # 15) Logs de verificação
         # ───────────────────────────────────────────────────────────────
         if not df[df["Veiculo"].fillna("") == ""].empty:
-            log.warning("[%s] linhas sem Veiculo: %s",
-                        self.sheet_name,
-                        df.index[df["Veiculo"].fillna('') == ""].tolist())
+            log.warning(
+                "[%s] linhas sem Veiculo: %s",
+                self.sheet_name,
+                df.index[df["Veiculo"].fillna("") == ""].tolist(),
+            )
         if "objective" in df.columns and not df[df["objective"].fillna("") == ""].empty:
-            log.warning("[%s] linhas sem objective: %s",
-                        self.sheet_name,
-                        df.index[df["objective"].fillna('') == ""].tolist())
+            log.warning(
+                "[%s] linhas sem objective: %s",
+                self.sheet_name,
+                df.index[df["objective"].fillna("") == ""].tolist(),
+            )
 
         return df
 
@@ -388,4 +418,3 @@ def execute_pipeline(
     )
 
     return results
-

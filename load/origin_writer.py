@@ -69,14 +69,12 @@ def write_back_origin(
     extras = set(df_ok.columns) - set(header_cols)
     missing = set(header_cols) - set(df_ok.columns)
     if extras:
-         log.warning(
+        log.warning(
             "[write_back_origin] Ignorando colunas extras: %s",
             sorted(extras),
         )
     if missing:
-        raise ValueError(
-            f"[write_back_origin] Colunas faltando: {sorted(missing)}"
-        )
+        raise ValueError(f"[write_back_origin] Colunas faltando: {sorted(missing)}")
 
     # 2) Se write_back estiver desligado, não grava nada
     if not write_back:
@@ -94,7 +92,9 @@ def write_back_origin(
     # 5) Obtém o Worksheet (se não foi fornecido)
     if worksheet is None:
         if sheet_name is None:
-            raise ValueError("Quando `worksheet=None`, `sheet_name` deve ser fornecido.")
+            raise ValueError(
+                "Quando `worksheet=None`, `sheet_name` deve ser fornecido."
+            )
         ws = get_worksheet(creds_path, spreadsheet_id, sheet_name)
         actual_sheet_name = sheet_name
     else:

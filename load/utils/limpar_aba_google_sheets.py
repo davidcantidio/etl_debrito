@@ -1,15 +1,17 @@
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
+
 def get_sheet_id(service, spreadsheet_id: str, aba_nome: str) -> int:
     """
     Retorna o ID interno da aba a partir do seu nome.
     """
     spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-    for sheet in spreadsheet['sheets']:
-        if sheet['properties']['title'] == aba_nome:
-            return sheet['properties']['sheetId']
+    for sheet in spreadsheet["sheets"]:
+        if sheet["properties"]["title"] == aba_nome:
+            return sheet["properties"]["sheetId"]
     raise ValueError(f"Aba '{aba_nome}' não encontrada no documento.")
+
 
 def limpar_aba_mantendo_cabecalho(service, spreadsheet_id: str, aba_nome: str):
     """
@@ -24,7 +26,7 @@ def limpar_aba_mantendo_cabecalho(service, spreadsheet_id: str, aba_nome: str):
                     "range": {
                         "sheetId": sheet_id,
                         "dimension": "ROWS",
-                        "startIndex": 1  # começa na linha 2 (0-indexed)
+                        "startIndex": 1,  # começa na linha 2 (0-indexed)
                     }
                 }
             }
@@ -32,8 +34,7 @@ def limpar_aba_mantendo_cabecalho(service, spreadsheet_id: str, aba_nome: str):
     }
 
     service.spreadsheets().batchUpdate(
-        spreadsheetId=spreadsheet_id,
-        body=request_body
+        spreadsheetId=spreadsheet_id, body=request_body
     ).execute()
 
     print(f"Aba '{aba_nome}' limpa com sucesso (mantido apenas o cabeçalho).")
@@ -50,7 +51,7 @@ if __name__ == "__main__":
         "modeloIdade",
         "modeloAlcance",
         "modeloRegiao",
-        "modeloGenero"
+        "modeloGenero",
     ]
 
     # Autenticação e serviço

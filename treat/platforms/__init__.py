@@ -2,6 +2,7 @@
 
 from importlib import import_module
 
+
 def dispatch(sheet_name: str):
     """Aplica transformações específicas da plataforma."""
     lower = sheet_name.lower()
@@ -20,7 +21,4 @@ def dispatch(sheet_name: str):
         return lambda df, lookup=None: df
 
     # importa dinamicamente o módulo e retorna transform_<mod>
-    return getattr(
-        import_module(f"treat.platforms.{mod}"),
-        f"transform_{mod}"
-    )
+    return getattr(import_module(f"treat.platforms.{mod}"), f"transform_{mod}")

@@ -12,10 +12,12 @@ from load import dest_writer
 import treat.treat_pipeline as pipeline
 from googleapiclient import discovery
 
+
 class DummyFetcher:
     def __init__(self):
         self.calls = 0
         self.cache = {}
+
     def get(self, names, as_frame=True):
         self.calls += 1
         result = {}
@@ -26,8 +28,10 @@ class DummyFetcher:
                 self.cache[n] = df
             result[n] = df
         return result
+
     def get_cached(self, names, as_frame=True):
         return {n: self.cache[n] for n in names}
+
     def open_worksheet(self, name):
         return MagicMock(title=name)
 
@@ -41,11 +45,18 @@ def test_single_batch_get_and_update(monkeypatch):
     monkeypatch.setattr(dest_writer, "_build_service", lambda c: service)
 
     monkeypatch.setattr(TreatPipeline, "run", lambda self, df: df)
-    monkeypatch.setattr(pipeline, "prefetch_meta", lambda f, s: dest_writer._HEADERS.update({dest_writer.DESTINATION_SHEETS["geral"]: ["ID"]}))
+    monkeypatch.setattr(
+        pipeline,
+        "prefetch_meta",
+        lambda f, s: dest_writer._HEADERS.update(
+            {dest_writer.DESTINATION_SHEETS["geral"]: ["ID"]}
+        ),
+    )
 
     fetcher = DummyFetcher()
-    execute_pipeline(["metaGeral"], "creds.json", "xyz", write_back_origin=False, fetcher=fetcher)
+    execute_pipeline(
+        ["metaGeral"], "creds.json", "xyz", write_back_origin=False, fetcher=fetcher
+    )
 
     assert fetcher.calls == 1
     assert batch_call.call_count == 1
-

@@ -3,12 +3,14 @@
 import pandas as pd
 from typing import Any, Dict, Optional
 
+
 def _init_preview_column(df: pd.DataFrame) -> pd.DataFrame:
     """
     Garante que exista a coluna 'URL_do_Anuncio' no DataFrame.
     """
     df["URL_do_Anuncio"] = df.get("URL_do_Anuncio", "")
     return df
+
 
 def _apply_preview_map(df: pd.DataFrame, preview_map: Dict[str, str]) -> pd.DataFrame:
     """
@@ -22,6 +24,7 @@ def _apply_preview_map(df: pd.DataFrame, preview_map: Dict[str, str]) -> pd.Data
         )
     return df
 
+
 def _override_ad_name(df: pd.DataFrame, ad_name_map: Dict[str, str]) -> pd.DataFrame:
     """
     Substitui 'ad_name' com base em utm_content → ad_name, onde houver mapeamento.
@@ -29,11 +32,13 @@ def _override_ad_name(df: pd.DataFrame, ad_name_map: Dict[str, str]) -> pd.DataF
     if ad_name_map and "utm_content" in df.columns:
         df["ad_name"] = (
             df["utm_content"]
-            .astype(str).str.strip()
+            .astype(str)
+            .str.strip()
             .map(ad_name_map)
             .fillna(df.get("ad_name", ""))
         )
     return df
+
 
 def _sync_ad_group(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -41,6 +46,7 @@ def _sync_ad_group(df: pd.DataFrame) -> pd.DataFrame:
     """
     df["ad_group_name"] = df["ad_name"]
     return df
+
 
 def transform_linkedin(df: pd.DataFrame, lookup: Optional[Any] = None) -> pd.DataFrame:
     """

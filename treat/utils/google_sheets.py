@@ -3,14 +3,15 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from gspread_dataframe import get_as_dataframe
 
+
 # --- leitura de aba via DataFrame ---
 def carregar_aba_google_sheets(creds_path, sheet_url, nome_aba):
     """
     Autentica com o Google Sheets e retorna um DataFrame da aba especificada.
     """
     scope = [
-        'https://spreadsheets.google.com/feeds',
-        'https://www.googleapis.com/auth/drive'
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
     ]
     creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
     client = gspread.authorize(creds)
@@ -21,6 +22,7 @@ def carregar_aba_google_sheets(creds_path, sheet_url, nome_aba):
     df = get_as_dataframe(aba, dtype=str, na_filter=False)
     return df
 
+
 # --- escrita em batch (batch_update) ---
 def batch_update_sheet_values(
     creds_path: str,
@@ -28,7 +30,7 @@ def batch_update_sheet_values(
     nome_aba: str,
     a1_range: str,
     values: list[list],
-    value_input_option: str = "USER_ENTERED"
+    value_input_option: str = "USER_ENTERED",
 ) -> None:
     """
     Autentica com o Google Sheets e faz batch_update de uma faixa A1.
@@ -40,8 +42,8 @@ def batch_update_sheet_values(
     - value_input_option: USER_ENTERED ou RAW
     """
     scope = [
-        'https://spreadsheets.google.com/feeds',
-        'https://www.googleapis.com/auth/drive'
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
     ]
     creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
     client = gspread.authorize(creds)
@@ -50,6 +52,5 @@ def batch_update_sheet_values(
     aba = sheet.worksheet(nome_aba)
 
     aba.batch_update(
-        [{'range': a1_range, 'values': values}],
-        value_input_option=value_input_option
+        [{"range": a1_range, "values": values}], value_input_option=value_input_option
     )

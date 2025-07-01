@@ -160,7 +160,11 @@ def _ensure_rows(
     except Exception:
         return
 
-    frozen = getattr(ws, "_properties", {}).get("gridProperties", {}).get("frozenRowCount", 0)
+    frozen = (
+        getattr(ws, "_properties", {})
+        .get("gridProperties", {})
+        .get("frozenRowCount", 0)
+    )
     min_rows = max(frozen + 1, 2)
     desired = max(end_row, min_rows)
 
@@ -211,7 +215,9 @@ def collect_dest_payload(df_model: pd.DataFrame, sheet_name: str) -> Optional[di
         return None
     payload = _to_payload(df_out, sheet_name)
     if "ID" in df_out.columns:
-        _EXISTING_IDS.setdefault(sheet_name, set()).update(df_out["ID"].astype(str).tolist())
+        _EXISTING_IDS.setdefault(sheet_name, set()).update(
+            df_out["ID"].astype(str).tolist()
+        )
     return payload
 
 

@@ -16,7 +16,7 @@ def append_records_to_sheet(
     sheet_name: str,
     df: pd.DataFrame,
     *,
-    include_header: Optional[bool] = None
+    include_header: Optional[bool] = None,
 ) -> None:
     """
     Insere os registros de `df` na aba `sheet_name`, usando apenas UMA chamada de leitura
@@ -59,11 +59,7 @@ def append_records_to_sheet(
     try:
         worksheet = fetcher.open_worksheet(sheet_name)
         set_with_dataframe(
-            worksheet,
-            df,
-            row=next_row,
-            col=1,
-            include_column_header=include_header
+            worksheet, df, row=next_row, col=1, include_column_header=include_header
         )
     except Exception as e:
         log.error(f"Falha ao escrever dados em '{sheet_name}': {e}")
@@ -71,8 +67,12 @@ def append_records_to_sheet(
 
     # 5) Calcular novas dimensões sem ler de novo:
     new_rows = df.shape[0]
-    new_cols = df.shape[1] + (1 if include_header else 0)  # colunas do df, header não conta como coluna extra
-    total_rows = existing_rows + new_rows + (1 if include_header and existing_rows == 0 else 0)
+    new_cols = df.shape[1] + (
+        1 if include_header else 0
+    )  # colunas do df, header não conta como coluna extra
+    total_rows = (
+        existing_rows + new_rows + (1 if include_header and existing_rows == 0 else 0)
+    )
     total_cols = max(existing_cols, new_cols)
 
     # 6) Ajustar tamanho da planilha

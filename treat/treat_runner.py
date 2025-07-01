@@ -54,6 +54,7 @@ def _run_pipeline(
 
 # ───────────────────────── wrappers públicos ─────────────────────────── #
 
+
 def treat_general_data(
     df_raw: pd.DataFrame,
     creds_path: str,
@@ -129,6 +130,7 @@ def treat_ga_geral(
         write_back=write_back,
     )
 
+
 # Exemplo de wrappers adicionais para outras plataformas:
 # def treat_tiktok_gender(...):
 #     return _run_pipeline(..., sheet_name="tiktokGenero", mapping=renomeacao_tiktok_genero)
@@ -139,7 +141,7 @@ def treat_ga_geral(
 
 # ───── aliases para compatibilidade com código legado ─────
 
-treat_meta_geral  = treat_general_data
+treat_meta_geral = treat_general_data
 treat_meta_genero = treat_gender_data
-treat_meta_idade  = treat_age_data
+treat_meta_idade = treat_age_data
 treat_ga = treat_ga_geral

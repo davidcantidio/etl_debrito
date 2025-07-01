@@ -4,4 +4,5 @@ from typing import List
 CAMPAIGN_NAME_FILTER_LIST: List[str] = [
     # Add campaign names here that should be excluded
     # e.g.: "Test Campaign", "Internal Promo"
-"TOPVIEW-20250321-Q-20250301460526-2025031002130"]
+    "TOPVIEW-20250321-Q-20250301460526-2025031002130"
+]

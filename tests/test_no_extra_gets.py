@@ -76,7 +76,13 @@ def test_no_extra_header_get(monkeypatch):
         return df_prep
 
     monkeypatch.setattr(TreatPipeline, "run", simple_run)
-    monkeypatch.setattr(pipeline, "prefetch_meta", lambda f, s: dest_writer._HEADERS.update({dest_writer.DESTINATION_SHEETS["geral"]: ["ID"]}))
+    monkeypatch.setattr(
+        pipeline,
+        "prefetch_meta",
+        lambda f, s: dest_writer._HEADERS.update(
+            {dest_writer.DESTINATION_SHEETS["geral"]: ["ID"]}
+        ),
+    )
 
     fetcher = DummyFetcher()
     execute_pipeline(["metaGeral"], "creds.json", "xyz", fetcher=fetcher)
@@ -84,4 +90,5 @@ def test_no_extra_header_get(monkeypatch):
     assert fetcher.calls == 1
     assert ws.row_values.call_count == 0
     import builtins
+
     assert getattr(builtins, "_wb_origin_done") == {"metaGeral"}

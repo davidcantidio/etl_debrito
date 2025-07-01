@@ -20,13 +20,14 @@ from utils.google_sheets import CREDS_PATH, SPREADSHEET_ID
 
 log = logging.getLogger(__name__)
 
+
 # ------------------------------------------------------------------------------
 # 1) BIParamLookup: cache e geração de lookup dicts da planilha BI_PARAMETRIZAÇÃO
 # ------------------------------------------------------------------------------
 class BIParamLookup:
     SHEET_NAME = "BI_PARAMETRIZAÇÃO"
-    HEADER_ROW = 1     # 0-indexed
-    _TTL = 60 * 10     # 10 minutos
+    HEADER_ROW = 1  # 0-indexed
+    _TTL = 60 * 10  # 10 minutos
 
     def __init__(self, creds_path: str, spreadsheet_id: str):
         self.creds_path = creds_path
@@ -78,33 +79,45 @@ class BIParamLookup:
         out: Dict[str, Tuple[str, ...]] = {}
         for row in self._df.itertuples(index=False):  # type: ignore
             raw = getattr(row, key_col)
-            if pd.isna(raw): continue
+            if pd.isna(raw):
+                continue
             k = str(raw).strip()
-            if not k: continue
+            if not k:
+                continue
             k = k.upper() if upper_keys else k.lower()
             vals = tuple(str(getattr(row, vc)).strip() for vc in val_cols)  # type: ignore
             out[k] = vals
         return out
 
-    def get_taxonomy_camp_name_and_id_from_ad_name(self) -> Tuple[Dict[str,str], Dict[str,str]]:
-        raw = self._map_columns("ad_name", ["taxonomy_campaign_name","utm_campaign"], upper_keys=True)
-        return ({k:v[0] for k,v in raw.items()}, {k:v[1] for k,v in raw.items()})
+    def get_taxonomy_camp_name_and_id_from_ad_name(
+        self,
+    ) -> Tuple[Dict[str, str], Dict[str, str]]:
+        raw = self._map_columns(
+            "ad_name", ["taxonomy_campaign_name", "utm_campaign"], upper_keys=True
+        )
+        return ({k: v[0] for k, v in raw.items()}, {k: v[1] for k, v in raw.items()})
 
-    def utm_start_end(self) -> Dict[str,Dict[str,str]]:
-        raw = self._map_columns("utm_content", ["start","end"], upper_keys=False)
-        return {k:{"start":v[0],"end":v[1]} for k,v in raw.items()}
+    def utm_start_end(self) -> Dict[str, Dict[str, str]]:
+        raw = self._map_columns("utm_content", ["start", "end"], upper_keys=False)
+        return {k: {"start": v[0], "end": v[1]} for k, v in raw.items()}
 
-    def get_criativo_mapping(self) -> Dict[str,str]:
+    def get_criativo_mapping(self) -> Dict[str, str]:
         raw = self._map_columns("utm_content", ["criativo"], upper_keys=False)
-        return {k:v[0] for k,v in raw.items()}
+        return {k: v[0] for k, v in raw.items()}
 
     def lookup_utm_for_ad_name(self, ad_name: str) -> str:
-        if not isinstance(ad_name, str): return ""
-        inv = {v:k for k,v in self.get_criativo_mapping().items()}
-        return inv.get(ad_name.strip(),"")    
+        if not isinstance(ad_name, str):
+            return ""
+        inv = {v: k for k, v in self.get_criativo_mapping().items()}
+        return inv.get(ad_name.strip(), "")
 
-def get_campaign_parameterization(creds_path: str, spreadsheet_id: str) -> Tuple[Dict[str,str],Dict[str,str]]:
-    return BIParamLookup(creds_path, spreadsheet_id).get_taxonomy_camp_name_and_id_from_ad_name()
+
+def get_campaign_parameterization(
+    creds_path: str, spreadsheet_id: str
+) -> Tuple[Dict[str, str], Dict[str, str]]:
+    return BIParamLookup(
+        creds_path, spreadsheet_id
+    ).get_taxonomy_camp_name_and_id_from_ad_name()
 
 
 # ------------------------------------------------------------------------------
@@ -115,33 +128,39 @@ def _normalize_str(s: str) -> str:
     s = "".join(c for c in s if not unicodedata.combining(c))
     return s.strip().lower()
 
-def load_ad_name_mapping(df_param: pd.DataFrame) -> Dict[str,str]:
+
+def load_ad_name_mapping(df_param: pd.DataFrame) -> Dict[str, str]:
     df = df_param.copy()
     df.columns = [_normalize_str(c) for c in df.columns]
-    if not {"utm_content","criativo"}.issubset(df.columns):
-        log.warning("Creative mapping: colunas faltando %s", set(("utm_content","criativo")) - set(df.columns))
+    if not {"utm_content", "criativo"}.issubset(df.columns):
+        log.warning(
+            "Creative mapping: colunas faltando %s",
+            set(("utm_content", "criativo")) - set(df.columns),
+        )
         return {}
-    df = df[["utm_content","criativo"]].dropna().applymap(str.strip)
+    df = df[["utm_content", "criativo"]].dropna().applymap(str.strip)
     return dict(zip(df["utm_content"], df["criativo"]))
 
-def get_ad_name_from_utm_content(utm: str, mapping: Dict[str,str]) -> str:
+
+def get_ad_name_from_utm_content(utm: str, mapping: Dict[str, str]) -> str:
     return mapping.get(utm.strip(), "")
+
 
 def fill_utm_from_ad_name(
     df: pd.DataFrame,
-    mapping: Dict[str,str],
-    coluna_ad: str="Ad name",
-    coluna_dest: str="Content (utm)",
-    write_back: bool=False,
-    sheet_name: Optional[str]=None
+    mapping: Dict[str, str],
+    coluna_ad: str = "Ad name",
+    coluna_dest: str = "Content (utm)",
+    write_back: bool = False,
+    sheet_name: Optional[str] = None,
 ) -> pd.DataFrame:
-    inv = {v:k for k,v in mapping.items()}
+    inv = {v: k for k, v in mapping.items()}
     df = df.copy()
-    updates: List[Dict[str,Any]] = []
+    updates: List[Dict[str, Any]] = []
     # prepare worksheet if write_back...
     for idx, ad in df[coluna_ad].astype(str).str.strip().items():
         if not df.at[idx, coluna_dest].strip():
-            utm = inv.get(ad,"")
+            utm = inv.get(ad, "")
             if utm:
                 df.at[idx, coluna_dest] = utm
                 # se write_back, acumular updates...
@@ -153,17 +172,22 @@ def fill_utm_from_ad_name(
 # 3) Datas e parâmetros (fill_missing_start_end_from_params)
 # ------------------------------------------------------------------------------
 MAX_CELLS = 500
-def _chunk(upd: List[Dict[str,Any]], size:int):
-    for i in range(0,len(upd),size): yield upd[i:i+size]
+
+
+def _chunk(upd: List[Dict[str, Any]], size: int):
+    for i in range(0, len(upd), size):
+        yield upd[i : i + size]
+
 
 def fill_missing_start_end_from_params(
     df: pd.DataFrame,
-    sheet_name: Optional[str]=None,
-    worksheet: Optional[Worksheet]=None,
-    write_back: bool=True,
-    inplace: bool=True
+    sheet_name: Optional[str] = None,
+    worksheet: Optional[Worksheet] = None,
+    write_back: bool = True,
+    inplace: bool = True,
 ) -> pd.DataFrame:
-    if not inplace: df = df.copy()
+    if not inplace:
+        df = df.copy()
     # carregar BI_PARAMETRIZAÇÃO raw (linha 2)
     client = get_google_client(CREDS_PATH)
     sh = client.open_by_key(SPREADSHEET_ID)
@@ -176,68 +200,100 @@ def fill_missing_start_end_from_params(
     # preenche start e end, write_back se solicitado...
     return df
 
+
 def transformar_para_date(v):
-    if not v: return None
-    if isinstance(v, date): return v
-    if isinstance(v, datetime): return v.date()
-    for fmt in ("%Y-%m-%d %H:%M:%S","%Y-%m-%d"):
-        try: return datetime.strptime(v.strip(),fmt).date()
-        except: continue
+    if not v:
+        return None
+    if isinstance(v, date):
+        return v
+    if isinstance(v, datetime):
+        return v.date()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(v.strip(), fmt).date()
+        except:
+            continue
     raise ValueError("Formato inválido")
+
 
 def converter_data(df: pd.DataFrame, col: str) -> pd.DataFrame:
     if col in df.columns:
         df[col] = pd.to_datetime(df[col], errors="coerce").dt.date.fillna("")
     return df
 
+
 def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["Inicio_da_Campanha"] = df.get("start","").apply(transformar_para_date)
-    df["Fim_da_Campanha"]    = df.get("end","").apply(transformar_para_date)
+    df["Inicio_da_Campanha"] = df.get("start", "").apply(transformar_para_date)
+    df["Fim_da_Campanha"] = df.get("end", "").apply(transformar_para_date)
     return df
+
 
 # ------------------------------------------------------------------------------
 # 4) UTM-Lookup simplificado (via DataFrame)
 # ------------------------------------------------------------------------------
-def load_utm_mapping() -> Dict[str,Dict[str,str]]:
+def load_utm_mapping() -> Dict[str, Dict[str, str]]:
     client = get_google_client(CREDS_PATH)
-    df = read_sheet_as_dataframe_range(client, SPREADSHEET_ID, "BI_PARAMETRIZAÇÃO","A2:ZZ",0)
-    df["utm_content"] = df.get("utm_content","").astype(str).str.strip().str.lower()
+    df = read_sheet_as_dataframe_range(
+        client, SPREADSHEET_ID, "BI_PARAMETRIZAÇÃO", "A2:ZZ", 0
+    )
+    df["utm_content"] = df.get("utm_content", "").astype(str).str.strip().str.lower()
     out = {}
-    for _,r in df.iterrows():
+    for _, r in df.iterrows():
         k = r["utm_content"]
-        if k: out[k] = {"start":r.get("start",""),"end":r.get("end","")}
+        if k:
+            out[k] = {"start": r.get("start", ""), "end": r.get("end", "")}
     return out
 
-def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_map: Dict[str,Dict[str,str]]) -> pd.DataFrame:
+
+def fill_missing_start_end_from_utm(
+    df: pd.DataFrame, utm_map: Dict[str, Dict[str, str]]
+) -> pd.DataFrame:
     df = df.copy()
-    key = df.get("Content (utm)","").astype(str).str.strip().str.lower()
-    df["start"] = df["start"].mask(df["start"].eq(""), key.map({k:v["start"] for k,v in utm_map.items()}))
-    df["end"]   = df["end"].mask  (df["end"].eq(""),   key.map({k:v["end"]   for k,v in utm_map.items()}))
+    key = df.get("Content (utm)", "").astype(str).str.strip().str.lower()
+    df["start"] = df["start"].mask(
+        df["start"].eq(""), key.map({k: v["start"] for k, v in utm_map.items()})
+    )
+    df["end"] = df["end"].mask(
+        df["end"].eq(""), key.map({k: v["end"] for k, v in utm_map.items()})
+    )
     return df
+
 
 # ------------------------------------------------------------------------------
 # 5) Preview-links
 # ------------------------------------------------------------------------------
 def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.rename(columns={"Preview Link FB":"Preview_Link_FB","Preview Link IG":"Preview_Link_IG"})
-    df["URL_do_Anuncio"] = df.get("URL_do_Anuncio","").mask(
-        df.get("URL_do_Anuncio","")!="",
-        df.get("Preview_Link_IG","").mask("", df.get("Preview_Link_FB",""))
+    df = df.rename(
+        columns={
+            "Preview Link FB": "Preview_Link_FB",
+            "Preview Link IG": "Preview_Link_IG",
+        }
+    )
+    df["URL_do_Anuncio"] = df.get("URL_do_Anuncio", "").mask(
+        df.get("URL_do_Anuncio", "") != "",
+        df.get("Preview_Link_IG", "").mask("", df.get("Preview_Link_FB", "")),
     )
     return df
 
-def generate_linkedin_ad_preview_link_from_lookup(df_param: pd.DataFrame) -> Dict[str,str]:
-    if not {"utm_content","preview"}.issubset(df_param.columns):
+
+def generate_linkedin_ad_preview_link_from_lookup(
+    df_param: pd.DataFrame,
+) -> Dict[str, str]:
+    if not {"utm_content", "preview"}.issubset(df_param.columns):
         return {}
-    m = df_param[["utm_content","preview"]].dropna().drop_duplicates("utm_content")
-    return dict(zip(m["utm_content"],m["preview"]))
+    m = df_param[["utm_content", "preview"]].dropna().drop_duplicates("utm_content")
+    return dict(zip(m["utm_content"], m["preview"]))
+
 
 def build_pinterest_preview_link(pin_id: Any) -> str:
     s = str(pin_id).strip()
     return f"https://www.pinterest.com/pin/{s}" if s else ""
 
+
 def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
-    col = next((c for c in df.columns if c.strip().lower()=="preview link"),None)
-    df["URL_do_Anúncio"] = df.get(col,"").apply(build_pinterest_preview_link) if col else ""
+    col = next((c for c in df.columns if c.strip().lower() == "preview link"), None)
+    df["URL_do_Anúncio"] = (
+        df.get(col, "").apply(build_pinterest_preview_link) if col else ""
+    )
     return df

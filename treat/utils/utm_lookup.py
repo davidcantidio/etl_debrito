@@ -1,6 +1,7 @@
 import pandas as pd
 import logging
 
+
 def load_utm_mapping() -> dict[str, dict[str, str]]:
     """
     Loads the BI_PARAMETRIZAÇÃO sheet and returns a mapping:
@@ -19,19 +20,16 @@ def load_utm_mapping() -> dict[str, dict[str, str]]:
         SPREADSHEET_ID,
         sheet_name="BI_PARAMETRIZAÇÃO",
         range_str="A2:ZZ",
-        header_row_index=0
+        header_row_index=0,
     )
 
     # Safely get the utm_content column or create an empty one
     if "utm_content" in df.columns:
-        utm_series = (
-            df["utm_content"]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-        )
+        utm_series = df["utm_content"].astype(str).str.strip().str.lower()
     else:
-        logger.warning("Column 'utm_content' not found in BI_PARAMETRIZAÇÃO; using empty keys")
+        logger.warning(
+            "Column 'utm_content' not found in BI_PARAMETRIZAÇÃO; using empty keys"
+        )
         utm_series = pd.Series([""] * len(df), index=df.index)
 
     df = df.copy()
@@ -41,10 +39,7 @@ def load_utm_mapping() -> dict[str, dict[str, str]]:
     for _, row in df.iterrows():
         key = row["utm_content"]
         if key:
-            mapping[key] = {
-                "start": row.get("start", ""),
-                "end":   row.get("end",   "")
-            }
+            mapping[key] = {"start": row.get("start", ""), "end": row.get("end", "")}
 
     logger.info(f"Loaded {len(mapping)} UTM entries for start/end lookup")
     return mapping
@@ -52,13 +47,16 @@ def load_utm_mapping() -> dict[str, dict[str, str]]:
 
 log = logging.getLogger(__name__)
 
-def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.DataFrame:
+
+def fill_missing_start_end_from_utm(
+    df: pd.DataFrame, utm_mapping: dict
+) -> pd.DataFrame:
     """
     Fill missing 'start' / 'end' by looking-up the
     utm_content in *utm_mapping* (dict: utm -> {"START":…, "END":…}).
 
-    • Ignora linhas cujo “Content (utm)” esteja vazio.  
-    • Mantém valores originais quando já preenchidos.  
+    • Ignora linhas cujo “Content (utm)” esteja vazio.
+    • Mantém valores originais quando já preenchidos.
     • Faz log INFO com contagem de linhas realmente preenchidas.
     """
     if not utm_mapping:
@@ -68,12 +66,7 @@ def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.D
     df = df.copy()
 
     # 1) Normalised key
-    df["_utm_key"] = (
-        df.get("Content (utm)", "")
-          .astype(str)
-          .str.strip()
-          .str.lower()
-    )
+    df["_utm_key"] = df.get("Content (utm)", "").astype(str).str.strip().str.lower()
 
     # 2) Build lookup Series once
     start_lkp = pd.Series(
@@ -93,21 +86,20 @@ def fill_missing_start_end_from_utm(df: pd.DataFrame, utm_mapping: dict) -> pd.D
 
     # 4) Only replace blanks / NA
     before_start_na = df["start"].eq("").sum()
-    before_end_na   = df["end"].eq("").sum()
+    before_end_na = df["end"].eq("").sum()
 
-    df.loc[df["start"].eq(""), "start"] = (
-        df.loc[df["start"].eq(""), "_utm_key"].map(start_lkp)
+    df.loc[df["start"].eq(""), "start"] = df.loc[df["start"].eq(""), "_utm_key"].map(
+        start_lkp
     )
-    df.loc[df["end"].eq(""), "end"] = (
-        df.loc[df["end"].eq(""), "_utm_key"].map(end_lkp)
-    )
+    df.loc[df["end"].eq(""), "end"] = df.loc[df["end"].eq(""), "_utm_key"].map(end_lkp)
 
     filled_start = before_start_na - df["start"].eq("").sum()
-    filled_end   = before_end_na   - df["end"].eq("").sum()
+    filled_end = before_end_na - df["end"].eq("").sum()
 
     log.info(
         "[utm_lookup] Filled Start/End from UTM — Start:%s  End:%s",
-        filled_start, filled_end
+        filled_start,
+        filled_end,
     )
 
     return df.drop(columns="_utm_key")

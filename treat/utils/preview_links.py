@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import logging
 
+
 def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     """
     Preenche/atualiza 'URL_do_Anuncio' para relatórios Meta:
@@ -31,7 +32,9 @@ def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     veic_col = colmap.get("veiculo")  # pode não existir
 
     if ig_col is None and fb_col is None:
-        log.warning("[determine_meta_ad_preview_link] Nenhuma coluna preview_* encontrada.")
+        log.warning(
+            "[determine_meta_ad_preview_link] Nenhuma coluna preview_* encontrada."
+        )
         return df
 
     # ---------------- garante coluna destino -------------------- #
@@ -45,8 +48,6 @@ def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
             .where(~df["URL_do_Anuncio"].isin([np.nan, "nan", "NaN"]), "")
             .str.strip()
         )
-
-
 
     # ---------------- função de escolha por linha --------------- #
     def _choose(row: pd.Series) -> str:
@@ -70,15 +71,23 @@ def determine_meta_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao: pd.DataFrame) -> dict:
+
+def generate_linkedin_ad_preview_link_from_lookup(
+    df_parametrizacao: pd.DataFrame,
+) -> dict:
     """
     Gera um dicionário {utm_content: preview} para ser usado no preenchimento de preview do LinkedIn.
     """
     COL_UTM = "utm_content"
     COL_PREVIEW = "ad_preview_link"
 
-    if COL_UTM not in df_parametrizacao.columns or COL_PREVIEW not in df_parametrizacao.columns:
-        logging.warning("Colunas 'utm_content' ou 'preview' não encontradas em BI_PARAMETRIZAÇÃO.")
+    if (
+        COL_UTM not in df_parametrizacao.columns
+        or COL_PREVIEW not in df_parametrizacao.columns
+    ):
+        logging.warning(
+            "Colunas 'utm_content' ou 'preview' não encontradas em BI_PARAMETRIZAÇÃO."
+        )
         return {}
 
     mapping = df_parametrizacao[[COL_UTM, COL_PREVIEW]].dropna()
@@ -90,6 +99,7 @@ def generate_linkedin_ad_preview_link_from_lookup(df_parametrizacao: pd.DataFram
         logging.debug(f"{k} -> {v}")
 
     return preview_dict
+
 
 def build_pinterest_preview_link(id_pin: str) -> str:
     """
@@ -106,17 +116,16 @@ def build_pinterest_preview_link(id_pin: str) -> str:
     return f"https://www.pinterest.com/pin/{str(id_pin).strip()}"
 
 
-
 def generate_pinterest_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     """
     Preenche a coluna 'URL_do_Anuncio' com base na coluna 'Preview Link'
     aplicando a função build_pinterest_preview_link().
     """
-    match_col = [col for col in df.columns if col.strip().lower() == 'preview link']
+    match_col = [col for col in df.columns if col.strip().lower() == "preview link"]
     if match_col:
-        df['URL_do_Anuncio'] = df[match_col[0]].apply(build_pinterest_preview_link)
+        df["URL_do_Anuncio"] = df[match_col[0]].apply(build_pinterest_preview_link)
     else:
-        df['URL_do_Anuncio'] = ""
+        df["URL_do_Anuncio"] = ""
     return df
 
 
@@ -132,6 +141,6 @@ def generate_tiktok_ad_preview_link(df: pd.DataFrame) -> pd.DataFrame:
     # aplica vetoricamente: se URL_do_Anuncio vazio, usa ad_preview_link
     if "ad_preview_link" in df.columns:
         dest = df["URL_do_Anuncio"].astype(str).fillna("")
-        src  = df["ad_preview_link"].astype(str).fillna("").str.strip()
+        src = df["ad_preview_link"].astype(str).fillna("").str.strip()
         df["URL_do_Anuncio"] = dest.where(dest.str.strip() != "", src)
     return df

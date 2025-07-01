@@ -4,6 +4,7 @@ import logging
 from logging import StreamHandler, FileHandler, Formatter
 from typing import Optional
 
+
 def setup_logging(
     level: int = logging.INFO,
     log_file: Optional[str] = "etl_geral.log",
@@ -27,8 +28,10 @@ def setup_logging(
         root.removeHandler(h)
 
     handlers = []
-    fmt = Formatter("%(asctime)s | %(levelname)-5s | %(name)s:%(lineno)d | %(message)s",
-                    datefmt="%Y-%m-%d %H:%M:%S")
+    fmt = Formatter(
+        "%(asctime)s | %(levelname)-5s | %(name)s:%(lineno)d | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     if console:
         ch = StreamHandler()

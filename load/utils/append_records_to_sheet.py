@@ -77,6 +77,11 @@ def append_records_to_sheet(
         raise
 
     updated = result.get("updates", {}).get("updatedRows", 0)
-    log.info("✅ %d linhas adicionadas em '%s' a partir de %s%d",
-             updated, sheet_name, start_column, start_row)
+    log.info(
+        "✅ %d linhas adicionadas em '%s' a partir de %s%d",
+        updated,
+        sheet_name,
+        start_column,
+        start_row,
+    )
     return updated

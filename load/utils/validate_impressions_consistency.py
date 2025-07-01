@@ -3,6 +3,7 @@ import pandas as pd
 from typing import Sequence
 from extract.sheets_fetcher import SheetsFetcher
 
+
 def validate_impressions_consistency(
     fetcher: SheetsFetcher,
     meta_sheet: str = "metaGeral",
@@ -15,14 +16,13 @@ def validate_impressions_consistency(
 
     demo_sum = (
         pd.concat([demos[s] for s in demo_sheets])
-          .groupby("Veiculo", as_index=False)["Impressoes"]
-          .sum()
+        .groupby("Veiculo", as_index=False)["Impressoes"]
+        .sum()
     )
     meta_sum = df_meta.groupby("Veiculo", as_index=False)["Impressoes"].sum()
 
     merged = demo_sum.merge(
-        meta_sum, on="Veiculo", how="outer",
-        suffixes=("_demo", "_meta")
+        meta_sum, on="Veiculo", how="outer", suffixes=("_demo", "_meta")
     ).fillna(0)
 
     mismatch = merged[merged["Impressoes_demo"] != merged["Impressoes_meta"]]

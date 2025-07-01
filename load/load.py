@@ -25,20 +25,20 @@ def default_appender(creds_path: str, spreadsheet_id: str):
     """
     Retorna uma função appender que insere registros na planilha.
     """
+
     def _append(sheet_name: str, df: pd.DataFrame):
         append_records_to_sheet(
             creds_path=creds_path,
             spreadsheet_id=spreadsheet_id,
             sheet_name=sheet_name,
-            df=df
+            df=df,
         )
+
     return _append
 
 
 def fetch_data(
-    fetcher: SheetsFetcher,
-    origem_sheet: str,
-    destino_sheet: str
+    fetcher: SheetsFetcher, origem_sheet: str, destino_sheet: str
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Extrai DataFrames de origem e destino usando o fetcher.
@@ -48,10 +48,7 @@ def fetch_data(
     return df_src, df_dest
 
 
-def prepare_new_records(
-    df_src: pd.DataFrame,
-    df_dest: pd.DataFrame
-) -> pd.DataFrame:
+def prepare_new_records(df_src: pd.DataFrame, df_dest: pd.DataFrame) -> pd.DataFrame:
     """
     Identifica registros faltantes, gera numeração e organiza colunas.
     """
@@ -69,11 +66,7 @@ def prepare_new_records(
     return df_new
 
 
-def append_new_records(
-    appender,
-    destino_sheet: str,
-    df_new: pd.DataFrame
-) -> None:
+def append_new_records(appender, destino_sheet: str, df_new: pd.DataFrame) -> None:
     """
     Insere (append) novos registros na aba de destino.
     """
@@ -92,7 +85,7 @@ def load_missing_records(
     origem_sheet: str,
     destino_sheet: str,
     fetcher=None,
-    appender=None
+    appender=None,
 ) -> None:
     """
     Pipeline de carga: extrai dados, prepara registros faltantes e faz append.
@@ -123,10 +116,11 @@ def load_missing_records(
 
 if __name__ == "__main__":
     import os
+
     # Exemplo de uso com variáveis de ambiente
     load_missing_records(
         spreadsheet_id=os.getenv("SPREADSHEET_ID"),
         creds_path=os.getenv("GOOGLE_CREDS_PATH", "creds.json"),
         origem_sheet="Origem",
-        destino_sheet="ModeloGeral"
+        destino_sheet="ModeloGeral",
     )

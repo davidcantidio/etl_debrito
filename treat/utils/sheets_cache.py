@@ -1,4 +1,4 @@
-#sheets_cache
+# sheets_cache
 """Cache global para Google Sheets & Worksheets.
 
 Evita estourar a quota de leitura criando objetos gspread apenas uma vez
@@ -32,8 +32,8 @@ def get_worksheet(
     if key_ws not in _WS_CACHE:
         key_sheet = (creds_path, spreadsheet_id)
         if key_sheet not in _SHEET_CACHE:
-            _SHEET_CACHE[key_sheet] = (
-                get_google_client(creds_path).open_by_key(spreadsheet_id)
+            _SHEET_CACHE[key_sheet] = get_google_client(creds_path).open_by_key(
+                spreadsheet_id
             )
         _WS_CACHE[key_ws] = _SHEET_CACHE[key_sheet].worksheet(sheet_name)
     return _WS_CACHE[key_ws]

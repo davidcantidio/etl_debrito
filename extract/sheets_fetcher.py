@@ -9,9 +9,16 @@ import pandas as pd
 from google.api_core.exceptions import TooManyRequests
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
-from treat.utils.get_google_client import get_google_client  # retorna um cliente gspread
+from treat.utils.get_google_client import (
+    get_google_client,
+)  # retorna um cliente gspread
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +46,6 @@ class SheetsFetcher:
         header_row: int = 0,
         col_range: str = "A:ZZ",
         cache_ttl: int = 300,
-         
     ):
         """
         Inicializa o fetcher.
@@ -56,7 +62,9 @@ class SheetsFetcher:
         self.header_row = header_row
         self.col_range = col_range
         self._service = _build_sheets_service(creds_path)
-        self._cache: Dict[Tuple[str, ...], Tuple[float, Dict[str, List[List[str]]]]] = {}
+        self._cache: Dict[Tuple[str, ...], Tuple[float, Dict[str, List[List[str]]]]] = (
+            {}
+        )
         self._cache_ttl = cache_ttl
         self._spreadsheet_meta: dict | None = None
 
@@ -68,22 +76,21 @@ class SheetsFetcher:
 
     @retry(
         retry=retry_if_exception_type(TooManyRequests),
-        stop=stop_after_attempt(6),                  # 1 + 2 + 4 + 8 + 16 + 32 ≈ 63 s
+        stop=stop_after_attempt(6),  # 1 + 2 + 4 + 8 + 16 + 32 ≈ 63 s
         wait=wait_exponential(multiplier=1, min=1, max=32),
         reraise=True,
     )
-
-
     def _get_meta(self):
         if self._spreadsheet_meta is None:
             self._spreadsheet_meta = (
-                self._service.spreadsheets().get(
+                self._service.spreadsheets()
+                .get(
                     spreadsheetId=self.spreadsheet_id,
                     includeGridData=False,
-                ).execute()
+                )
+                .execute()
             )
         return self._spreadsheet_meta
-    
 
     def _batch_get(self, ranges: List[str]) -> Dict[str, Any]:
         """Executa batchGet com retry/back-off para código 429."""
@@ -110,7 +117,9 @@ class SheetsFetcher:
 
         resp = self._batch_get(ranges)
         if not resp.get("valueRanges"):
-            raise RuntimeError("Sheets API retornou valueRanges vazio – quota ou planilha vazia?")
+            raise RuntimeError(
+                "Sheets API retornou valueRanges vazio – quota ou planilha vazia?"
+            )
 
         payload: Dict[str, List[List[str]]] = {}
         for name, vr in zip(cleaned, resp["valueRanges"]):
@@ -129,7 +138,9 @@ class SheetsFetcher:
                 self._headers[original_key] = [c.strip() for c in values[0]]
         return payload
 
-    def get(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
+    def get(
+        self, sheet_names: Iterable[str], *, as_frame: bool = True
+    ) -> Dict[str, Any]:
         """
         Lê em lote as abas listadas em sheet_names.
         Retorna dicionário {nome_aba: DataFrame|raw lists} conforme as_frame.
@@ -156,7 +167,9 @@ class SheetsFetcher:
 
         return {n: self._as_dataframe(raw.get(n, [])) for n in names}
 
-    def get_cached(self, sheet_names: Iterable[str], *, as_frame: bool = True) -> Dict[str, Any]:
+    def get_cached(
+        self, sheet_names: Iterable[str], *, as_frame: bool = True
+    ) -> Dict[str, Any]:
         """Retorna dados do cache sem acionar a API."""
         names = [n.strip().strip("'") for n in dict.fromkeys(sheet_names)]
         key = tuple(sorted(names))
@@ -196,9 +209,7 @@ class SheetsFetcher:
         header, *body = raw
         header = (header + [""] * (max_cols - len(header)))[:max_cols]
 
-        normalized = [
-            (row + [""] * (max_cols - len(row)))[:max_cols] for row in body
-        ]
+        normalized = [(row + [""] * (max_cols - len(row)))[:max_cols] for row in body]
         return pd.DataFrame(normalized, columns=[c.strip() for c in header])
 
     def open_worksheet(self, sheet_name: str):
