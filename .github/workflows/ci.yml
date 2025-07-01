@@ -1,20 +1,17 @@
 # .github/workflows/ci.yml
 name: CI
 
-# Dispara em push ou pull_request para qualquer branch
 on:
   push:
-    branches:
-      - '**'
   pull_request:
-    branches:
-      - '**'
 
 jobs:
-  # Job de instalação e cache de dependências
+  # === Setup & cache the project dependencies ===
   setup:
     name: ♻️ Setup & Cache Dependencies
     runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v3
@@ -24,7 +21,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: ♻️ Cache pip dependencies
+      - name: ♻️ Cache pip deps
+        id: cache-deps
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
@@ -37,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-  # Job de linting: flake8, isort e black
+  # === Linting: flake8, isort, black ===
   lint:
     name: 🧹 Code Linting
     runs-on: ubuntu-latest
@@ -64,17 +62,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 isort black
 
-      - name: 🔍 Run flake8
+      - name: 🔍 flake8 (PEP8 + unused imports)
         run: |
-          # Exclui virtual-envs e cache de bytecode
           flake8 . \
-            --exclude=venv,env,.venv,__pycache__,**/*.pyc \
-            --extend-exclude=".github,tests/data"
+            --exclude=venv,env,.venv,__pycache__,*.pyc
 
-      - name: 🔀 Check import order with isort
+      - name: 🔀 isort (import order)
         run: |
-          # --check-only: falha se precisar ordenar
-          # --skip: ignora virtual-envs
           isort . \
             --check-only \
             --diff \
@@ -82,9 +76,7 @@ jobs:
             --skip=env \
             --skip=.venv
 
-      - name: 🎨 Check formatting with black
+      - name: 🎨 black (formatting)
         run: |
-          # --check: falha se encontrar alterações
-          # exclui notebooks e virtual-envs
           black --check . \
             --exclude '(venv|env|\.venv|__pycache__|\.ipynb_checkpoints)'
