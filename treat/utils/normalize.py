@@ -237,18 +237,20 @@ def format_columns_to_comma_decimal(
     return df
 
 
-def normalize_vehicle(value: str) -> str:
-    """
-    Normaliza o nome do veículo:
-    - Facebook → FB
-    - Instagram → IG
-    - Caso contrário, devolve value.strip()
-    """
-    if not isinstance(value, str) or not value.strip():
+def normalize_vehicle(v: str) -> str:
+    if not v or str(v).strip() == "":
         return ""
-    v = value.strip().casefold()
-    if v.startswith("facebook"):
-        return "FB"
-    if v.startswith("instagram"):
-        return "IG"
-    return value.strip()
+    raw = str(v).strip().lower()
+
+    MAP = {
+        "facebook":  "FB",
+        "instagram": "IG",
+        "insta":     "IG",
+        "ig":        "IG",
+        "youtube":   "YouTube",
+        "yt":        "YouTube",
+        "tiktok":    "TikTok",
+        # adicione outros se necessário
+    }
+
+    return MAP.get(raw, raw.title())

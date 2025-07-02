@@ -1,177 +1,218 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
-diff --git a/ponto_de_controle_writting.ipynb b/ponto_de_controle_writting.ipynb
-index 7601470924b4f95b640a33d07b5827dc1d995ea4..b46025c53dc6fbd085b2a661c4ef51dafd595b8e 100644
---- a/ponto_de_controle_writting.ipynb
-+++ b/ponto_de_controle_writting.ipynb
-@@ -1,50 +1,49 @@
- {
-  "cells": [
-   {
-    "cell_type": "markdown",
-    "id": "06b8ae4e",
-    "metadata": {},
-    "source": [
-     "# Ponto de Controle\n",
-     "Este notebook valida e escreve dados transformados no Google Sheets."
-    ]
-   },
-   {
-    "cell_type": "code",
-    "execution_count": null,
-    "id": "7e2bf979",
-    "metadata": {},
-    "outputs": [],
-    "source": [
-     "import os\n",
-     "import pandas as pd\n",
-     "import datetime as dt\n",
-     "from extract import read_df\n",
-     "from treat.utils.datas import normalize_date_to_str_DD_M_YYYY\n",
-     "from treat.utils.write_dataframe_to_sheet import write_dataframe_to_sheet\n",
--    "from treat.utils.renomeacoes import renomear_colunas_origem_para_modelo as rename\n",
-     "from treat.utils.normalize import normalize_vehicle\n",
-     "from treat.utils.datas import concat_period\n",
-     "from treat.utils.campos_calculados import make_id_ponto_de_controle\n",
-     "from treat.utils.campos_calculados import add_key_creative\n",
-     "from treat.utils.campos_calculados import dedupe_by_key_creative\n",
-     "import numpy as np"
-    ]
-   },
-   {
-    "cell_type": "code",
-    "execution_count": null,
-    "id": "82348e21",
-    "metadata": {},
-    "outputs": [],
-    "source": [
-     "# Flags de execução\n",
-     "\"\"\"\n",
-     "Célula  – Imports & parâmetros globais\n",
-     "\n",
-     "Define:\n",
-     "- Módulos padrão e helpers do projeto\n",
-     "- Flags de execução e IDs de planilhas via env var\n",
-     "- Constantes de aba, cabeçalho e filtro de data\n",
-     "- Lista de colunas de destino\n",
-     "\"\"\"\n",
-@@ -339,51 +338,51 @@
-     "      df[\"Resultado\"].astype(bool).sum())\n",
-     "\n",
-     "# Asserts para garantir colunas e conteúdo esperado\n",
-     "assert \"Agência\" in df.columns and df[\"Agência\"].eq(\"De Brito\").all(), \\\n",
-     "    \"Erro em 'Agência': valores diferentes de 'De Brito' ou coluna ausente\"\n",
-     "assert \"Editoria\" in df.columns, \"Coluna 'Editoria' ausente\"\n",
-     "assert all(df[\"Meta\"] == \"\"), \\\n",
-     "    \"'Meta\"\n",
-     "assert all(df[\"Status\"] == \"\"), \"'Status' deve ser completamente vazio\"\n",
-     "assert all(df[\"Resultado\"] == \"\"), \"'Resultado' deve ser completamente vazio\"\n"
-    ]
-   },
-   {
-    "cell_type": "code",
-    "execution_count": null,
-    "id": "8fbc7cc4",
-    "metadata": {},
-    "outputs": [],
-    "source": [
-     "# Debug prints e asserts para verificar ordem e conteúdo das colunas\n",
-     "\n",
-     "\n",
-     "# Reordenar / reindexar com DEST_COLUMNS e preencher vazios\n",
-     "df_transf = df.reindex(columns=DEST_COLUMNS, fill_value=\"\")\n",
-     "print(\"Colunas em df_transf:\", df_transf.columns.tolist())\n",
--    "assert df_transf.columns.tolist() == DEST_COLUMNS, (\n",
-+    "assert set(DEST_COLUMNS).issubset(df_transf.columns), (\n",
-     "    f\"Colunas fora de ordem ou faltando: {df_transf.columns.tolist()}\"\n",
-     ")\n",
-     "\n",
-     "# Mostrar as primeiras linhas para confirmação visual\n",
-     "display(df_transf.head())\n",
-     "print(f\"Total de linhas em df_transf: {len(df_transf)}\")\n"
-    ]
-   },
-   {
-    "cell_type": "code",
-    "execution_count": null,
-    "id": "ec178bf3",
-    "metadata": {},
-    "outputs": [],
-    "source": [
-     "# ▶ Gerar __ID__ após garantir colunas necessárias\n",
-     "print(\"▶ Gerando __ID__ em df_transf...\")\n",
-     "df_transf[\"__ID__\"] = df_transf.apply(make_id_ponto_de_controle, axis=1)\n",
-     "\n",
-     "# ▶ Validações\n",
-     "assert df_transf[\"__ID__\"].isna().sum() == 0, \"❌ Há NaNs em __ID__ em df_transf — verifique campos obrigatórios vazios\"\n",
-     "assert df_transf[\"__ID__\"].nunique() == len(df_transf), f\"❌ __ID__ duplicado em df_transf ({df_transf['__ID__'].nunique()} únicos vs {len(df_transf)} linhas)\"\n",
-     "print(\"✅ __ID__ gerado com sucesso em df_transf\")\n"
-    ]
-   },
-@@ -474,57 +473,54 @@
-     "# 3 • Limpa cada label de cabeçalho\n",
-     "def _clean(label: str) -> str:\n",
-     "    txt = unicodedata.normalize(\"NFKD\", label or \"\")\n",
-     "    txt = \"\".join(c for c in txt if not unicodedata.combining(c))\n",
-     "    txt = txt.replace(\"\\n\", \" \").strip()\n",
-     "    return re.sub(r\"\\s{2,}\", \" \", txt)\n",
-     "\n",
-     "cleaned = [_clean(c) for c in header_raw]\n",
-     "print(\"Header limpo :\", cleaned)\n",
-     "\n",
-     "# 4 • Puxa linhas formatadas a partir da linha 6 (HEAD_ROW_DEST+1)\n",
-     "body = ws_dest.get_values(\n",
-     "    f\"A{HEADER_ROW_SHEET+1}:K\",\n",
-     "\n",
-     ")\n",
-     "assert body, \"❌ body veio vazio: não trouxe nenhuma linha de dados\"\n",
-     "\n",
-     "# 5 • Normaliza cada linha para ter exatamente 11 colunas\n",
-     "n_cols = len(DEST_COLUMNS)\n",
-     "normalized = [(row + [\"\"]*n_cols)[:n_cols] for row in body]\n",
-     "\n",
-     "# 6 • Monta DataFrame com o cabeçalho oficial\n",
-     "df_dest = pd.DataFrame(normalized, columns=DEST_COLUMNS)\n",
-     "if \"Criativo\" not in df_dest.columns:\n",
-     "    df_dest[\"Criativo\"] = \"\"\n",
-+    "assert set(DEST_COLUMNS).issubset(df_dest.columns)\n",
-     "\n",
-     "print(\"Colunas após montagem:\", df_dest.columns.tolist())\n",
-     "\n",
--    "# 7 • Harmoniza nome de Veículo → Veiculo (antes do reindex)\n",
--    "if \"Veículo\" in df_dest.columns:                # ← com acento!\n",
--    "    df_dest.rename(columns={\"Veículo\": \"Veiculo\"}, inplace=True)\n",
--    "    print(\"✅ Renomeei 'Veículo' → 'Veiculo'\")\n",
-     "\n",
-     "\n",
-     "# 8 • Limpa linhas totalmente vazias (bordas/formatação)\n",
-     "df_dest = (\n",
-     "    df_dest\n",
-     "    .replace(\"\", pd.NA)\n",
-     "    .dropna(how=\"all\")\n",
-     "    .reset_index(drop=True)\n",
-     ")\n",
-     "print(f\"Linhas válidas em df_dest após dropna: {len(df_dest)}\")\n",
-     "\n",
-     "# 9 • Gera coluna __ID__ — somente aqui, com todos os campos (incluindo key_creative já embutido)\n",
-     "df_dest[\"__ID__\"] = df_dest.apply(make_id_ponto_de_controle, axis=1)\n",
-     "\n",
-     "# 9.1 • Deduplica mantendo o 1º registro de cada ID\n",
-     "before = len(df_dest)\n",
-     "df_dest = df_dest.drop_duplicates(\"__ID__\", keep=\"first\").reset_index(drop=True)\n",
-     "removed = before - len(df_dest)\n",
-     "print(f\"🧹 Removidas {removed} linhas duplicadas de __ID__ (mantida a 1ª ocorrência)\")\n",
-     "\n",
-     "# 10 • Validações finais (já com df_dest deduplicado)\n",
-     "assert df_dest[\"__ID__\"].notna().all(), \"❌ Há NaNs em __ID__\"\n",
-     "assert df_dest[\"__ID__\"].nunique() == len(df_dest), \\\n",
-     "    f\"❌ __ID__ duplicados ainda presentes: {df_dest['__ID__'].nunique()} únicos vs {len(df_dest)} linhas\"\n",
-     "\n",
+diff --git a/.env b/.env
+index e69de29bb2d1d6434b8b29ae775ad8c2e48c5391..3fbe066d96e2b4c99b2834cf0c9c9dee5937cdc7 100644
+--- a/.env
++++ b/.env
+@@ -0,0 +1,5 @@
++ORIGIN_SHEET_ID=1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg
++ORIGIN_TAB=modeloGeral
++DEST_SHEET_ID=1DpH5tu4KJKqbA6ueFtf1s1FueBkR4-EtPf5xHyXx8zw
++DEST_TAB=IMPULSIONAMENTOS 2025
++HEAD_ROW_DEST=4
+diff --git a/ponto_de_controle.py b/ponto_de_controle.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8b72faa6219d32795af93de954b7230b8c237770
+--- /dev/null
++++ b/ponto_de_controle.py
+@@ -0,0 +1,142 @@
++"""Pipeline de atualização do Ponto de Controle.
++
++# HOW TO RUN
++-------------
++1. ``poetry install``
++2. ``python ponto_de_controle.py --dry-run``
++"""
++
++from __future__ import annotations
++
++import argparse
++import logging
++import os
++from datetime import date
++from pathlib import Path
++from typing import Iterable
++
++import pandas as pd
++from dotenv import load_dotenv
++
++from extract import read_df
++from treat.utils.campos_calculados import (
++    DEFAULT_DEST_COLUMNS,
++    add_key_creative,
++    dedupe_by_key_creative,
++    make_id_ponto_de_controle,
++)
++from treat.utils.datas import concat_period, normalize_date_to_str_DD_M_YYYY
++from treat.utils.normalize import normalize_vehicle
++from treat.utils.write_dataframe_to_sheet import write_dataframe_to_sheet
++
++
++logger = logging.getLogger(__name__)
++
++
++def load_google_creds() -> str:
++    """Carrega o JSON de credenciais do caminho indicado em ``GOOGLE_CREDS_PATH``."""
++
++    path = Path(os.getenv("GOOGLE_CREDS_PATH", "creds.json"))
++    return path.read_text(encoding="utf-8")
++
++
++DEST_COLUMNS: Iterable[str] = DEFAULT_DEST_COLUMNS
++MIN_DATE = date(2025, 6, 1)
++
++
++def read_origin_df() -> pd.DataFrame:
++    """Lê a planilha de origem e aplica deduplicação de criativos."""
++
++    sheet_id = os.environ["ORIGIN_SHEET_ID"]
++    tab = os.environ["ORIGIN_TAB"]
++    df = read_df(sheet_id=sheet_id, tab=tab, header_row=0)
++    df = add_key_creative(df)
++    df = dedupe_by_key_creative(df)
++    df["date_dt"] = pd.to_datetime(df["date"], errors="coerce").dt.date
++    df = df[df["date_dt"] >= MIN_DATE].copy()
++    df.drop(columns=["date_dt"], inplace=True)
++    return df
++
++
++def transform_df(df: pd.DataFrame) -> pd.DataFrame:
++    """Transforma ``df`` nas colunas de destino e gera ``__ID__``."""
++
++    df2 = df.copy()
++    df2["Data"] = df2["start"].apply(normalize_date_to_str_DD_M_YYYY)
++    df2["Periodo"] = df2.apply(lambda r: concat_period(r["start"], r["end"]), axis=1)
++    df2["Veiculo"] = df2["Veiculo"].apply(normalize_vehicle)
++    df2["Link conteúdos impulsionados"] = df2.get("URL_do_Anuncio", "")
++    df2["Agência"] = "De Brito"
++    df2["Editoria"] = df2["Campanha"]
++    df2["Objetivo"] = df2.get("objective", "")
++    df2["Meta"] = ""
++    df2["Status"] = ""
++    df2["Resultado"] = ""
++
++    df_transf = df2.reindex(columns=DEST_COLUMNS, fill_value="")
++    df_transf["__ID__"] = df_transf.apply(
++        make_id_ponto_de_controle, axis=1, columns=DEST_COLUMNS
++    )
++    return df_transf
++
++
++def read_destination_df() -> pd.DataFrame:
++    """Lê a planilha de destino já com ``__ID__`` calculado."""
++
++    sheet_id = os.environ["DEST_SHEET_ID"]
++    tab = os.environ["DEST_TAB"]
++    head = int(os.getenv("HEAD_ROW_DEST", "4"))
++    df = read_df(sheet_id=sheet_id, tab=tab, header_row=head)
++    df = df.reindex(columns=DEST_COLUMNS, fill_value="")
++    df["__ID__"] = df.apply(make_id_ponto_de_controle, axis=1, columns=DEST_COLUMNS)
++    df = df.drop_duplicates("__ID__", keep="first").reset_index(drop=True)
++    return df
++
++
++def diff_new_rows(src: pd.DataFrame, dst: pd.DataFrame) -> pd.DataFrame:
++    """Retorna registros de ``src`` cujo ``__ID__`` não exista em ``dst``."""
++
++    mask = ~src["__ID__"].isin(dst["__ID__"])
++    return src[mask].copy()
++
++
++def write_df_to_sheet_final(df_new: pd.DataFrame, *, dry_run: bool) -> None:
++    """Escreve ``df_new`` no destino se ``dry_run`` for ``False``."""
++
++    if dry_run or df_new.empty:
++        logger.info("DRY-RUN: %d linhas seriam gravadas", len(df_new))
++        return
++
++    creds_json = load_google_creds()
++    write_dataframe_to_sheet(
++        spreadsheet_id=os.environ["DEST_SHEET_ID"],
++        sheet_name=os.environ["DEST_TAB"],
++        df=df_new,
++        start_row=int(os.getenv("HEAD_ROW_DEST", "4")) + 2,
++        google_credentials_json=creds_json,
++    )
++
++
++def main(dry_run: bool) -> None:
++    """Executa o pipeline completo."""
++
++    load_dotenv()
++    logging.basicConfig(level=logging.INFO)
++
++    df_origin = read_origin_df()
++    logger.info("Origem: %d linhas", len(df_origin))
++
++    df_transf = transform_df(df_origin)
++    df_dest = read_destination_df()
++    df_new = diff_new_rows(df_transf, df_dest)
++
++    logger.info("Novas linhas identificadas: %d", len(df_new))
++    write_df_to_sheet_final(df_new, dry_run=dry_run)
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(description="Atualiza ponto de controle")
++    parser.add_argument("--dry-run", action="store_true", help="não grava no sheet")
++    args = parser.parse_args()
++    main(args.dry_run)
++
+diff --git a/py.typed b/py.typed
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/treat/utils/campos_calculados.py b/treat/utils/campos_calculados.py
-index 66a2895d7f79d1ed716566ca3e8ac0800b1ea1f1..8deed3127c697d043a6047c119449d664619f597 100644
+index 88aa446cc54511c1de660aa18f84ee667ec3b174..c181183b444ea54a09cd72193f02e20a50533a5c 100644
 --- a/treat/utils/campos_calculados.py
 +++ b/treat/utils/campos_calculados.py
-@@ -45,74 +45,76 @@ def remover_colunas_indesejadas(self):
-             self.df.drop(columns=col, inplace=True)
+@@ -1,30 +1,47 @@
+ import logging
++from typing import Iterable, Sequence
+ 
+ import pandas as pd
+ 
+ 
++# Colunas padrão para a geração de ID no ponto de controle
++DEFAULT_DEST_COLUMNS: Sequence[str] = [
++    "Data",
++    "Campanha",
++    "Veiculo",
++    "Link conteúdos impulsionados",
++    "Periodo",
++    "Agência",
++    "Editoria",
++    "Objetivo",
++    "Meta",
++    "Status",
++    "Resultado",
++]
++
++
+ def calcular_engajamento_total(df: pd.DataFrame) -> pd.DataFrame:
+     """
+     Calcula a coluna 'Engajamento_Total' como a soma de:
+     - post_reactions
+     - post_shares
+     - post_comments
+ 
+     Caso os campos 'post_shares' ou 'post_comments' estejam ausentes ou vazios,
+     assume valor 0.
+     """
+     for col in ["post_shares", "post_comments"]:
+         if col not in df.columns:
+             df[col] = 0
+         else:
+             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+ 
+     if "post_reactions" not in df.columns:
+         df["post_reactions"] = 0
+     else:
+         df["post_reactions"] = pd.to_numeric(
+             df["post_reactions"], errors="coerce"
+         ).fillna(0)
+ 
+     df["Engajamento_Total"] = (
+         df["post_reactions"] + df["post_shares"] + df["post_comments"]
+@@ -50,78 +67,66 @@ def remover_colunas_indesejadas(self):
  
  
  def gerar_id(row: pd.Series) -> str:
@@ -180,6 +221,7 @@ index 66a2895d7f79d1ed716566ca3e8ac0800b1ea1f1..8deed3127c697d043a6047c119449d66
      Aceita tanto colunas snake_case (inglês) quanto as
      antigas em PT-BR com iniciais maiúsculas.
      """
+ 
      def pick(*candidatos: str) -> str:
          for c in candidatos:
              if c in row and str(row[c]).strip():
@@ -187,60 +229,56 @@ index 66a2895d7f79d1ed716566ca3e8ac0800b1ea1f1..8deed3127c697d043a6047c119449d66
          return ""
  
      parts = [
-         pick("date",      "Data"),
-         pick("Campanha"),               # só existe em PT mesmo
+         pick("date", "Data"),
+         pick("Campanha"),  # só existe em PT mesmo
          pick("impressions", "Impressoes"),
-         pick("cost",        "Investimento"),
+         pick("cost", "Investimento"),
          pick("link_clicks", "Cliques_no_Link"),
      ]
      return "-".join(parts)
  
  
-+
- def make_id_ponto_de_controle(row: pd.Series) -> str:
-+    """Gera identificador concatenando campos chave.
-+
-+    Concatena ``Periodo|Campanha|Veiculo|Link conteúdos impulsionados|Agência|Editoria|Objetivo|criativo``.
-+    O valor ``criativo`` vem da coluna ``Criativo`` ou ``key_creative``.
-+    Valores nulos são convertidos para string vazia antes de juntar.
-     """
--    Gera ID concatenando:
+-def make_id_ponto_de_controle(row: pd.Series) -> str:
+-    """
+-    Concatena:
 -      Periodo|Campanha|Veiculo|Link conteúdos impulsionados|
 -      Agência|Editoria|Objetivo|Criativo
--    - Usa 'Criativo' se existir; caso contrário tenta 'key_creative'.
--    - Todos os campos são forçados a string.
--    """
--    criativo = (
--    row["Criativo"] if pd.notna(row.get("Criativo")) and row.get("Criativo") != "" 
--    else row.get("key_creative", "")
--)
+-    Valores nulos (pd.NA/None) viram string vazia.
++def make_id_ponto_de_controle(
++    row: pd.Series, *, columns: Iterable[str] | None = None
++) -> str:
++    """Gera identificador concatenando as colunas de ``columns``.
 +
-+    criativo = row.get("Criativo") or row.get("key_creative", "")
-+
-+    def safe(val):
-+        return str(val) if pd.notna(val) else ""
++    Valores ``None`` ou ``NaN`` são convertidos para string vazia antes da
++    junção. Caso ``columns`` não seja informado, usa ``DEFAULT_DEST_COLUMNS``.
+     """
  
-     parts = [
--        row["Periodo"],
--        row["Campanha"],
--        row["Veiculo"],
--        row["Link conteúdos impulsionados"],
--        row["Agência"],
--        row["Editoria"],
--        row["Objetivo"],
+-    def safe(val) -> str:
+-        return "" if pd.isna(val) else str(val)
++    col_list = list(columns or DEFAULT_DEST_COLUMNS)
+ 
+-    # -- resolve 'criativo' sem ambiguidade -----------------------------
+-    criativo_val = row.get("Criativo", pd.NA)
+-    if pd.isna(criativo_val) or criativo_val == "":
+-        criativo_val = row.get("key_creative", "")
+-    criativo = safe(criativo_val)
++    def safe(val: object) -> str:
++        return "" if pd.isna(val) else str(val)
+ 
+-    parts = [
+-        safe(row.get("Periodo")),
+-        safe(row.get("Campanha")),
+-        safe(row.get("Veiculo")),
+-        safe(row.get("Link conteúdos impulsionados")),
+-        safe(row.get("Agência")),
+-        safe(row.get("Editoria")),
+-        safe(row.get("Objetivo")),
 -        criativo,
-+        safe(row.get("Periodo")),
-+        safe(row.get("Campanha")),
-+        safe(row.get("Veiculo")),
-+        safe(row.get("Link conteúdos impulsionados")),
-+        safe(row.get("Agência")),
-+        safe(row.get("Editoria")),
-+        safe(row.get("Objetivo")),
-+        safe(criativo),
-     ]
--    return "|".join(str(p) for p in parts)
-+    return "|".join(parts)
-+
+-    ]
+-    return "|".join(parts)
++    values = [safe(row.get(col)) for col in col_list]
++    return "|".join(values)
+ 
  
  def add_key_creative(df: pd.DataFrame) -> pd.DataFrame:
      """
@@ -265,7 +303,6 @@ index 66a2895d7f79d1ed716566ca3e8ac0800b1ea1f1..8deed3127c697d043a6047c119449d66
              conds.append(False)
  
      # escolhas correspondentes na mesma ordem
-     choices = [
  
 EOF
 )

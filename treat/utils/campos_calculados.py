@@ -1,6 +1,23 @@
 import logging
+from typing import Iterable, Sequence
 
 import pandas as pd
+
+
+# Colunas padrão para a geração de ID no ponto de controle
+DEFAULT_DEST_COLUMNS: Sequence[str] = [
+    "Data",
+    "Campanha",
+    "Veiculo",
+    "Link conteúdos impulsionados",
+    "Periodo",
+    "Agência",
+    "Editoria",
+    "Objetivo",
+    "Meta",
+    "Status",
+    "Resultado",
+]
 
 
 def calcular_engajamento_total(df: pd.DataFrame) -> pd.DataFrame:
@@ -72,34 +89,22 @@ def gerar_id(row: pd.Series) -> str:
     return "-".join(parts)
 
 
-def make_id_ponto_de_controle(row: pd.Series) -> str:
-    """
-    Concatena:
-      Periodo|Campanha|Veiculo|Link conteúdos impulsionados|
-      Agência|Editoria|Objetivo|Criativo
-    Valores nulos (pd.NA/None) viram string vazia.
+def make_id_ponto_de_controle(
+    row: pd.Series, *, columns: Iterable[str] | None = None
+) -> str:
+    """Gera identificador concatenando as colunas de ``columns``.
+
+    Valores ``None`` ou ``NaN`` são convertidos para string vazia antes da
+    junção. Caso ``columns`` não seja informado, usa ``DEFAULT_DEST_COLUMNS``.
     """
 
-    def safe(val) -> str:
+    col_list = list(columns or DEFAULT_DEST_COLUMNS)
+
+    def safe(val: object) -> str:
         return "" if pd.isna(val) else str(val)
 
-    # -- resolve 'criativo' sem ambiguidade -----------------------------
-    criativo_val = row.get("Criativo", pd.NA)
-    if pd.isna(criativo_val) or criativo_val == "":
-        criativo_val = row.get("key_creative", "")
-    criativo = safe(criativo_val)
-
-    parts = [
-        safe(row.get("Periodo")),
-        safe(row.get("Campanha")),
-        safe(row.get("Veiculo")),
-        safe(row.get("Link conteúdos impulsionados")),
-        safe(row.get("Agência")),
-        safe(row.get("Editoria")),
-        safe(row.get("Objetivo")),
-        criativo,
-    ]
-    return "|".join(parts)
+    values = [safe(row.get(col)) for col in col_list]
+    return "|".join(values)
 
 
 def add_key_creative(df: pd.DataFrame) -> pd.DataFrame:
