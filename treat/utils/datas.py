@@ -2,19 +2,24 @@
 
 from datetime import date, datetime
 from typing import Any
-
 import pandas as pd
 
-try:
-    from .datas_utils import transformar_para_date
-except ImportError:  # pragma: no cover - optional dependency
-
-    def transformar_para_date(val):
-        """Converte string/data para date, ou retorna None."""
-        return pd.to_datetime(val, errors="coerce").date()
-
-
 from treat.bi_param_utils import BIParamLookup
+from treat.settings import MIN_DATE   # import centralizado da data mínima
+
+
+def filter_by_min_date(df: pd.DataFrame, *, date_col: str = "date") -> pd.DataFrame:
+    """
+    Remove linhas cujo ``date_col`` (string ISO ou datetime-compatível)
+    seja anterior a MIN_DATE.
+
+    • Cria coluna auxiliar 'date_dt' normalizada para datetime.date
+    • Devolve df já filtrado e com índice reiniciado.
+    """
+    df = df.copy()
+    df["date_dt"] = pd.to_datetime(df[date_col], errors="coerce").dt.date
+    mask = df["date_dt"] >= MIN_DATE
+    return df.loc[mask].reset_index(drop=True)
 
 
 def fill_missing_start_end_from_params(
@@ -28,22 +33,11 @@ def fill_missing_start_end_from_params(
 ) -> pd.DataFrame:
     """
     Preenche as colunas 'start' e 'end' em memória usando BIParamLookup.
-    Não faz nenhuma chamada ao Google Sheets nem write-back aqui: apenas
-    delega o preenchimento ao lookup e devolve o DataFrame resultante.
-
-    Parâmetros:
-    - df: DataFrame de origem (preenchido ou não).
-    - lookup: instância de BIParamLookup (já inicializada no pipeline).
-    - coluna_utm: nome da coluna usada como chave para lookup (ex: "ad_name").
-    - coluna_start: nome da coluna 'start' a ser preenchida.
-    - coluna_end: nome da coluna 'end' a ser preenchida.
-    - inplace: se False, trabalha em uma cópia de df; caso contrário, altera df diretamente.
+    Não faz batch_update no Google Sheets.
     """
     if not inplace:
         df = df.copy()
 
-    # Delega o preenchimento em memória a BIParamLookup
-    # write_back=False garante que não ocorra batch_update aqui
     df_result = lookup.fill_missing_start_end_from_utm(
         df,
         coluna_utm=coluna_utm,
@@ -52,7 +46,6 @@ def fill_missing_start_end_from_params(
         sheet_name=None,
         write_back=False,
     )
-
     return df_result
 
 
@@ -82,6 +75,10 @@ def transformar_para_date(valor):
 
 
 def converter_data(df: pd.DataFrame, coluna: str) -> pd.DataFrame:
+    """
+    Converte a coluna especificada de datetime/string para date, deixando
+    células vazias onde não for possível interpretar.
+    """
     if coluna in df.columns:
         parsed = pd.to_datetime(df[coluna], errors="coerce")
         df[coluna] = parsed.dt.date.where(~parsed.isna(), "")
@@ -90,8 +87,7 @@ def converter_data(df: pd.DataFrame, coluna: str) -> pd.DataFrame:
 
 def generate_pinterest_dates(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Preenche as colunas 'Inicio_da_Campanha' e 'Fim_da_Campanha' convertendo
-    as colunas 'start' e 'end' (datetime) para datas (YYYY-MM-DD) no Pinterest.
+    Popula 'Inicio_da_Campanha' e 'Fim_da_Campanha' a partir de 'start' e 'end'.
     """
     if "start" in df.columns:
         df["Inicio_da_Campanha"] = df["start"].apply(transformar_para_date)
@@ -114,14 +110,9 @@ def unify_campaign_dates(
     *,
     inplace: bool = True,
 ) -> pd.DataFrame:
-    """Padroniza start/end por ``campaign_name`` usando menor/maior datas.
-
-    Para cada ``campaign_name`` presente em ``camp_col`` calcula a data mais
-    antiga encontrada em ``start_col`` e a mais recente em ``end_col``. Todas as
-    linhas daquela campanha recebem esses valores, mantendo vazios quando não
-    houver datas válidas.
     """
-
+    Padroniza start/end por ``campaign_name`` usando menor/maior datas.
+    """
     if not inplace:
         df = df.copy()
 
@@ -133,22 +124,19 @@ def unify_campaign_dates(
     if start_col in df.columns:
         start_dates = pd.to_datetime(df[start_col], errors="coerce")
         earliest = start_dates.groupby(key).transform("min")
-        earliest_dates = earliest.dt.date
-        df[start_col] = df[start_col].where(earliest.isna(), earliest_dates)
+        df[start_col] = df[start_col].where(earliest.isna(), earliest.dt.date)
 
     if end_col in df.columns:
         end_dates = pd.to_datetime(df[end_col], errors="coerce")
         latest = end_dates.groupby(key).transform("max")
-        latest_dates = latest.dt.date
-        df[end_col] = df[end_col].where(latest.isna(), latest_dates)
+        df[end_col] = df[end_col].where(latest.isna(), latest.dt.date)
 
     return df
 
 
 def normalize_date_to_str_DD_M_YYYY(value) -> str:
-    """Normaliza ``value`` para a string ``DD/M/YYYY``.
-
-    Meses são exibidos sem zero à esquerda. Valores vazios retornam ``""``.
+    """
+    Normaliza ``value`` para a string ``DD/M/YYYY``.
     """
     if value is None or value == "" or (isinstance(value, float) and pd.isna(value)):
         return ""
@@ -173,8 +161,7 @@ def normalize_date_to_str_DD_M_YYYY(value) -> str:
 
 def concat_period(start: Any, end: Any) -> str:
     """
-    Gera um período formatado "DD/M/YYYY a DD/M/YYYY" a partir de duas datas,
-    ou string vazia se faltar um dos valores.
+    Gera um período formatado "DD/M/YYYY a DD/M/YYYY", ou "" se faltar algum.
     """
     if not start or not end:
         return ""
