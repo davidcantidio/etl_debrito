@@ -41,9 +41,10 @@ def limpar_aba_mantendo_cabecalho(service, spreadsheet_id: str, aba_nome: str):
 
 
 if __name__ == "__main__":
-    # Configuração inicial
-    creds_path = "creds.json"
-    spreadsheet_id = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
+    import os
+    # Configuração inicial - usa variáveis de ambiente
+    creds_path = os.getenv("GOOGLE_CREDS_PATH", "creds.json")
+    spreadsheet_id = os.getenv("SPREADSHEET_ID", "")
 
     # Abas a limpar
     abas_para_limpar = [

@@ -84,11 +84,8 @@ class TreatPipeline:
         # BI lookup (cache + TTL)
         self.bi_lookup = BIParamLookup(creds_path, spreadsheet_id)
 
-        # Fetcher único (reaproveita se já existir em builtins)
-        self.fetcher: SheetsFetcher = getattr(builtins, "fetcher", None)  # type: ignore
-        if self.fetcher is None:
-            self.fetcher = SheetsFetcher(spreadsheet_id, creds_path)
-            builtins.fetcher = self.fetcher
+        # Fetcher único para este pipeline
+        self.fetcher = SheetsFetcher(spreadsheet_id, creds_path)
 
         # Worksheet de origem (apenas se vamos fazer write-back)
         self.worksheet_origem: Optional[Worksheet] = (
@@ -157,10 +154,8 @@ class TreatPipeline:
                 ),
             )
 
-            # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache global)
-            import builtins
-
-            df_geral = getattr(builtins, "_pinterest_geral_tratado", None)
+            # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache da instância)
+            df_geral = self._sibling_cache.get("pinterest_geral_tratado")
             if df_geral is None:
                 raise RuntimeError(
                     "pinterestGeral não foi processado antes da dimensão."
@@ -366,14 +361,13 @@ def execute_pipeline(
     fetcher: SheetsFetcher | None = None,
 ) -> Dict[str, dict]:
     fetcher = fetcher or SheetsFetcher(spreadsheet_id, creds_path)
-    builtins.fetcher = fetcher
     all_tabs = list(sheet_names) + list(DESTINATION_SHEETS.values()) + ["SOURCE"]
     all_raw = fetcher.get(all_tabs)
 
     prefetch_meta(fetcher, spreadsheet_id)
 
     dest_payloads: List[dict] = []
-    builtins._wb_origin_done = set()
+    wb_origin_done = set()
     results: Dict[str, dict] = {}
 
     for name in sheet_names:

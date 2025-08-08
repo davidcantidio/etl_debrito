@@ -28,9 +28,10 @@ def limpar_aba_mantendo_cabecalho(
 
 
 if __name__ == "__main__":
-    # Configuração inicial — adapte paths/IDs conforme seu ambiente
-    CREDS_PATH = "creds.json"
-    SPREADSHEET_ID = "1DazUQxspLgT0utOFHcTINbFngXw7Fq0LOq6v4lRGixg"
+    import os
+    # Configuração inicial — usa variáveis de ambiente
+    CREDS_PATH = os.getenv("GOOGLE_CREDS_PATH", "creds.json")
+    SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "")
 
     # lista de abas-modelo a limpar
     ABAS = [

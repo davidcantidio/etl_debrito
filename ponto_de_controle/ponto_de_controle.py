@@ -29,7 +29,6 @@ import argparse
 import logging
 import os
 from collections import OrderedDict
-from datetime import date
 from pathlib import Path
 from typing import Iterable
 
@@ -46,6 +45,9 @@ from treat.utils.campos_calculados import (
 from treat.utils.datas import concat_period, normalize_date_to_str_DD_M_YYYY
 from treat.utils.normalize import normalize_vehicle
 from treat.utils.write_dataframe_to_sheet import write_dataframe_to_sheet
+
+# Importa MIN_DATE da configuração central
+from config import MIN_DATE
 
 logger = logging.getLogger(__name__)
 pd.set_option("display.max_rows", 20)
@@ -66,7 +68,7 @@ HEAD_ROW_DEST: int = int(os.getenv("HEAD_ROW_DEST", "4"))  # zero-based
 
 GOOGLE_CREDS_PATH: Path = Path(os.getenv("GOOGLE_CREDS_PATH", "creds.json"))
 
-MIN_DATE = date(2025, 6, 1)
+# MIN_DATE agora vem de config.py via constants.py
 DEST_COLUMNS: list[str] = list(OrderedDict.fromkeys(DEFAULT_DEST_COLUMNS))  # garante unicidade
 assert len(DEST_COLUMNS) == 11, "DEST_COLUMNS deve conter 11 rótulos únicos"
 

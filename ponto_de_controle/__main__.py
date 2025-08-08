@@ -5,7 +5,7 @@ from ponto_de_controle.origin import read_origin_df
 from ponto_de_controle.transform import transform_df
 from ponto_de_controle.destination import read_destination_df
 from ponto_de_controle.diff import diff_new_rows
-from ponto_de_controle.witter import write_df_to_sheet_final
+from ponto_de_controle.writer import write_df_to_sheet_final
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,8 @@ def main(*, dry_run: bool) -> None:
     except ImportError:
         print(df_new.drop(columns="__ID__", errors="ignore"))
 
-    write_df_to_sheet_final(df_new, dry_run=dry_run)
+    # Passa o número de linhas do destino para evitar dependência circular
+    write_df_to_sheet_final(df_new, dry_run=dry_run, dest_rows_count=len(df_dest))
     logger.info("── Fim ──")
 
 if __name__ == "__main__":

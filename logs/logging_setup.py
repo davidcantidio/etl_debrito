@@ -3,9 +3,14 @@ import pathlib
 import sys
 
 # ── Caminho para o diretório de logs ────────────────────────────────────────
-LOG_DIR = pathlib.Path("/home/debrito/Documentos/etl_debrito/logs")
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-LOG_FILE = LOG_DIR / "pipeline_debug.log"
+# Usa configuração central ou caminho relativo como fallback
+try:
+    from config import LOG_DIR, LOG_FILE
+except ImportError:
+    # Se config.py não estiver disponível, usa caminho relativo
+    LOG_DIR = pathlib.Path(__file__).parent
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_FILE = LOG_DIR / "pipeline_debug.log"
 
 
 def setup_logging() -> None:
