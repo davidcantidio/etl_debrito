@@ -9,8 +9,60 @@ from gspread import Worksheet
 
 from treat.utils.sheets_cache import get_worksheet
 from treat.utils.write_back import write_back_df  # faz o batch_update
+from load.utils.column_mapper import apply_smart_column_mapping
 
 log = logging.getLogger(__name__)
+
+
+def prepare_origin_payload(
+    df_raw: pd.DataFrame,
+    df_ok: pd.DataFrame,
+    sheet_name: str,
+    a1_range: str = "A1",
+    header: Optional[list[str]] = None,
+    dry_run: bool = False,
+) -> Optional[dict]:
+    """Prepara payload para batchUpdate sem enviá-lo."""
+    # Apply smart column mapping to reduce warnings
+    df_mapped = apply_smart_column_mapping(df_raw, df_ok, sheet_name, for_destination=False)
+    
+    header_cols = header or df_raw.columns.tolist()
+    
+    # Only check for actually problematic mismatches after smart mapping
+    available_cols = [col for col in header_cols if col in df_mapped.columns]
+    extras = set(df_mapped.columns) - set(available_cols)
+    missing = set(header_cols) - set(df_mapped.columns)
+    
+    if extras and len(extras) > 3:  # Only warn for significant extras
+        log.warning("Ignorando colunas extras: %s", sorted(list(extras)[:5]))
+    if missing:
+        log.debug(f"Colunas do header ausentes no processed: {sorted(missing)}")
+    
+    # Use available columns for write-back
+    final_cols = available_cols if available_cols else list(df_mapped.columns)
+    df_wb = df_mapped[final_cols].copy()
+    
+    if df_wb.empty:
+        return None
+    
+    # Convert to JSON-safe values
+    def _scalar(v):
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return ""
+        if hasattr(v, 'isoformat'):  # date/datetime objects
+            return v.isoformat()
+        return v
+    
+    values = [final_cols] + df_wb.map(_scalar).values.tolist()
+    return {
+        "range": f"{sheet_name}!{a1_range}",
+        "majorDimension": "ROWS",
+        "values": values,
+    }
+
+
+# Alias for backwards compatibility
+prepare_origin_changes = prepare_origin_payload
 
 
 def write_back_origin(

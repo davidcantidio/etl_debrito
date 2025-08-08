@@ -21,10 +21,8 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
 def _build_sheets_service(creds_path: str):
     """Constrói o serviço da Google Sheets API via google-api-python-client."""
-    import google.oauth2.service_account as sa
-
-    creds = sa.Credentials.from_service_account_file(creds_path, scopes=SCOPES)
-    return build("sheets", "v4", credentials=creds, cache_discovery=False)
+    from treat.utils.google_service_pool import get_sheets_service
+    return get_sheets_service(creds_path, readonly=True)
 
 
 class SheetsFetcher:
@@ -105,9 +103,15 @@ class SheetsFetcher:
         Constrói ranges a partir dos nomes de abas e realiza batchGet,
         retornando o payload em raw lists e atualizando o cache interno.
         """
-        cleaned = [n.strip().strip("'") for n in sheet_names]
-        ranges = [f"{n}!{self.col_range}" for n in cleaned]
-        log.info("🧹 ranges normalizados: %s", ranges)
+        from treat.utils.sheet_name_normalizer import batch_normalize_sheet_names, safe_sheet_range
+        
+        # Normalize sheet names to handle special characters
+        name_mapping = batch_normalize_sheet_names(sheet_names)
+        cleaned = [name_mapping[name] for name in sheet_names]
+        
+        # Create safe ranges
+        ranges = [safe_sheet_range(name, self.col_range) for name in cleaned]
+        log.info("🧹 ranges normalizados com encoding seguro: %s", ranges[:3] + ['...'] if len(ranges) > 3 else ranges)
 
         resp = self._batch_get(ranges)
         if not resp.get("valueRanges"):
@@ -116,20 +120,16 @@ class SheetsFetcher:
             )
 
         payload: Dict[str, List[List[str]]] = {}
-        for name, vr in zip(cleaned, resp["valueRanges"]):
-            log.info("🔍 range completo retornado pela API: %s", vr.get("range"))
-            original_key = name.strip()
-            returned_key = vr["range"].split("!", 1)[0].strip().strip("'")
-            if returned_key != original_key:
-                log.warning(
-                    "Nome retornado pela API difere do solicitado: '%s' → '%s'",
-                    original_key,
-                    vr["range"].split("!", 1)[0].strip(),
-                )
+        for original_name, normalized_name, vr in zip(sheet_names, cleaned, resp["valueRanges"]):
+            log.debug("🔍 range retornado: %s", vr.get("range", "")[:100] + "..." if len(vr.get("range", "")) > 100 else vr.get("range", ""))
+            
             values = vr.get("values", [])
-            payload[original_key] = values
+            # Use original sheet name as key for consistency
+            payload[original_name] = values
             if values:
-                self._headers[original_key] = [c.strip() for c in values[0]]
+                self._headers[original_name] = [c.strip() for c in values[0]]
+                
+        log.info(f"📊 Fetched data for {len(payload)} sheets with encoding safety")
         return payload
 
     def get(

@@ -26,6 +26,7 @@ from googleapiclient.discovery import build
 from extract.sheets_fetcher import SheetsFetcher
 from treat.utils.sheets_cache import get_worksheet as _get_worksheet
 from treat.utils.validations import validate_columns
+from load.utils.column_mapper import apply_smart_column_mapping
 
 log = logging.getLogger(__name__)
 
@@ -134,9 +135,8 @@ def _infer_data_type(sheet_name: str) -> str:
 
 
 def _build_service(creds_path: str):
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
-    return build("sheets", "v4", credentials=creds, cache_discovery=False)
+    from treat.utils.google_service_pool import get_sheets_service
+    return get_sheets_service(creds_path, readonly=False)
 
 
 def _ensure_rows(
@@ -185,8 +185,22 @@ def _to_payload(df: pd.DataFrame, sheet_name: str) -> dict:
 
 def _prepare_df(df_model: pd.DataFrame, sheet_name: str) -> Optional[pd.DataFrame]:
     header = _HEADERS[sheet_name]
-    df_out = df_model.reindex(columns=header, fill_value="").applymap(_scalar)
-    validate_columns(df_out, header, stage=f"Destino {sheet_name}")
+    
+    # Apply smart column mapping for destination
+    df_mapped = apply_smart_column_mapping(
+        df_model, df_model, sheet_name, for_destination=True
+    )
+    
+    # Reindex with header but only include available columns to reduce warnings
+    available_header_cols = [col for col in header if col in df_mapped.columns]
+    missing_header_cols = set(header) - set(available_header_cols)
+    
+    if missing_header_cols and len(missing_header_cols) <= 3:
+        log.debug(f"Destino {sheet_name}: colunas header ausentes: {sorted(missing_header_cols)}")
+    
+    df_out = df_mapped.reindex(columns=available_header_cols, fill_value="").map(_scalar)
+    validate_columns(df_out, available_header_cols, stage=f"Destino {sheet_name}")
+    
     if "ID" in df_out.columns:
         existing = _EXISTING_IDS.get(sheet_name, set())
         df_out = df_out.loc[~df_out["ID"].isin(existing)]
@@ -364,6 +378,19 @@ def write_back_destination(
         value_input_option=value_input_option,
     )
     return result.get(data_type)
+
+
+def prepare_dest_payload(
+    df_model: pd.DataFrame, 
+    sheet_name: str, 
+    creds_path: str = None, 
+    spreadsheet_id: str = None, 
+    dry_run: bool = False
+) -> Optional[dict]:
+    """Prepara payload para batchUpdate sem enviá-lo."""
+    data_type = _infer_data_type(sheet_name)
+    sheet_name_dest = DESTINATION_SHEETS[data_type]
+    return collect_dest_payload(df_model, sheet_name_dest)
 
 
 def write_back_for_sheet(

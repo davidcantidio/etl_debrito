@@ -154,8 +154,9 @@ class TreatPipeline:
                 ),
             )
 
-            # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache da instância)
-            df_geral = self._sibling_cache.get("pinterest_geral_tratado")
+            # 3b) recupera pinterestGeral JÁ ENRIQUECIDO (cache global via builtins)
+            import builtins
+            df_geral = getattr(builtins, "_pinterest_geral_tratado", None)
             if df_geral is None:
                 raise RuntimeError(
                     "pinterestGeral não foi processado antes da dimensão."
