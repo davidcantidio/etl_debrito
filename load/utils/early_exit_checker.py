@@ -42,7 +42,7 @@ def check_has_new_data(
     
     try:
         # Quick ID generation for sample
-        from treat.utils.campos_calculados import gerar_id
+        from transform.utils.campos_calculados import gerar_id
         
         # Simulate basic column mapping for ID generation
         id_sample = sample_df.apply(gerar_id, axis=1).astype(str).tolist()

@@ -5,9 +5,9 @@ import os
 import yaml
 
 from extract.sheets_fetcher import SheetsFetcher
-from treat.meta import treat_meta  # Exemplo de função de treat
+from transform.meta import treat_meta  # Exemplo de função de treat
 
-# from treat.tiktok import treat_tiktok
+# from transform.tiktok import treat_tiktok
 # etc.
 
 # 1) Carrega configuração de abas

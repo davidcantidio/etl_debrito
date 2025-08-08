@@ -24,8 +24,8 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
 from extract.sheets_fetcher import SheetsFetcher
-from treat.utils.sheets_cache import get_worksheet as _get_worksheet
-from treat.utils.validations import validate_columns
+from transform.utils.sheets_cache import get_worksheet as _get_worksheet
+from transform.utils.validations import validate_columns
 from load.utils.column_mapper import apply_smart_column_mapping
 
 log = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ def _infer_data_type(sheet_name: str) -> str:
 
 
 def _build_service(creds_path: str):
-    from treat.utils.google_service_pool import get_sheets_service
+    from transform.utils.google_service_pool import get_sheets_service
     return get_sheets_service(creds_path, readonly=False)
 
 
@@ -145,7 +145,7 @@ def _ensure_rows(
     """Expande a planilha se `end_row` exceder o tamanho atual."""
     import sys
 
-    pipeline = sys.modules.get("treat.treat_pipeline")
+    pipeline = sys.modules.get("transform.transform_pipeline")
     ws_getter = getattr(pipeline, "get_worksheet", get_worksheet)
     try:
         ws = ws_getter(creds_path, spreadsheet_id, sheet_name)

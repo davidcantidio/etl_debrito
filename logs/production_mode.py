@@ -45,9 +45,9 @@ class ProductionFilter(logging.Filter):
         "google.auth.transport.requests",
         "googleapiclient.discovery_cache",
         "googleapiclient.discovery",
-        "treat.utils.schema_validator",
-        "treat.utils.date_normalizer",
-        "treat.utils.connection_pool",
+        "transform.utils.schema_validator",
+        "transform.utils.date_normalizer",
+        "transform.utils.connection_pool",
         "load.utils.column_mapper"
     }
     

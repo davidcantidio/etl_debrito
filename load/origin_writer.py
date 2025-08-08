@@ -7,8 +7,8 @@ from typing import Optional
 import pandas as pd
 from gspread import Worksheet
 
-from treat.utils.sheets_cache import get_worksheet
-from treat.utils.write_back import write_back_df  # faz o batch_update
+from transform.utils.sheets_cache import get_worksheet
+from transform.utils.write_back import write_back_df  # faz o batch_update
 from load.utils.column_mapper import apply_smart_column_mapping
 
 log = logging.getLogger(__name__)

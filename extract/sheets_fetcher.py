@@ -11,7 +11,7 @@ from googleapiclient.errors import HttpError
 from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
                       wait_exponential)
 
-from treat.utils.get_google_client import \
+from transform.utils.get_google_client import \
     get_google_client  # retorna um cliente gspread
 
 log = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
 def _build_sheets_service(creds_path: str):
     """Constrói o serviço da Google Sheets API via google-api-python-client."""
-    from treat.utils.google_service_pool import get_sheets_service
+    from transform.utils.google_service_pool import get_sheets_service
     return get_sheets_service(creds_path, readonly=True)
 
 
@@ -103,7 +103,7 @@ class SheetsFetcher:
         Constrói ranges a partir dos nomes de abas e realiza batchGet,
         retornando o payload em raw lists e atualizando o cache interno.
         """
-        from treat.utils.sheet_name_normalizer import batch_normalize_sheet_names, safe_sheet_range
+        from transform.utils.sheet_name_normalizer import batch_normalize_sheet_names, safe_sheet_range
         
         # Normalize sheet names to handle special characters
         name_mapping = batch_normalize_sheet_names(sheet_names)

@@ -19,7 +19,7 @@ from config import (
 )
 
 # Importa colunas padrão
-from treat.utils.campos_calculados import DEFAULT_DEST_COLUMNS
+from transform.utils.campos_calculados import DEFAULT_DEST_COLUMNS
 
 # Garante unicidade e ordem das colunas
 DEST_COLUMNS: list[str] = list(OrderedDict.fromkeys(DEFAULT_DEST_COLUMNS))

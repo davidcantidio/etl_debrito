@@ -59,8 +59,8 @@ from IPython.display import display
 import time
 
 # Imports consolidados para evitar repetição nas células seguintes
-from treat.treat_pipeline import BIParamLookup
-from treat.utils.validations import validate_consistent_dates_across_models
+from transform.transform_pipeline import BIParamLookup
+from transform.utils.validations import validate_consistent_dates_across_models
 
 # 🚀 Cache global para worksheets para reduzir chamadas API
 _WORKSHEETS_CACHE = {}
@@ -218,7 +218,7 @@ def get_cached_worksheets(gc, spreadsheet_id: str):
     🚀 ULTRA-OTIMIZADA: Get worksheets using consolidated metadata (1 API call)
     """
     try:
-        from treat.utils.metadata_optimizer import get_consolidated_metadata
+        from transform.utils.metadata_optimizer import get_consolidated_metadata
         
         # Get metadata using single API call
         metadata = get_consolidated_metadata(
@@ -272,7 +272,7 @@ def get_sheet_statistics(creds_path: str, spreadsheet_id: str, top_n: int = 10) 
     """
     try:
         # Import the optimized metadata fetcher
-        from treat.utils.metadata_optimizer import get_sheet_statistics_optimized
+        from transform.utils.metadata_optimizer import get_sheet_statistics_optimized
         
         stats = get_sheet_statistics_optimized(spreadsheet_id, creds_path, top_n)
         
@@ -296,7 +296,7 @@ def add_rate_limiting(delay_seconds: float = 0.1, force: bool = False):
     if not force and delay_seconds <= 0.01:
         return
     
-    from treat.utils.smart_rate_limiting import smart_rate_limit
+    from transform.utils.smart_rate_limiting import smart_rate_limit
     
     # Use smart rate limiting with connection pooling awareness
     smart_rate_limit(
@@ -411,12 +411,12 @@ import os
 import importlib
 
 # 🚀 SMART HOT-RELOAD: Only reload changed modules
-from treat.utils.smart_reload import conditional_hot_reload
+from transform.utils.smart_reload import conditional_hot_reload
 conditional_hot_reload()
 
 # Standard imports (will be reloaded only if changed)
 import extract.sheets_fetcher
-import treat.treat_pipeline  
+import transform.transform_pipeline  
 import load.origin_writer
 import load.dest_writer
 
@@ -436,14 +436,14 @@ from logs.logging_setup import get_logger
 logger = get_logger(__name__)
 
 from extract.sheets_fetcher import SheetsFetcher
-from treat.treat_pipeline import TreatPipeline
-from treat.utils.renomeacoes import (
+from transform.transform_pipeline import TreatPipeline
+from transform.utils.renomeacoes import (
     renomeacao_geral,
     renomear_colunas_origem_para_modelo,
 )
-from treat.utils.campos_calculados import calcular_engajamento_total, gerar_id
-from treat.utils.schema_validator import validate_schema_early
-from treat.utils.date_normalizer import normalize_campaign_dates
+from transform.utils.campos_calculados import calcular_engajamento_total, gerar_id
+from transform.utils.schema_validator import validate_schema_early
+from transform.utils.date_normalizer import normalize_campaign_dates
 
 # Instância única do fetcher (retry/backoff/cache interno)
 fetcher = SheetsFetcher(

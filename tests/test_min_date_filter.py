@@ -1,7 +1,7 @@
 # tests/test_min_date_filter.py
 import pandas as pd
 import datetime as dt
-from treat.settings import MIN_DATE
+from transform.settings import MIN_DATE
 from extract import read_df
 
 def test_filter_respects_min_date(tmp_path):
