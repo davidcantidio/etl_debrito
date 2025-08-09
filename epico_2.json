@@ -1,0 +1,346 @@
+{
+  "epic": {
+    "id": "1",
+    "name": "Discovery & Compatibility",
+    "summary": "Entender completamente os sistemas de logging e supressão existentes (warning_suppressor, production_mode, early_exit_checker) e validar via testes que os comportamentos de supressão e modos de execução estão corretos, preparando o terreno para integração segura com o sistema interativo de warnings.",
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "goals": [
+      "Garantir que o warning_suppressor suprime corretamente warnings predefinidos sem afetar warnings críticos",
+      "Verificar que o production_mode configura os níveis de log adequadamente (normal/quiet/minimal)",
+      "Mapear e testar a interação de early_exit_checker com a geração de warnings para evitar processamento desnecessário"
+    ],
+    "definition_of_done": [
+      "Todos os testes escritos antes da implementação",
+      "100% de cobertura de testes nos novos módulos",
+      "Ciclo red-green-refactor seguido consistentemente",
+      "Tests red-green-refactor escritos para os comportamentos principais de supressão e logging",
+      "Cobertura mínima de 90% nos módulos de configuração (conforme template)",
+      "Todos os testes existentes permanecem verdes",
+      "Documentação atualizada sobre comportamentos observados"
+    ],
+    "duration": "5 dias",
+    "labels": ["tdd", "logging", "compatibility", "discovery"],
+    "tasks": [
+      {
+        "id": "1.1a",
+        "title": "Analisar warning_suppressor.py (linhas 1-30)",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Ler o arquivo logs/warning_suppressor.py (linhas 1‑30) para entender quais warnings são suprimidos automaticamente e identificar padrões de supressão configuráveis.",
+        "deliverables": ["reports/analysis_warning_suppressor.md"],
+        "acceptance_criteria": [
+          "Documento descrevendo padrões de supressão identificados",
+          "Lista de environment variables que controlam a supressão"
+        ],
+        "dependencies": [],
+        "branch": "feature/discovery-compat",
+        "files_touched": [],
+        "risk": "Padrões implícitos não serem facilmente identificáveis",
+        "mitigation": "Conferir com logs gerados e comparar com código"
+      },
+      {
+        "id": "1.1b.1",
+        "title": "TEST: should_suppress_validation_warnings_when_suppressor_enabled",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que, quando o supressor de warnings está habilitado, warnings de validação predefinidos não aparecem no output, mas erros críticos continuam visíveis. Pode ser desenvolvido em paralelo com análise usando conhecimento básico do sistema.",
+        "test_specs": [
+          "should_suppress_validation_warnings_when_suppressor_enabled",
+          "should_not_suppress_critical_errors_when_suppressor_enabled"
+        ],
+        "acceptance_criteria": [
+          "Teste falha inicialmente com assertion clara",
+          "Mensagem de erro indica que o warning foi emitido incorretamente"
+        ],
+        "deliverables": [
+          "tests/test_warning_suppressor.py::test_should_suppress_predefined_warnings_when_suppressor_enabled"
+        ],
+        "dependencies": [],
+        "branch": "feature/discovery-compat",
+        "files_touched": ["tests/test_warning_suppressor.py"],
+        "risk": "Difícil simular ambiente de supressão em teste isolado",
+        "mitigation": "Utilizar monkeypatch de logging e variáveis de ambiente"
+      },
+      {
+        "id": "1.1b.2",
+        "title": "IMPL: suppression harness to pass test",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar código mínimo (ou configuração de teste) para que o teste de supressão de warnings passe, configurando variáveis de ambiente e hooks necessários.",
+        "test_specs": [
+          "should_suppress_validation_warnings_when_suppressor_enabled",
+          "should_not_suppress_critical_errors_when_suppressor_enabled"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red agora passa",
+          "Nenhum outro teste anterior quebra",
+          "Implementação é a mínima necessária"
+        ],
+        "deliverables": [
+          "tests/test_warning_suppressor.py::test_should_suppress_predefined_warnings_when_suppressor_enabled",
+          "config/test_warning_suppressor_setup.py"
+        ],
+        "dependencies": ["1.1b.1"],
+        "branch": "feature/discovery-compat",
+        "files_touched": [
+          "config/test_warning_suppressor_setup.py"
+        ],
+        "risk": "Modificar global state do logger afetar outros testes",
+        "mitigation": "Restaurar estado original do logger após cada teste"
+      },
+      {
+        "id": "1.1b.3",
+        "title": "REFACTOR: clean up suppression harness",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar o código de suporte à supressão para remover duplicação e melhorar a clareza, mantendo todos os testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Todos os testes continuam verdes",
+          "Função de setup/teardown centralizada",
+          "Sem código duplicado"
+        ],
+        "deliverables": [
+          "config/test_warning_suppressor_setup.py"
+        ],
+        "dependencies": ["1.1b.2"],
+        "branch": "feature/discovery-compat",
+        "files_touched": [
+          "config/test_warning_suppressor_setup.py"
+        ],
+        "risk": "Refatoração quebrar configuração de testes",
+        "mitigation": "Executar todos os testes antes e depois da refatoração"
+      },
+      {
+        "id": "1.2a",
+        "title": "Analisar production_mode.py (linhas 1-100)",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Ler o arquivo logs/production_mode.py (linhas 1‑100) para entender como os níveis de log são configurados em diferentes modos (normal, quiet, minimal) e suas respectivas configurações.",
+        "deliverables": ["reports/analysis_production_mode.md"],
+        "acceptance_criteria": [
+          "Documento explicando níveis normal, quiet e minimal",
+          "Mapping de environment variables para cada modo"
+        ],
+        "dependencies": [],
+        "branch": "feature/discovery-compat",
+        "files_touched": [],
+        "risk": "Detalhes de implementação dispersos pelo código",
+        "mitigation": "Complementar leitura com testes de execução prática"
+      },
+      {
+        "id": "1.2b.1",
+        "title": "TEST: should_set_logging_level_to_warning_when_production_mode_enabled",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que, ao habilitar o modo de produção, o nível de log é ajustado para WARNING ou superior, suprimindo logs DEBUG e INFO. Independente da análise detalhada - usa configuração padrão de produção.",
+        "test_specs": [
+          "should_set_logging_level_to_warning_when_production_mode_enabled",
+          "should_suppress_debug_and_info_logs_in_production_mode"
+        ],
+        "acceptance_criteria": [
+          "Teste falha inicialmente por nível incorreto",
+          "Mensagem de erro descreve níveis esperados vs atual"
+        ],
+        "deliverables": [
+          "tests/test_production_mode.py::test_should_set_logging_level_correctly_in_production_mode"
+        ],
+        "dependencies": [],
+        "branch": "feature/discovery-compat",
+        "files_touched": ["tests/test_production_mode.py"],
+        "risk": "Dificuldade em isolar o logger global de outros testes",
+        "mitigation": "Usar fixtures de pytest para reconfigurar logging temporariamente"
+      },
+      {
+        "id": "1.2b.2",
+        "title": "IMPL: production mode logging setup",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar configuração mínima de logging para que o teste de produção passe, utilizando variáveis de ambiente ou módulos de configuração.",
+        "test_specs": [
+          "should_set_logging_level_to_warning_when_production_mode_enabled",
+          "should_suppress_debug_and_info_logs_in_production_mode"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red agora passa",
+          "Nenhum teste anterior quebra",
+          "Implementação é localizada e configurável"
+        ],
+        "deliverables": [
+          "tests/test_production_mode.py::test_should_set_logging_level_correctly_in_production_mode",
+          "config/production_logging_setup.py"
+        ],
+        "dependencies": ["1.2b.1"],
+        "branch": "feature/discovery-compat",
+        "files_touched": [
+          "config/production_logging_setup.py"
+        ],
+        "risk": "Alterar o logger global pode causar regressões",
+        "mitigation": "Isolar configuração em módulo separado e restaurar após uso"
+      },
+      {
+        "id": "1.2b.3",
+        "title": "REFACTOR: improve production logging configuration",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar a configuração de logging para torná-la reutilizável e menos dependente de variáveis globais, mantendo todos os testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Configuração de logging encapsulada em função ou classe",
+          "Nenhum teste quebra",
+          "Legibilidade e reuse melhorados"
+        ],
+        "deliverables": [
+          "config/production_logging_setup.py"
+        ],
+        "dependencies": ["1.2b.2"],
+        "branch": "feature/discovery-compat",
+        "files_touched": [
+          "config/production_logging_setup.py"
+        ],
+        "risk": "Introduzir acoplamento excessivo entre módulos",
+        "mitigation": "Manter API pública estável e bem documentada"
+      },
+      {
+        "id": "1.3a",
+        "title": "Analisar early_exit_checker e schema_validator",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Verificar se existem os módulos early_exit_checker.py e schema_validator.py, e analisar como eles interagem com a geração de warnings, especialmente como o early exit evita validações desnecessárias.",
+        "deliverables": ["reports/analysis_early_exit_and_schema.md"],
+        "acceptance_criteria": [
+          "Confirmação da existência ou ausência dos módulos",
+          "Descrição de como early exit evita warnings sem novos dados",
+          "Levantamento de warnings gerados por schema validation"
+        ],
+        "dependencies": [],
+        "branch": "feature/discovery-compat",
+        "files_touched": [],
+        "risk": "Ausência de módulos dificultar análise",
+        "mitigation": "Propor criação de stubs e tests se módulos estiverem ausentes"
+      },
+      {
+        "id": "1.3b.1",
+        "title": "TEST: should_skip_validation_warnings_when_no_new_sheet_data_detected",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o early_exit_checker impede a geração de warnings de validação quando não há novos dados na planilha desde a última execução. Pode ser desenvolvido usando mock básico de SheetsFetcher.",
+        "test_specs": [
+          "should_skip_validation_warnings_when_no_new_sheet_data_detected",
+          "should_maintain_api_call_count_when_early_exit_triggered"
+        ],
+        "acceptance_criteria": [
+          "Teste falha inicialmente porque early exit não ocorre",
+          "Mensagem de erro indica que warnings foram emitidos erroneamente"
+        ],
+        "deliverables": [
+          "tests/test_early_exit.py::test_should_trigger_early_exit_before_warnings_when_no_new_data"
+        ],
+        "dependencies": [],
+        "branch": "feature/discovery-compat",
+        "files_touched": ["tests/test_early_exit.py"],
+        "risk": "Dificuldade em simular sheet sem novos dados",
+        "mitigation": "Mockar SheetsFetcher para retornar estado de 'sem alterações'"
+      },
+      {
+        "id": "1.3b.2",
+        "title": "IMPL: early exit harness to satisfy test",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar código mínimo para acionar o early exit antes das validações e suprimir warnings quando não houver novos dados.",
+        "test_specs": [
+          "should_skip_validation_warnings_when_no_new_sheet_data_detected",
+          "should_maintain_api_call_count_when_early_exit_triggered"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red agora passa",
+          "Nenhum outro teste quebra",
+          "Implementação não aumenta contagem de chamadas de API"
+        ],
+        "deliverables": [
+          "tests/test_early_exit.py::test_should_trigger_early_exit_before_warnings_when_no_new_data",
+          "transform/warnings/early_exit_hook.py"
+        ],
+        "dependencies": ["1.3b.1"],
+        "branch": "feature/discovery-compat",
+        "files_touched": [
+          "transform/warnings/early_exit_hook.py"
+        ],
+        "risk": "Introdução de early exit interromper fluxo de dados",
+        "mitigation": "Adicionar logs e monitorar contagem de registros processados"
+      },
+      {
+        "id": "1.3b.3",
+        "title": "REFACTOR: unify early exit logic",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar a lógica de early exit para torná-la reutilizável e centralizada, garantindo que todos os testes permanecem verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Módulo de early exit reutilizável em diferentes pontos do pipeline",
+          "Todos os testes passam",
+          "Sem duplicação de código"
+        ],
+        "deliverables": [
+          "transform/warnings/early_exit_hook.py"
+        ],
+        "dependencies": ["1.3b.2"],
+        "branch": "feature/discovery-compat",
+        "files_touched": [
+          "transform/warnings/early_exit_hook.py"
+        ],
+        "risk": "Refatoração causar regressão em pipelines existentes",
+        "mitigation": "Executar ETL completo com dados de amostra antes de merge"
+      }
+    ],
+    "checklist_epic_level": [
+      "Todos os testes escritos antes da implementação",
+      "100% de cobertura de testes nos novos módulos",
+      "Ciclo red-green-refactor seguido consistentemente",
+      "Nenhuma regressão em testes existentes",
+      "Code review aprovado com foco em qualidade dos testes",
+      "Todas as tarefas analíticas concluídas com documentação anexada",
+      "Testes red escritos antes de qualquer implementação",
+      "Passagem pela fase green com implementações mínimas",
+      "Refatorações melhoram legibilidade sem quebrar testes",
+      "Cobertura de testes ≥ 90% nos módulos modificados",
+      "Compatibilidade verificada com contagem de chamadas de API"
+    ],
+    "automation_hooks": {
+      "create_labels": ["tdd", "logging", "compatibility", "discovery"],
+      "project_board": {
+        "name": "TDD Development Board",
+        "columns": ["Red (Failing Tests)", "Green (Implementation)", "Refactor", "Done"]
+      },
+      "default_branch": "refactor",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": ["pytest", "coverage", "black", "flake8"],
+      "issue_template_fields": [
+        "title", "description", "tdd_phase", "test_specs",
+        "acceptance_criteria", "deliverables", "dependencies",
+        "estimate_minutes", "risk", "mitigation"
+      ],
+      "milestone": "EPIC 1 - Discovery & Compatibility"
+    }
+  }
+}
