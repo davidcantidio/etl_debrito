@@ -1,9 +1,9 @@
 # SPRINT PLANNING: Sistema Interativo de Warnings
 
-## 📋 **Product Backlog - 93 Micro-Tasks TDAH-Optimized**
+## 📋 **Product Backlog - ~100 Micro-Tasks TDAH-Optimized (Estimativas Ajustadas)**
 
 ### **Metodologia SCRUM Adaptada para TDAH**
-- **Micro-tasks**: 5-10 minutos cada (93 total)
+- **Micro-tasks**: 8-15 minutos cada (~100 total, estimativa realista)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Visual progress**: Checkbox satisfaction constante
 - **Zero context switching**: 1 arquivo, 1 função por task
@@ -11,7 +11,7 @@
 
 ---
 
-## 🎯 **EPIC 1: DISCOVERY & COMPATIBILITY** *(3 dias, 30 micro-tasks)*
+## 🎯 **EPIC 1: DISCOVERY & COMPATIBILITY** *(5 dias, 25 micro-tasks realistas)*
 
 ### **Sprint Goal**
 > Entender completamente os sistemas existentes e identificar pontos seguros de integração sem quebrar otimizações críticas.
@@ -24,26 +24,26 @@
 
 ---
 
-#### **DIA 1: System Understanding (10 tasks × 5-8min)**
+#### **DIA 1: System Understanding (8 tasks × 10-15min)**
 
 **US001**: *Como desenvolvedor, quero entender os sistemas de logging existentes para integrar sem conflitos*
 
-1. [ ] **Task 1.1**: Read `logs/warning_suppressor.py` lines 1-30 *(5min)*
+1. [ ] **Task 1.1**: Read `logs/warning_suppressor.py` lines 1-30 *(10min)*
    - **AC**: Entender quais warnings são suprimidos automaticamente
    - **Test**: Executar sistema e confirmar warnings suprimidos
    - **Deliverable**: Lista de padrões de supressão ativos
 
-2. [ ] **Task 1.2**: Read `logs/warning_suppressor.py` lines 31-end *(5min)*
+2. [ ] **Task 1.2**: Read `logs/warning_suppressor.py` lines 31-end *(8min)*
    - **AC**: Mapear funções de supressão e configurações
    - **Test**: Identificar environment variables que controlam supressão
    - **Deliverable**: Documentar como desabilitar supressão temporariamente
 
-3. [ ] **Task 1.3**: Read `logs/production_mode.py` lines 1-50 *(7min)*
+3. [ ] **Task 1.3**: Read `logs/production_mode.py` lines 1-50 *(12min)*
    - **AC**: Entender níveis de logging (normal, quiet, minimal)
    - **Test**: Testar mudança de nível via environment variable
    - **Deliverable**: Mapa de comportamento por nível
 
-4. [ ] **Task 1.4**: Read `logs/production_mode.py` lines 51-100 *(7min)*
+4. [ ] **Task 1.4**: Read `logs/production_mode.py` lines 51-100 *(15min)*
    - **AC**: Identificar filtros automáticos em produção
    - **Test**: Simular production mode e observar diferenças
    - **Deliverable**: Lista de loggers silenciados em produção
@@ -73,31 +73,31 @@
    - **Test**: Comparar warnings visíveis em cada modo
    - **Deliverable**: Strategy para funcionar em ambos os ambientes
 
-10. [ ] **Task 1.10**: Create compatibility matrix (systems vs proposed changes) *(10min)*
+8. [ ] **Task 1.8**: Create compatibility matrix (systems vs proposed changes) *(20min)*
     - **AC**: Documentar impact de cada sistema no projeto
     - **Test**: Validar assessment com tests básicos
     - **Deliverable**: Risk/compatibility assessment completo
 
 ---
 
-#### **DIA 2: Warning System Analysis (10 tasks × 5-8min)**
+#### **DIA 2-3: Warning System Analysis (8 tasks × 10-20min)**
 
 **US002**: *Como desenvolvedor, quero mapear todos os pontos onde warnings são gerados para saber onde fazer hooks*
 
-11. [ ] **Task 2.1**: Read `validations.py` lines 1-50, find first log.warning() *(5min)*
-    - **AC**: Identificar primeiro warning específico
-    - **Test**: Trigger esse warning manualmente
-    - **Deliverable**: Context e trigger condition documentados
+9. [ ] **Task 2.1**: Analyze `transform/transform/utils/validations.py` structure *(15min)*
+    - **AC**: Entender organização geral do arquivo e suas funções
+    - **Test**: Executar validações e observar comportamento
+    - **Deliverable**: Mapa de funções de validação existentes
 
-12. [ ] **Task 2.2**: Read `validations.py` lines 51-100, find second log.warning() *(5min)*
-    - **AC**: Identificar segundo warning type
-    - **Test**: Criar cenário que triggere esse warning
-    - **Deliverable**: Test case reproduzível
+10. [ ] **Task 2.2**: Catalog ALL log.warning() calls in validations.py *(20min)*
+    - **AC**: Lista completa com contexto, linha e tipo de warning
+    - **Test**: Grep + verificação manual para garantir completude
+    - **Deliverable**: Warning inventory detalhado
 
-13. [ ] **Task 2.3**: List ALL log.warning() calls in validations.py *(8min)*
-    - **AC**: Catalog completo de todos os warnings
-    - **Test**: Grep para confirmar lista completa
-    - **Deliverable**: Warning inventory com line numbers
+11. [ ] **Task 2.3**: Test warning triggering and context analysis *(18min)*
+    - **AC**: Criar cenários que triggerem diferentes types de warning
+    - **Test**: Capturar contexto disponível para cada warning
+    - **Deliverable**: Test cases reproduzíveis com contexto mapeado
 
 14. [ ] **Task 2.4**: Read `schema_validator.py` warning calls *(6min)*
     - **AC**: Identificar warnings de schema validation

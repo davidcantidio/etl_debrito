@@ -42,7 +42,7 @@ graph LR
 
 ## 📦 **Componentes Detalhados**
 
-### **1. Warning Interceptor** (`src/warnings/interactive_handler.py`)
+### **1. Warning Interceptor** (`transform/warnings/interactive_handler.py`)
 
 #### **Responsabilidades**
 - Interceptar warnings antes da supressão automática
@@ -102,13 +102,13 @@ class WarningContext:
         """Format context for user display."""
 ```
 
-### **2. Decision Engine** (`src/warnings/warning_resolver.py`)
+### **2. Decision Engine** (`transform/warnings/warning_resolver.py`)
 
 #### **Responsabilidades**
 - Aplicar decisões do usuário aos dados atuais
 - Persistir decisões para reutilização futura
-- Atualizar BI_PARAMETRIZAÇÃO quando necessário
-- Invalidar caches apropriados
+- Atualizar classes distribuídas (Campanha, Anuncio, Plano) quando necessário
+- Invalidar caches multi-classe apropriados
 
 #### **Decision Types**
 ```python
@@ -148,10 +148,10 @@ class DecisionResolver:
             DecisionResult: What actions were performed
         """
         
-    def update_bi_parametrizacao(self, 
-                                value: str, 
-                                taxonomy_type: str) -> bool:
-        """Add new value to BI_PARAMETRIZAÇÃO sheet."""
+    def update_distributed_classes(self, 
+                                   data_type: str,
+                                   new_data: dict) -> bool:
+        """Update distributed data classes (Campanha, Anuncio, Plano)."""
         
     def create_substitution_rule(self, 
                                pattern: str, 
@@ -159,7 +159,7 @@ class DecisionResolver:
         """Create automatic substitution rule."""
 ```
 
-### **3. Rules Engine** (`src/warnings/rules_engine.py`)
+### **3. Rules Engine** (`transform/warnings/rules_engine.py`)
 
 #### **Responsabilidades**
 - Carregar regras persistidas na inicialização
@@ -206,7 +206,7 @@ class RulesEngine:
         """Add new rule and persist to database."""
 ```
 
-### **4. Database Layer** (`src/warnings/database.py`)
+### **4. Database Layer** (`transform/warnings/database.py`)
 
 #### **Schema SQLite**
 ```sql

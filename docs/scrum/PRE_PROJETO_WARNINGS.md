@@ -46,7 +46,7 @@
 
 ### **Componentes Principais**
 
-#### **1. WarningInterceptor** (`src/warnings/interactive_handler.py`)
+#### **1. WarningInterceptor** (`transform/warnings/interactive_handler.py`)
 ```python
 class WarningInterceptor:
     def intercept(self, warning_msg: str, context: dict) -> UserDecision:
@@ -55,7 +55,7 @@ class WarningInterceptor:
         # Return decision for application
 ```
 
-#### **2. Decision Engine** (`src/warnings/warning_resolver.py`)
+#### **2. Decision Engine** (`transform/warnings/warning_resolver.py`)
 ```python
 class DecisionResolver:
     def apply_decision(self, decision: UserDecision, context: dict):
@@ -64,7 +64,7 @@ class DecisionResolver:
         # Update BI_PARAMETRIZACAO if needed
 ```
 
-#### **3. Rules Engine** (`src/warnings/rules_engine.py`)
+#### **3. Rules Engine** (`transform/warnings/rules_engine.py`)
 ```python
 class RulesEngine:
     def auto_resolve(self, warning: Warning) -> Optional[Resolution]:
@@ -140,18 +140,24 @@ CREATE TABLE geografia (
 - Hook em 1 warning type, menu básico, decisão persistida
 - Compatibilidade total com sistemas existentes
 
-### **EPIC 3: BI_PARAMETRIZAÇÃO Integration** *(1 semana)*  
-**Objetivo**: Integração completa com sistema de taxonomia
-- 28 micro-tasks de 5-10 minutos cada
-- Adicionar valores ao BI_PARAMETRIZACAO
-- Sistema de regras automáticas
+### **EPIC 3: Classes Integration** *(2 semanas)*  
+**Objetivo**: Integração com nova arquitetura de classes distribuídas (Campanha, Anuncio, Plano)
+- 40 micro-tasks de 8-15 minutos cada
+- Sistema de cache invalidation multi-classe
+- Regras específicas por tipo de dados
+
+### **EPIC 4: Performance & Production** *(1 semana)*
+**Objetivo**: Garantir performance e preparar para produção
+- 15 micro-tasks de 10-20 minutos cada
+- Testes de regressão (manter 2 API calls)
+- Instrumentação e monitoramento
 
 ---
 
 ## 🧠 **Otimização TDAH**
 
 ### **Micro-Granularização**
-- **93 tasks total**: Cada 5-10 minutos máximo
+- **~100 tasks total**: Cada 8-15 minutos máximo (estimativa realista)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Zero context switching**: 1 arquivo, 1 função por task
 - **Frequent dopamine**: Progress visível a cada task

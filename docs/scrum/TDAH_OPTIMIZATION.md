@@ -34,7 +34,7 @@
 
 #### **Critérios de Qualidade**
 1. **Single Action**: Uma única ação bem definida
-2. **Timeboxed**: 5-10 minutos máximo (pomodoro-friendly)
+2. **Timeboxed**: 8-20 minutos máximo (estimativa realista, ainda pomodoro-friendly)
 3. **Testable**: Resultado verificável imediatamente
 4. **Atomic**: Pode ser feita independentemente
 5. **Clear Exit**: Critério inequívoco de "done"
@@ -49,7 +49,7 @@
 
 #### **✅ Task Bem Granularizada** (TDAH friendly)
 ```markdown  
-[ ] **Task 4.3**: Create WarningInterceptor empty class (3min)
+[ ] **Task 4.3**: Create WarningInterceptor empty class (8min)
     - **AC**: Class structure definida com __init__ method
     - **Test**: Can instantiate class without errors
     - **Deliverable**: Basic OOP structure ready for methods
@@ -83,8 +83,8 @@
    ├─ Sprint 3.3: Sheets Update              [░░░░░░░░░░] 0%
    └─ Sprint 3.4: Rule Creation              [░░░░░░░░░░] 0%
 
-📍 Current: Task 46/93 - Create simple menu options
-⏱️ Estimated: 8 minutes remaining
+📍 Current: Task 46/100 - Create simple menu options
+⏱️ Estimated: 12 minutes remaining
 🎯 Next: Handle 'i' option (return and continue)
 ```
 
