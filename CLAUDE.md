@@ -203,8 +203,24 @@ API_OPTIMIZATIONS = {
 4. **Hot-reload inteligente** - 16 modules→apenas alterados
 5. **Reorganização ETL** - Arquitetura profissional Extract/Transform/Load
 
+## 🚧 **Projetos em Desenvolvimento**
+
+### **Sistema Interativo de Warnings** *(Pre-Projeto)*
+**Status**: 📋 Planejamento completo documentado  
+**Objetivo**: Resolver warnings do ETL de forma interativa durante execução  
+**Benefício**: Eliminar edição manual de CSVs, persistir decisões  
+
+**Documentação completa disponível em:**
+- [`docs/scrum/PRE_PROJETO_WARNINGS.md`](docs/scrum/PRE_PROJETO_WARNINGS.md) - Visão geral do projeto
+- [`docs/scrum/SPRINT_PLANNING.md`](docs/scrum/SPRINT_PLANNING.md) - 93 micro-tasks detalhadas  
+- [`docs/scrum/ARQUITETURA_WARNINGS.md`](docs/scrum/ARQUITETURA_WARNINGS.md) - Especificação técnica
+- [`docs/scrum/TDAH_OPTIMIZATION.md`](docs/scrum/TDAH_OPTIMIZATION.md) - Estratégias TDAH específicas
+
+**Próximos passos**: Refinamento do planejamento → Início da implementação
+
 ---
 
 **Última atualização**: 2025-01-09  
 **Status**: Pipeline completamente funcional e otimizado  
-**Performance**: 93% redução em API calls, zero crashes
+**Performance**: 93% redução em API calls, zero crashes  
+**Projetos futuros**: Sistema de warnings interativo planejado e documentado
