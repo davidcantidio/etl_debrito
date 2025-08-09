@@ -669,6 +669,43 @@ class SkillProgression:
         }
 ```
 
+### **Quick Wins Strategies**
+```python
+class QuickWinsStrategy:
+    """TDAH-optimized implementation approach for immediate wins."""
+    
+    def implement_passive_interceptor(self):
+        """Start with zero-impact interceptor for confidence building."""
+        return {
+            "approach": "Log-only interceptor that records warnings without interrupting ETL",
+            "effort": "5 minutes",
+            "confidence": "High - no risk of breaking existing system",
+            "dopamine_reward": "Immediate - see warnings being captured",
+            "next_step": "Add simple menu without decision logic"
+        }
+    
+    def use_in_memory_decisions(self):
+        """Skip SQLite complexity initially."""
+        return {
+            "approach": "Dictionary in builtins for temporary decision storage",
+            "effort": "8 minutes", 
+            "confidence": "High - no database setup required",
+            "dopamine_reward": "See decisions being remembered within session",
+            "next_step": "Convert to SQLite when memory approach proves working"
+        }
+    
+    def leverage_existing_optimizations(self):
+        """Build on current code strengths."""
+        return {
+            "sheet_name_normalizer": "Use for display-friendly sheet names",
+            "apply_smart_column_mapping": "Leverage for intelligent suggestions", 
+            "existing_caches": "Use _last_taxo_report for context enrichment",
+            "effort": "12 minutes total",
+            "confidence": "Very High - reusing proven code",
+            "dopamine_reward": "Rich context immediately available"
+        }
+```
+
 ---
 
 **Documento criado**: 2025-01-09  

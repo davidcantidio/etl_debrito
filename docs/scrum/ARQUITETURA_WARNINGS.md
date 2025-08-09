@@ -289,6 +289,52 @@ class WarningDatabase:
         """Archive old decisions to keep database size manageable."""
 ```
 
+### **6. Performance Guard** (`transform/warnings/performance.py`)
+
+#### **Responsabilidades**
+- Monitorar número de chamadas API durante execução
+- Garantir que sistema de warnings não ultrapasse 2 API calls
+- Alertar proativamente sobre degradação de performance
+- Fornecer métricas para otimização contínua
+
+#### **Interface de Contagem**
+```python
+class PerformanceGuard:
+    def __init__(self):
+        self.api_calls = 0
+        self.max_calls = 2
+        self.call_log = []
+        
+    def before_api_call(self, operation: str) -> None:
+        """Track API call before execution."""
+        self.api_calls += 1
+        if self.api_calls > self.max_calls:
+            raise PerformanceViolation(
+                f"Exceeded {self.max_calls} API calls limit!"
+            )
+```
+
+### **7. Environment Integration** (`transform/warnings/environment.py`)
+
+#### **Production Safety**
+```python
+class EnvironmentConfig:
+    def __init__(self):
+        self.interactive_mode = os.getenv("INTERACTIVE_MODE", "false").lower() == "true"
+        self.production_mode = os.getenv("PRODUCTION_MODE", "false").lower() == "true"
+        
+    def should_intercept(self) -> bool:
+        """Determine if warnings should be intercepted."""
+        if self.production_mode:
+            return False
+        return self.interactive_mode
+        
+    def is_compatible_with_suppressor(self) -> bool:
+        """Check compatibility with warning_suppressor.py."""
+        from logs.warning_suppressor import is_suppression_active
+        return not is_suppression_active()
+```
+
 ---
 
 ## 🔗 **Pontos de Integração**
@@ -381,6 +427,48 @@ class PerformanceGuard:
         """Batch warning-related updates with existing batchUpdate."""
         # Add to existing consolidated write-back instead of separate call
         add_to_consolidated_payload(updates)
+```
+
+#### **Enhanced Context Integration**
+```python
+# Leverage existing optimizations for rich context
+class EnhancedContextBuilder:
+    def __init__(self):
+        self.sheet_normalizer = SheetNameNormalizer()
+        self.column_mapper = SmartColumnMapper()
+        
+    def build_warning_context(self, 
+                             warning_type: str,
+                             sheet_name: str, 
+                             problematic_value: Any) -> WarningContext:
+        """Build rich context using existing optimizations."""
+        # Use existing sheet name normalization
+        normalized_name = self.sheet_normalizer.normalize(sheet_name)
+        friendly_name = self.sheet_normalizer.get_display_name(sheet_name)
+        
+        # Leverage existing caches for context
+        context_data = {}
+        if hasattr(builtins, '_last_taxo_report'):
+            context_data['taxonomy'] = builtins._last_taxo_report
+        if hasattr(builtins, '_last_impressions_report'):
+            context_data['impressions'] = builtins._last_impressions_report
+            
+        # Use smart column mapping for suggestions
+        suggestions = []
+        if warning_type == "bi_parametrization":
+            suggestions = self.column_mapper.get_fuzzy_matches(
+                problematic_value, 
+                context_data.get('taxonomy', {})
+            )
+            
+        return WarningContext(
+            warning_type=warning_type,
+            sheet_name=friendly_name,
+            current_value=problematic_value,
+            suggested_values=suggestions,
+            context_data=context_data,
+            normalized_sheet_name=normalized_name
+        )
 ```
 
 ---

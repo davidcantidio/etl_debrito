@@ -1,13 +1,99 @@
 # SPRINT PLANNING: Sistema Interativo de Warnings
 
-## 📋 **Product Backlog - ~100 Micro-Tasks TDAH-Optimized (Estimativas Ajustadas)**
+## 📋 **Product Backlog - ~110 Micro-Tasks TDAH-Optimized (Refinado com Auditoria Crítica)**
 
 ### **Metodologia SCRUM Adaptada para TDAH**
-- **Micro-tasks**: 8-15 minutos cada (~100 total, estimativa realista)
+- **Micro-tasks**: 10-25 minutos cada (~110 total, incluindo pontos omitidos)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Visual progress**: Checkbox satisfaction constante
 - **Zero context switching**: 1 arquivo, 1 função por task
 - **Rollback individual**: Cada task pode ser desfeita
+
+---
+
+## 🎯 **EPIC 0: ENVIRONMENT & PRODUCTION SAFETY** *(2 dias, 12 micro-tasks críticas)*
+
+### **Sprint Goal**
+> Garantir compatibilidade total com ambiente de produção e sistemas críticos existentes antes de qualquer desenvolvimento.
+
+### **Definition of Done**
+- [ ] Environment variables configuradas e testadas
+- [ ] Compatibilidade com warning_suppressor.py verificada
+- [ ] Integration com production_mode.py funcionando
+- [ ] PerformanceGuard implementado e testado
+- [ ] Configuração .env funcional em dev e prod
+
+---
+
+#### **DIA 1: Production Safety & Environment (6 tasks × 15-20min)**
+
+**US000**: *Como desenvolvedor, quero garantir que o sistema funciona seguramente em produção*
+
+1. [ ] **Task 0.1**: Test current warning_suppressor.py behavior *(15min)*
+   - **AC**: Entender exatamente quais warnings são suprimidos
+   - **Test**: Executar ETL com/sem supressor e comparar outputs
+   - **Deliverable**: Lista de warnings afetados pelo suppressor
+
+2. [ ] **Task 0.2**: Test production_mode.py impact on logging *(18min)*
+   - **AC**: Mapear como production_mode afeta visibility de warnings
+   - **Test**: Testar todos os níveis (normal, quiet, minimal)
+   - **Deliverable**: Matriz de compatibilidade mode × warning type
+
+3. [ ] **Task 0.3**: Design environment-based configuration *(20min)*
+   - **AC**: Criar schema de environment variables necessárias
+   - **Test**: Definir INTERACTIVE_MODE, PRODUCTION_MODE flags
+   - **Deliverable**: Environment variables documentation
+
+4. [ ] **Task 0.4**: Implement basic PerformanceGuard class *(20min)*
+   - **AC**: Classe que conta chamadas API e alerta se > 2
+   - **Test**: Instanciar e testar contagem manual
+   - **Deliverable**: PerformanceGuard.py funcional
+
+5. [ ] **Task 0.5**: Test PerformanceGuard integration *(15min)*
+   - **AC**: Integrar PerformanceGuard no SheetsFetcher
+   - **Test**: Executar ETL e verificar contagem correta
+   - **Deliverable**: Contagem de API calls funcionando
+
+6. [ ] **Task 0.6**: Create .env configuration system *(20min)*
+   - **AC**: Sistema para ler configurações de .env file
+   - **Test**: Testar diferentes combinações de flags
+   - **Deliverable**: Configuration loader funcional
+
+---
+
+#### **DIA 2: System Integration Safety (6 tasks × 10-20min)**
+
+**US001**: *Como desenvolvedor, quero verificar todos os pontos de compatibilidade*
+
+7. [ ] **Task 0.7**: Check if early_exit_checker.py exists *(10min)*
+   - **AC**: Verificar se arquivo existe ou criar nota de ausência
+   - **Test**: Procurar no codebase atual
+   - **Deliverable**: Status report do módulo
+
+8. [ ] **Task 0.8**: Check if schema_validator.py exists *(10min)*
+   - **AC**: Verificar se arquivo existe ou criar nota de ausência  
+   - **Test**: Procurar no codebase atual
+   - **Deliverable**: Status report do módulo
+
+9. [ ] **Task 0.9**: Test smart_reload.py compatibility *(15min)*
+   - **AC**: Verificar se smart_reload não conflita com warnings
+   - **Test**: Executar reload durante warning generation
+   - **Deliverable**: Compatibility assessment
+
+10. [ ] **Task 0.10**: Design production mode detection *(18min)*
+    - **AC**: Lógica para detectar automaticamente production environment
+    - **Test**: Testar detection com different environment setups
+    - **Deliverable**: Production detection logic
+
+11. [ ] **Task 0.11**: Create compatibility matrix *(20min)*
+    - **AC**: Matriz completa system × environment × behavior
+    - **Test**: Validar cada combinação crítica
+    - **Deliverable**: Comprehensive compatibility documentation
+
+12. [ ] **Task 0.12**: Test complete safety configuration *(15min)*
+    - **AC**: Configuração final funcionando em prod/dev/test
+    - **Test**: Deploy test em cada environment  
+    - **Deliverable**: Working configuration para próximo epic
 
 ---
 

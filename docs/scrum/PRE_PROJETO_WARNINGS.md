@@ -128,16 +128,25 @@ CREATE TABLE geografia (
 
 ## 🎯 **Épicos e Timeline**
 
-### **EPIC 1: Discovery & Compatibility** *(3 dias)*
+### **EPIC 0: Environment & Production Safety** *(2 dias)*
+**Objetivo**: Garantir compatibilidade total com ambiente de produção e sistemas críticos
+- 12 micro-tasks de 10-20 minutos cada
+- Configuração via environment variables (INTERACTIVE_MODE, PRODUCTION_MODE)
+- Integração com warning_suppressor.py e production_mode.py
+- PerformanceGuard para garantir 2 API calls
+
+### **EPIC 1: Discovery & Compatibility** *(5 dias)*
 **Objetivo**: Entender sistemas existentes e pontos de integração
-- 30 micro-tasks de 5-8 minutos cada
+- 25 micro-tasks de 10-15 minutos cada
 - Análise de compatibilidade com sistemas críticos
 - Identificação de hooks seguros
+- Verificação de módulos assumidos (early_exit_checker, schema_validator)
 
-### **EPIC 2: Minimal Working Prototype** *(1 semana)*
-**Objetivo**: Sistema básico funcionando sem quebrar nada
-- 35 micro-tasks de 5-10 minutos cada  
-- Hook em 1 warning type, menu básico, decisão persistida
+### **EPIC 2: Quick Wins & Minimal Prototype** *(1.5 semanas)*
+**Objetivo**: Implementar quick wins estratégicos e protótipo básico
+- 30 micro-tasks de 10-20 minutos cada  
+- Interceptor passivo (log-only), decisões em memória, rule engine mínimo
+- PerformanceGuard, configuração .env, context básico
 - Compatibilidade total com sistemas existentes
 
 ### **EPIC 3: Classes Integration** *(2 semanas)*  
@@ -146,18 +155,26 @@ CREATE TABLE geografia (
 - Sistema de cache invalidation multi-classe
 - Regras específicas por tipo de dados
 
-### **EPIC 4: Performance & Production** *(1 semana)*
+### **EPIC 4: Enhanced Context & Integration** *(1 semana)*
+**Objetivo**: Aproveitar otimizações existentes para contexto rico
+- 20 micro-tasks de 15-25 minutos cada
+- Integração com sheet_name_normalizer, apply_smart_column_mapping
+- Uso de caches existentes (_last_taxo_report, _last_impressions_report)
+- Context enhancement com dados BI e sugestões inteligentes
+
+### **EPIC 5: Performance & Production** *(1 semana)*
 **Objetivo**: Garantir performance e preparar para produção
 - 15 micro-tasks de 10-20 minutos cada
 - Testes de regressão (manter 2 API calls)
 - Instrumentação e monitoramento
+- Rastreabilidade de micro-tasks e progresso TDAH
 
 ---
 
 ## 🧠 **Otimização TDAH**
 
 ### **Micro-Granularização**
-- **~100 tasks total**: Cada 8-15 minutos máximo (estimativa realista)
+- **~110 tasks total**: Cada 10-25 minutos máximo (estimativa realista com refinamentos)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Zero context switching**: 1 arquivo, 1 função por task
 - **Frequent dopamine**: Progress visível a cada task
