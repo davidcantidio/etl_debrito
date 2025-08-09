@@ -1,0 +1,172 @@
+{
+  "epic": {
+    "id": "X.Y",
+    "name": "[Nome do Épico]",
+    "summary": "[Resumo focado em comportamentos testáveis e valor de negócio]",
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "goals": [
+      "[Goal 1: Comportamento específico verificável via teste]",
+      "[Goal 2: Funcionalidade com critério de aceitação claro]",
+      "[Goal 3: Performance ou qualidade mensurável]"
+    ],
+    "definition_of_done": [
+      "Todos os testes escritos antes da implementação",
+      "100% de cobertura de testes nos novos módulos",
+      "Ciclo red-green-refactor seguido consistentemente",
+      "[Critério específico do épico]",
+      "[Outro critério mensurável]"
+    ],
+    "duration": "[X dias]",
+    "labels": ["tdd", "feature", "specific-domain"],
+    "tasks": [
+      {
+        "id": "X.Y.1",
+        "title": "TEST: [comportamento específico]",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 2,
+        "description": "Escrever teste que verifica: [comportamento específico]",
+        "test_specs": [
+          "should_[specific_behavior]_when_[condition]",
+          "should_raise_[exception]_when_[invalid_input]"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta e informativa",
+          "Mensagem de erro é clara e específica",
+          "Teste cobre caso edge identificado"
+        ],
+        "deliverables": [
+          "tests/test_[module].py::[test_name]"
+        ],
+        "dependencies": [],
+        "branch": "feature/[epic-name]",
+        "files_touched": [
+          "tests/test_[module].py"
+        ],
+        "risk": "[Risco específico do teste]",
+        "mitigation": "[Como mitigar o risco]"
+      },
+      {
+        "id": "X.Y.2",
+        "title": "IMPL: [funcionalidade mínima]",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 3,
+        "description": "Implementar código mínimo para passar o teste [X.Y.1]",
+        "test_specs": [
+          "should_[specific_behavior]_when_[condition]"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase RED agora passa",
+          "Nenhum teste anterior quebra",
+          "Implementação é mínima e focada"
+        ],
+        "deliverables": [
+          "tests/test_[module].py::[test_name]",
+          "[module_path]/[module].py"
+        ],
+        "dependencies": ["X.Y.1"],
+        "branch": "feature/[epic-name]",
+        "files_touched": [
+          "[module_path]/[module].py"
+        ],
+        "risk": "[Risco da implementação]",
+        "mitigation": "[Como mitigar]"
+      },
+      {
+        "id": "X.Y.3",
+        "title": "REFACTOR: [melhoria de design]",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 3,
+        "description": "Melhorar design/estrutura mantendo todos os testes verdes",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Todos os testes continuam verdes",
+          "Código mais limpo e maintível",
+          "Complexidade ciclomática reduzida ou mantida",
+          "Não há duplicação de código"
+        ],
+        "deliverables": [
+          "refactored_code_with_green_tests"
+        ],
+        "dependencies": ["X.Y.2"],
+        "branch": "feature/[epic-name]",
+        "files_touched": [
+          "[module_path]/[module].py"
+        ],
+        "risk": "Quebrar funcionalidade existente durante refatoração",
+        "mitigation": "Executar todos os testes antes e depois da refatoração"
+      }
+    ],
+    "checklist_epic_level": [
+      "Todos os testes escritos antes da implementação",
+      "100% de cobertura de testes nos novos módulos",
+      "Ciclo red-green-refactor seguido consistentemente",
+      "Nenhuma regressão em testes existentes",
+      "Code review aprovado com foco em qualidade dos testes",
+      "Documentação de comportamentos atualizada",
+      "CI/CD pipeline passando com novos testes"
+    ],
+    "automation_hooks": {
+      "create_labels": ["tdd", "feature", "test-driven"],
+      "project_board": {
+        "name": "TDD Development Board",
+        "columns": ["Red (Failing Tests)", "Green (Implementation)", "Refactor", "Done"]
+      },
+      "default_branch": "main",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": ["pytest", "coverage", "black", "flake8"],
+      "issue_template_fields": [
+        "title", "description", "tdd_phase", "test_specs", 
+        "acceptance_criteria", "deliverables", "dependencies", 
+        "estimate_minutes", "risk", "mitigation"
+      ],
+      "milestone": "EPIC [X.Y] - [Epic Name]"
+    },
+    "tdd_guidelines": {
+      "red_phase_rules": [
+        "Escreva o teste mais simples possível que falhe",
+        "Teste deve expressar claramente o comportamento desejado",
+        "Use nomes de teste descritivos (should_do_something_when_condition)",
+        "Evite lógica complexa nos próprios testes"
+      ],
+      "green_phase_rules": [
+        "Escreva o código mínimo para passar o teste",
+        "Não se preocupe com elegância nesta fase",
+        "Não implemente funcionalidades não testadas",
+        "Execute TODOS os testes para garantir não-regressão"
+      ],
+      "refactor_phase_rules": [
+        "Melhore apenas design, não funcionalidade",
+        "Mantenha todos os testes verdes durante refatoração",
+        "Elimine duplicação e melhore clareza",
+        "Considere princípios SOLID e padrões de design"
+      ]
+    },
+    "quality_gates": {
+      "test_coverage_minimum": 90,
+      "cyclomatic_complexity_max": 10,
+      "test_execution_time_max": "30s",
+      "code_duplication_max": "5%"
+    }
+  },
+  "_metadata": {
+    "template_version": "1.0",
+    "created_date": "2024-01-09",
+    "description": "Template para criação de épicos seguindo metodologia TDD",
+    "usage_instructions": [
+      "1. Substitua todos os placeholders [X.Y] por IDs reais",
+      "2. Defina comportamentos específicos e testáveis nos goals",
+      "3. Crie tasks seguindo sempre o ciclo red-green-refactor",
+      "4. Mantenha estimate_minutes baixo (5-15 min por micro-task)",
+      "5. Priorize test_specs claros e específicos",
+      "6. Use branches de feature por épico",
+      "7. Configure automation_hooks conforme ambiente do projeto"
+    ]
+  }
+}
