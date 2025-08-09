@@ -35,16 +35,16 @@ from typing import Iterable
 import pandas as pd
 from dotenv import load_dotenv
 
-from extract import read_df
-from transform.utils.campos_calculados import (
+from transform.extract import read_df
+from transform.transform.utils.campos_calculados import (
     DEFAULT_DEST_COLUMNS,
     add_key_creative,
     dedupe_by_key_creative,
     make_id_ponto_de_controle,
 )
-from transform.utils.datas import concat_period, normalize_date_to_str_DD_M_YYYY
-from transform.utils.normalize import normalize_vehicle
-from transform.utils.write_dataframe_to_sheet import write_dataframe_to_sheet
+from transform.transform.utils.datas import concat_period, normalize_date_to_str_DD_M_YYYY
+from transform.transform.utils.normalize import normalize_vehicle
+from transform.transform.utils.write_dataframe_to_sheet import write_dataframe_to_sheet
 
 # Importa MIN_DATE da configuração central
 from config import MIN_DATE

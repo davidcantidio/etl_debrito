@@ -59,8 +59,8 @@ from IPython.display import display
 import time
 
 # Imports consolidados para evitar repetição nas células seguintes
-from transform.transform_pipeline import BIParamLookup
-from transform.utils.validations import validate_consistent_dates_across_models
+from transform.transform.transform_pipeline import BIParamLookup
+from transform.transform.utils.validations import validate_consistent_dates_across_models
 
 # 🚀 Cache global para worksheets para reduzir chamadas API
 _WORKSHEETS_CACHE = {}
@@ -140,7 +140,7 @@ def consolidated_write_back(changes_list: list, creds_path: str, spreadsheet_id:
             
             if change_type == "origin":
                 # Processar mudanças de origem
-                from load.origin_writer import prepare_origin_payload
+                from transform.load.origin_writer import prepare_origin_payload
                 payload = prepare_origin_payload(
                     df_raw=change["df_raw"],
                     df_ok=change["df_ok"],
@@ -154,7 +154,7 @@ def consolidated_write_back(changes_list: list, creds_path: str, spreadsheet_id:
                     
             elif change_type == "dest":
                 # Processar mudanças de destino
-                from load.dest_writer import prepare_dest_payload
+                from transform.load.dest_writer import prepare_dest_payload
                 payload = prepare_dest_payload(
                     df_model=change["df_model"],
                     sheet_name=change["sheet_name"],
@@ -218,7 +218,7 @@ def get_cached_worksheets(gc, spreadsheet_id: str):
     🚀 ULTRA-OTIMIZADA: Get worksheets using consolidated metadata (1 API call)
     """
     try:
-        from transform.utils.metadata_optimizer import get_consolidated_metadata
+        from transform.transform.utils.metadata_optimizer import get_consolidated_metadata
         
         # Get metadata using single API call
         metadata = get_consolidated_metadata(
@@ -272,7 +272,7 @@ def get_sheet_statistics(creds_path: str, spreadsheet_id: str, top_n: int = 10) 
     """
     try:
         # Import the optimized metadata fetcher
-        from transform.utils.metadata_optimizer import get_sheet_statistics_optimized
+        from transform.transform.utils.metadata_optimizer import get_sheet_statistics_optimized
         
         stats = get_sheet_statistics_optimized(spreadsheet_id, creds_path, top_n)
         
@@ -296,7 +296,7 @@ def add_rate_limiting(delay_seconds: float = 0.1, force: bool = False):
     if not force and delay_seconds <= 0.01:
         return
     
-    from transform.utils.smart_rate_limiting import smart_rate_limit
+    from transform.transform.utils.smart_rate_limiting import smart_rate_limit
     
     # Use smart rate limiting with connection pooling awareness
     smart_rate_limit(
@@ -411,14 +411,14 @@ import os
 import importlib
 
 # 🚀 SMART HOT-RELOAD: Only reload changed modules
-from transform.utils.smart_reload import conditional_hot_reload
+from transform.transform.utils.smart_reload import conditional_hot_reload
 conditional_hot_reload()
 
 # Standard imports (will be reloaded only if changed)
-import extract.sheets_fetcher
-import transform.transform_pipeline  
-import load.origin_writer
-import load.dest_writer
+import transform.extract.sheets_fetcher
+import transform.transform.transform_pipeline  
+import transform.load.origin_writer
+import transform.load.dest_writer
 
 
 # In[7]:
@@ -435,15 +435,15 @@ from logs.logging_setup import get_logger
 
 logger = get_logger(__name__)
 
-from extract.sheets_fetcher import SheetsFetcher
-from transform.transform_pipeline import TreatPipeline
-from transform.utils.renomeacoes import (
+from transform.extract.sheets_fetcher import SheetsFetcher
+from transform.transform.transform_pipeline import TreatPipeline
+from transform.transform.utils.renomeacoes import (
     renomeacao_geral,
     renomear_colunas_origem_para_modelo,
 )
-from transform.utils.campos_calculados import calcular_engajamento_total, gerar_id
-from transform.utils.schema_validator import validate_schema_early
-from transform.utils.date_normalizer import normalize_campaign_dates
+from transform.transform.utils.campos_calculados import calcular_engajamento_total, gerar_id
+from transform.transform.utils.schema_validator import validate_schema_early
+from transform.transform.utils.date_normalizer import normalize_campaign_dates
 
 # Instância única do fetcher (retry/backoff/cache interno)
 fetcher = SheetsFetcher(
@@ -507,7 +507,7 @@ def run_etl_for_sheet(
 
     if not is_pinterest_dim and wb_origin_flag:
         # Preparar dados para write-back origem (sem executar)
-        from load.origin_writer import prepare_origin_changes
+        from transform.load.origin_writer import prepare_origin_changes
         origin_changes = {
             "sheet_name": sheet,
             "df_raw": df_raw,
@@ -702,7 +702,7 @@ from tqdm.auto import tqdm
 from googleapiclient.errors import HttpError
 
 from logs.logging_setup import get_logger
-from load.dest_writer import prefetch_meta, DESTINATION_SHEETS, _EXISTING_IDS
+from transform.load.dest_writer import prefetch_meta, DESTINATION_SHEETS, _EXISTING_IDS
 
 logger = get_logger(__name__)
 
@@ -816,7 +816,7 @@ def process_sheets(
                 # 🆕 Verificar quantos registros são novos
                 df_model = change_data["df_model"]
                 if "ID" in df_model.columns:
-                    from load.dest_writer import _infer_data_type, DESTINATION_SHEETS
+                    from transform.load.dest_writer import _infer_data_type, DESTINATION_SHEETS
                     data_type = _infer_data_type(sheet)
                     dest_sheet_name = DESTINATION_SHEETS.get(data_type)
                     if dest_sheet_name and dest_sheet_name in _EXISTING_IDS:

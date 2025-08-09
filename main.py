@@ -1,14 +1,16 @@
 # main.py
 
+import argparse
 import os
+import sys
+from typing import List, Optional
 
 import yaml
 
-from extract.sheets_fetcher import SheetsFetcher
-from transform.meta import treat_meta  # Exemplo de função de treat
-
-# from transform.tiktok import treat_tiktok
-# etc.
+from transform.extract.sheets_fetcher import SheetsFetcher
+from transform.transform.platforms.meta import transform_meta
+from transform.transform.platforms.linkedin import transform_linkedin  
+from transform.transform.platforms.tiktok import transform_tiktok
 
 # 1) Carrega configuração de abas
 with open("sheets_config.yaml", "r") as f:
@@ -17,25 +19,73 @@ with open("sheets_config.yaml", "r") as f:
 # 2) Instancia o fetcher (uma só vez)
 fetcher = SheetsFetcher(
     creds_path=os.getenv("GOOGLE_CREDS_PATH", "creds.json"),
-    spreadsheet_id=os.getenv("SPREADSHEET_ID"),
+    spreadsheet_id=os.getenv("SPREADSHEET_ID", "1jPFLqg7HIDZoxCwQacMpCS_bCKfRsnisvEniiHLljiE"),
 )
 
 
+def run_platform_pipeline(platform: str, fetcher: SheetsFetcher):
+    """Execute pipeline para uma plataforma específica."""
+    if platform not in SHEETS_TO_FETCH:
+        print(f"❌ Plataforma '{platform}' não encontrada em sheets_config.yaml")
+        return
+    
+    print(f"🚀 Executando pipeline para plataforma: {platform}")
+    
+    # Extração das abas da plataforma
+    sheets_for_platform = SHEETS_TO_FETCH[platform]
+    print(f"📥 Extraindo abas: {sheets_for_platform}")
+    
+    # Aqui você implementaria a lógica específica da plataforma
+    # Por enquanto, apenas demonstrativo
+    try:
+        dfs = fetcher.get(sheets_for_platform)
+        print(f"✅ {len(dfs)} abas extraídas com sucesso para {platform}")
+        
+        # Aplicar transformação específica da plataforma
+        if platform == "meta":
+            for sheet_name, df in dfs.items():
+                df_transformed = transform_meta(df)
+                print(f"🔄 Transformação Meta aplicada para {sheet_name}")
+        elif platform == "linkedin":
+            for sheet_name, df in dfs.items():
+                df_transformed = transform_linkedin(df)
+                print(f"🔄 Transformação LinkedIn aplicada para {sheet_name}")
+        elif platform == "tiktok":
+            for sheet_name, df in dfs.items():
+                df_transformed = transform_tiktok(df)
+                print(f"🔄 Transformação TikTok aplicada para {sheet_name}")
+        
+        print(f"✅ Pipeline {platform} concluído com sucesso")
+        
+    except Exception as e:
+        print(f"❌ Erro no pipeline {platform}: {str(e)}")
+
+
+def parse_platforms(platform_arg: str) -> List[str]:
+    """Parse do argumento --platform para lista de plataformas."""
+    if platform_arg == "all":
+        return list(SHEETS_TO_FETCH.keys())
+    return [p.strip() for p in platform_arg.split(",")]
+
+
 def main():
-    # 3) Extração
-    dfs_meta = fetcher.get(SHEETS_TO_FETCH["meta"])  # lista de abas meta
-    dfs_tiktok = fetcher.get(SHEETS_TO_FETCH["tiktok"])  # lista de abas tiktok
-    # ...
-
-    # 4) Tratamento
-    df_meta_geral = treat_meta(dfs_meta)  # implementado em treat/meta.py
-    # df_tiktok_geral = treat_tiktok(dfs_tiktok)
-    # ...
-
-    # 5) Load (exemplo)
-    # from load.common import write_to_sheet
-    # write_to_sheet(df_meta_geral, "modeloGeral")
-    # ...
+    parser = argparse.ArgumentParser(description="ETL Debrito - Pipeline por plataforma")
+    parser.add_argument(
+        "--platform",
+        default="all", 
+        help="Plataforma(s) para executar: meta,linkedin,tiktok ou 'all' (default: all)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Parse das plataformas solicitadas
+    platforms = parse_platforms(args.platform)
+    
+    print(f"🎯 Executando ETL para plataformas: {', '.join(platforms)}")
+    
+    # Executa pipeline para cada plataforma solicitada
+    for platform in platforms:
+        run_platform_pipeline(platform, fetcher)
 
 
 if __name__ == "__main__":

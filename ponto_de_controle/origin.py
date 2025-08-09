@@ -6,8 +6,8 @@ import logging
 
 import pandas as pd
 
-from extract import read_df
-from transform.utils.campos_calculados import add_key_creative, dedupe_by_key_creative
+from transform.extract import read_df
+from transform.transform.utils.campos_calculados import add_key_creative, dedupe_by_key_creative
 from ponto_de_controle.constants import ORIGIN_SHEET_ID, ORIGIN_TAB, MIN_DATE
 from ponto_de_controle.debug import debug_shape
 

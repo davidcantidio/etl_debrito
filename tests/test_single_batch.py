@@ -9,9 +9,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from googleapiclient import discovery
 
-import transform.transform_pipeline as pipeline
-from load import dest_writer
-from transform.transform_pipeline import TreatPipeline, execute_pipeline
+import transform.transform.transform_pipeline as pipeline
+from transform.load import dest_writer
+from transform.transform.transform_pipeline import TreatPipeline, execute_pipeline
 
 
 class DummyFetcher:

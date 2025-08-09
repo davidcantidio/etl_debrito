@@ -1,11 +1,11 @@
-from extract import read_df
+from transform.extract import read_df
 import pandas as pd
 import logging
 from typing import Iterable
 
 from ponto_de_controle.constants import DEST_SHEET_ID, DEST_TAB, HEAD_ROW_DEST
 from ponto_de_controle.constants import DEST_COLUMNS
-from transform.utils.campos_calculados import make_id_ponto_de_controle
+from transform.transform.utils.campos_calculados import make_id_ponto_de_controle
 
 logger = logging.getLogger(__name__)
 

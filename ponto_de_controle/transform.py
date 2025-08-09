@@ -1,9 +1,9 @@
 from typing import Iterable
 import pandas as pd
 
-from transform.utils.datas import concat_period, normalize_date_to_str_DD_M_YYYY
-from transform.utils.normalize import normalize_vehicle
-from transform.utils.campos_calculados import make_id_ponto_de_controle
+from transform.transform.utils.datas import concat_period, normalize_date_to_str_DD_M_YYYY
+from transform.transform.utils.normalize import normalize_vehicle
+from transform.transform.utils.campos_calculados import make_id_ponto_de_controle
 
 from ponto_de_controle.constants import HEAD_ROW_DEST, DEST_TAB  # se precisar em debug
 from ponto_de_controle.constants import GOOGLE_CREDS_PATH  # idem
