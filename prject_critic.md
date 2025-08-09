@@ -1,111 +1,171 @@
-Análise crítica entre pré‑projeto e implementação atual
-Nota: os documentos do pré‑projeto mencionados (_PRE_PROJETO_WARNINGS.md_, _SPRINT_PLANNING.md_, _ARQUITETURA_WARNINGS.md_, _TDAH_OPTIMIZATION.md_) não estavam presentes no repositório davidcantidio/etl_debrito. Assim, a análise abaixo parte de pressupostos típicos de um pré‑projeto de ETL e compara com o código existente nas pastas extract/, treat/ (equivalente a transform/) e load/. As conclusões e recomendações baseiam‑se na leitura do código e podem precisar de ajuste quando os documentos forem disponibilizados.
+Análise crítica – branch refactor
+Esta análise compara a documentação do pré‑projeto (arquivos docs/scrum no ramo refactor) com a implementação atual do ETL no diretório transform/ (também no ramo refactor). Ela busca identificar lacunas de funcionalidade, inconsistências arquiteturais, oportunidades não exploradas e pontos de integração para um sistema de warnings interativo otimizado para TDAH.
 
 ✅ Alinhamentos entre pré‑projeto e código
-Aspecto	Evidência no código	Alinhamento presumido
-Autenticação e economia de chamadas	A classe SheetsFetcher inicializa um único cliente para a Google Sheets API e utiliza batchGet para ler várias abas de uma só vez; resultados são cacheados por TTL para evitar repetidas leituras
+Aspecto documentado	Evidências no código	Comentário
+Preservar performance (2 API calls)	O pré‑projeto deixa claro que o novo sistema não deve degradar a arquitetura ultra‑otimizada (apenas duas chamadas à API)
+GitHub
+. O código atual mantém essa característica: o SheetsFetcher reúne todas as abas em um batchGet e usa cache TTL
+GitHub
+, e a função execute_pipeline lê todas as abas de origem e destino em uma única chamada antes de iniciar o loop
+GitHub
+.	Convergência: a base do ETL continua otimizada para poucas chamadas.
+Sistema atual deve funcionar se o modo interativo falhar	A documentação propõe uma arquitetura com degradação graciosa: se a interatividade falhar, o ETL deve seguir registrando warnings nos logs
+GitHub
+. O código atual grava warnings usando log.warning() sem interromper o fluxo
+GitHub
+, o que serve como fallback.	Coerência: o código já opera nesse modo passivo; a proposta é adicionar uma camada opcional de interatividade sem alterá‑lo.
+Uso de caches e TTL	O pré‑projeto lista SheetsFetcher, BIParamLookup e outros caches como sistemas a preservar
+GitHub
+. Na implementação, SheetsFetcher mantém cache TTL de 300 s para leituras e BIParamLookup (não mostrado aqui) possui cache de 10 min.	As otimizações documentadas estão presentes e devem ser mantidas.
+Múltiplos sistemas de validação	A documentação identifica que já existem funções de validação e supressão de warnings e que elas podem conflitar com o novo sistema
+GitHub
+. O código possui inúmeros log.warning() em validations.py para colunas vazias, inconsistências de taxonomia e datas
 GitHub
 GitHub
-. A pipeline reutiliza este fetcher único através de builtins.fetcher
+.	O pré‑projeto considera corretamente esses pontos de geração de warnings.
+Necessidade de micro‑tasks	A proposta de 93 micro‑tasks de 5‑10 minutos visa reduzir a sobrecarga cognitiva para pessoas com TDAH, com feedback imediato e granularização
 GitHub
-.	O pré‑projeto parece exigir um sistema de 2 API calls ou acesso ultra‑otimizado; o código já realiza apenas uma chamada para leitura de todas as abas (“batchGet”) e outra chamada para gravação final, atendendo a esse requisito.
-Processo ETL por aba	A classe TreatPipeline (nome diferente de transform_pipeline mencionado) define um fluxo claro: pré‑processamento, validações, enriquecimento com BI, conversão de datas, atribuição de veículo, transformação específica de plataforma, substituição de objetivos, validações de agregados e gravação back‑to‑source
+. Embora o código não reflita isso, a estrutura do pre‑projeto prova que as tarefas são bem definidas.	Alinhamento parcial: o backlog existe na documentação, mas falta rastreamento no código.
+Compatibilidade com múltiplos sistemas	A visão arquitetural enfatiza um layer de compatibilidade que não quebre integrações com 10+ sistemas e preserve filtros de produção
 GitHub
-GitHub
-.	O pré‑projeto divide o processo em micro‑tarefas; o código reflete um pipeline modular com etapas bem definidas, correspondendo à descrição macro que se esperaria.
-Validações e sistema de warnings	Há diversas funções de validação em treat/utils/validations.py: verificação de colunas obrigatórias e geração de warnings para vazios
-GitHub
-, comparação das colunas lidas com as esperadas levantando exceção em caso de discrepância
-GitHub
-, validação de utm_content contra parametrização BI com RuntimeError para utms não mapeados
-GitHub
-, e verificação de consistência de taxonomia e datas
-GitHub
-GitHub
-. A pipeline registra esses reports em atributos (_last_taxo_report, _last_impressions_report) e os devolve junto com a saída
-GitHub
-.	A documentação de pré‑projeto parece exigir um sistema de warnings; o código atual já dispõe de validações robustas e logging de inconsistências, o que está alinhado com a exigência de monitoramento e qualidade de dados.
-Escrita otimizada para destino	O módulo load/dest_writer.py pré‑carrega cabeçalhos e IDs de todas as abas‑modelo em uma única operação (prefetch_meta)
-GitHub
- e usa caches globais para evitar novas leituras durante a escrita. Só grava registros com “ID” inexistente, deduplicando dados
-GitHub
-.	O pré‑projeto provavelmente menciona otimizações para escrita; o código atende, realizando deduplicação, chunking e minimizando chamadas à API.
-Tratamento especial para abas demográficas do Pinterest	A pipeline detecta abas pinterestIdade, pinterestGenero e pinterestRegiao e executa um fluxo próprio: grava correções na própria aba, recupera o pinterestGeral já enriquecido de um cache global, faz merge demográfico e retorna ao pipeline geral
-GitHub
-.	Caso o pré‑projeto especifique tratamento diferenciado para dados demográficos, o código está alinhado, contemplando merge e caching entre abas.
+. O código já possui módulos como smart_reload.py e warning_suppressor.py (citados no backlog) e modulariza as operações de leitura, transformação e gravação, o que facilita a integração.	A modularização do ETL facilita a inserção de hooks compatíveis.
 
-❌ Gaps e funcionalidades faltantes
-Gap ou funcionalidade ausente	Evidência / justificativa	Impacto
-Documentação de 93 micro‑tasks	A pipeline implementa um fluxo completo, mas não há rastreamento explícito de cada micro‑tarefa conforme um SPRINT_PLANNING.md. Falta um mecanismo de mapeamento de cada etapa do código às micro‑tarefas do pré‑projeto, o que pode prejudicar acompanhamento de execução e cobertura de requisitos.	Médio: dificulta auditoria e acompanhamento de tarefas planejadas.
-Especificações de arquitetura e warnings do pré‑projeto	Sem acesso a ARQUITETURA_WARNINGS.md e PRE_PROJETO_WARNINGS.md, não é possível verificar se todas as verificações documentadas estão implementadas. Por exemplo, pode haver necessidades de avisos específicos para colunas de GA, ou integrações com outras APIs que não estão no código.	Potencialmente alto se o pré‑projeto listar requisitos adicionais.
-Estratégias “TDAH optimization”	Não há referência explícita a “TDAH” no código. Supondo que o documento se refira a estratégias para facilitar uso por pessoas com Transtorno de Déficit de Atenção/Hiperatividade (por ex., execuções rápidas, feedback imediato), o código não implementa UI, dashboards ou mecanismos de notificação; apenas escreve logs.	Alto se o pré‑projeto planeja interfaces ou interações específicas para acessibilidade TDAH.
-Controle de versão das warnings	O código registra warnings via logging, mas não há um sistema para consolidar e persistir relatórios de warnings por execução, nem para referenciar o histórico.	Médio: importante para auditoria e acompanhamento de qualidade de dados ao longo do tempo.
-Integração com outros serviços	O pré‑projeto pode assumir integração com plataformas além do Google Sheets (ex.: Slack, email para alertas, Data Studio). O código atual é restrito a planilhas; não há módulos para notificações ou APIs externas.	Variável conforme requisitos.
+❌ Gaps de funcionalidade
+Gap / funcionalidade assumida	Evidências de ausência	Impacto
+Interceptação interativa de warnings	A documentação define classes WarningInterceptor, DecisionResolver e RulesEngine com métodos para interceptar, apresentar contexto ao usuário, registrar decisões e aplicar regras
+GitHub
+GitHub
+. Nenhuma dessas classes ou arquivos (src/warnings/interactive_handler.py, etc.) existem no código atual; tampouco há lógica para pausar o pipeline e aguardar decisões.	Alto: o objetivo principal do projeto (transformar warnings passivos em interativos) ainda não está implementado.
+Persistência de decisões e regras	O pré‑projeto especifica um banco SQLite (warnings.db) com tabelas user_decisions, warning_rules, geografia e bi_param_cache
+GitHub
+GitHub
+. O código atual não possui módulo database.py nem acesso a SQLite; não há persistência de decisões ou rules.	Alto: sem persistência, decisões do usuário não podem ser reaproveitadas.
+Rules Engine com aplicação automática	A documentação detalha um mecanismo para carregar, aplicar e criar regras de substituição/supressão
+GitHub
+. O código atual não tem rules_engine.py nem lógica para aplicar regras antes das validações.	Alto: impede automatização de resoluções e reduz a eficácia do sistema proposto.
+Hooking antes da supressão de warnings	O pre‑projeto sugere modificar funções em validations.py para chamar o interceptor antes de log.warning()
+GitHub
+. O código atual simplesmente chama log.warning sem condição
+GitHub
+; não há mecanismo condicional para interatividade.	Médio: para introduzir a camada interativa, será necessário alterar cada ponto de log.
+Compatibilidade layer com modo de produção / supressão	A documentação propõe checar se o sistema está em produção ou se warnings estão suprimidos para ajustar a interatividade
+GitHub
+. Essa lógica não existe no código; a supressão de warnings ocorre em outro módulo (logs/warning_suppressor.py), mas não há verificação dentro do pipeline.	Médio: pode resultar em interceptação incorreta em produção.
+Gerenciamento de APIs e contagem de chamadas	O pre‑projeto define um PerformanceGuard que monitora o número de chamadas para garantir o limite de 2
+GitHub
+. O código não possui contadores de chamadas; ele depende implicitamente do design para manter poucas chamadas.	Baixo: apenas para monitoramento; mas pode ser útil para reforçar o limite.
+Integração com caches existentes	Após aplicar decisões que adicionem valores à BI_PARAMETRIZAÇÃO, o pre‑projeto sugere invalidar caches de BI e worksheets
+GitHub
+. O código atual não oferece métodos para invalidar caches após alterações, pois não há escrita interativa.	Médio: seria necessário modificar BIParamLookup e SheetsFetcher para suportar invalidação.
+Controle de progresso TDAH	O documento TDAH_OPTIMIZATION.md define painéis de progresso, timers e celebrações para cada micro‑task
+GitHub
+. O repositório não contém ferramentas de UI ou CLI para exibir progresso ou medir tempo.	Baixo: é uma funcionalidade de acompanhamento que pode ser implementada posteriormente, mas não afeta o núcleo ETL.
 
-⚠️ Riscos técnicos e inconsistências arquiteturais
-Risco / inconsistência	Descrição	Evidência
-Divergência de nomenclatura	A pasta do pré‑projeto indica transform/transform_pipeline.py, enquanto o repositório utiliza treat/treat_pipeline.py. A diferença de nomes e caminhos pode causar confusão ou falhas ao integrar novos desenvolvedores e scripts.	Estrutura de código aponta para treat/ e treat_pipeline.py
+🏗️ Inconsistências arquiteturais
+Inconsistência	Análise	Evidência
+Diferenças de nomenclatura e paths	A documentação refere‑se a módulos em src/warnings/…, porém o projeto real usa transform/ e não há diretório src. Funções importadas no pipeline referem‑se a transform.transform.utils… e transform.extract.sheets_fetcher
+GitHub
+. Uma eventual implementação de warnings deve respeitar essa estrutura ou ajustar a documentação.	O pipeline importa módulos de transform/…
+GitHub
+ e não de src/.
+Uso de builtins vs injeção explícita	No branch main, o pipeline reutilizava SheetsFetcher e caches via builtins; no branch refactor a classe TreatPipeline instância seu próprio SheetsFetcher localmente, sem builtins
+GitHub
+. O pre‑projeto, ao mostrar hooks usando builtins.warning_interceptor
+GitHub
+, assume o uso de variáveis globais em builtins. Essa divergência precisa ser resolvida para evitar vazamento de estado global.	Trechos do pré‑projeto e do código mostram abordagens distintas para compartilhamento de objetos.
+Normalização de nomes de abas	A nova implementação do SheetsFetcher utiliza sheet_name_normalizer para sanitizar nomes de abas, retornando um mapeamento original→normalizado
+GitHub
+. O pré‑projeto não menciona problemas de codificação de nomes; hooks baseados em nomes podem falhar se não considerarem a normalização.	O fetcher substitui nomes internamente
 GitHub
 .
-Assunção de presença de documentos	A inexistência dos arquivos de planejamento significa que parte da especificação está fora do controle de versão ou em outro repositório. Isso dificulta a garantia de aderência e aumenta risco de divergência entre planejado e implementado.	Busca via API não encontra os arquivos; somente código está disponível.
-Complexidade subestimada para merges demográficos	O merge para pinterestIdade/Genero/Regiao assume que pinterestGeral já foi executado e guarda sua versão enriquecida em builtins._pinterest_geral_tratado
+Extensão utils e modularização	A documentação supõe a existência de arquivos como smart_reload.py, early_exit_checker.py, schema_validator.py, mas no branch refactor esses arquivos ainda não estão presentes em transform/transform/utils (pelo menos não vistos nos trechos analisados). Isso sugere que o código não acompanha totalmente a estrutura esperada.	As tarefas do backlog referem‑se a arquivos que não encontramos, indicando que a arquitetura proposta ainda não foi implementada.
+
+⚡ Oportunidades perdidas e padrões do código
+Oportunidade	Detalhes
+Aproveitar sheet_name_normalizer e safe_sheet_range	O SheetsFetcher do branch refactor já sanitiza nomes de abas e constrói ranges seguros
 GitHub
-. Qualquer execução fora de ordem ou paralelismo pode quebrar o pipeline, pois o código lança RuntimeError se o cache não estiver presente
+. O sistema de warnings poderia reutilizar esta utilidade para exibir nomes de abas amigáveis ao usuário e evitar erros de codificação quando persistir decisões.
+Reutilização de caches e TTL	A documentação prevê múltiplos caches que podem mascarar mudanças
 GitHub
-.	Necessidade de controles de execução (ordem e concorrência).
-Limitações de TTL de cache	O cache do SheetsFetcher utiliza TTL default de 300 segundos
+. O código possui caches (_HEADERS, _EXISTING_IDS, SheetsFetcher, BIParamLookup). Uma integração inteligente poderia reutilizar esses caches para fornecer contexto ao usuário (ex.: mostrar dados da BI ao sugerir valores) e invalidar caches somente quando necessário.
+Integração com apply_smart_column_mapping	O dest_writer do branch refactor importa apply_smart_column_mapping
 GitHub
-. Caso o ETL dure mais que esse tempo ou diferentes pipelines rodem em sequência, leituras podem ocorrer novamente. O pré‑projeto talvez espere um cache de longa duração ou configurável.	Pode gerar chamadas extras e diminuir a eficiência desejada de “duas chamadas à API”.
-Dependência de estado global (builtins)	O pipeline escreve e lê caches via builtins.fetcher, builtins._pinterest_geral_tratado e _wb_origin_done
+, sugerindo que há lógica para mapear colunas de origem para destino de forma adaptativa. O pre‑projeto não menciona essa otimização; ela poderia ser aproveitada para sugerir automaticamente correções de coluna no modo interativo.
+Verificação de performance com PerformanceGuard	O pre‑projeto propõe um PerformanceGuard que lança erro se exceder duas chamadas
 GitHub
+. O código atual não possui tal guard, mas seria trivial implementar uma contagem de chamadas no SheetsFetcher.
+
+🧩 Pontos de integração
+Funções de validação – Os métodos validate_columns, check_required_columns, validate_taxonomy_consistency, validate_no_blank_cells e validate_aggregates em transform/transform/utils/validations.py são os principais geradores de warnings. É exatamente nesses pontos que o hook sugerido no pré‑projeto deveria ser inserido. Por exemplo, antes de chamar log.warning em check_required_columns
 GitHub
-. Isso facilita reutilização de objetos, mas torna a execução dependente de um contexto único; em ambientes serverless ou multi‑thread isso pode causar colisões ou dados incorretos.	Maior risco de condições de corrida ou vazamento de dados entre execuções.
-Ausência de testes automatizados	Não há evidências de testes unitários ou integração no repositório; a verificação de consistência depende do log manual.	Risco de regressões.
+, o código poderia verificar se um WarningInterceptor está ativo e, se sim, construir um WarningContext e chamar intercept().
 
-🔧 Refinamentos necessários
-Trazer a documentação para o repositório – Adicionar os arquivos PRE_PROJETO_WARNINGS.md, SPRINT_PLANNING.md, ARQUITETURA_WARNINGS.md e TDAH_OPTIMIZATION.md ao controle de versão. Isso permitirá alinhar o código com cada requisito e atualizar a pipeline conforme as micro‑tarefas.
+schema_validator.py e early_exit_checker.py – O backlog inclui tasks para ler schema_validator.py e early_exit_checker.py, que ainda não estão presentes no branch refactor. Se forem adicionados futuramente, esses módulos serão outros pontos de hook.
 
-Normalizar nomes de pastas e arquivos – Renomear treat/ para transform/ (ou atualizar a documentação) e garantir que a classe principal se chame TransformPipeline para refletir o pré‑projeto.
+Pipeline principal (TreatPipeline.run) – Após cada etapa de validação, o pipeline armazena relatórios em atributos (_last_taxo_report, _last_impressions_report)
+GitHub
+. O sistema de warnings pode anexar decisões ou atualizar esses relatórios. Além disso, o write‑back das correções (passo 13) é um ponto para aplicar decisões persistidas antes da gravação
+GitHub
+.
 
-Mapear micro‑tarefas às funções – Criar um checklist que relacione cada micro‑task descrita no SPRINT com uma função ou passo do pipeline. Isso ajudará a verificar cobertura e progresso.
+BIParamLookup e dest_writer – Quando uma decisão adicionar um novo valor à parametrização BI, será necessário invalidar o cache de BI e talvez atualizar abas de destino. O gancho para isso pode ser implementado no DecisionResolver (conforme previsto na documentação
+GitHub
+).
 
-Implementar sistema de persistência de warnings – Além de logs, consolidar os relatórios de warnings (taxonomia, impressões, colunas obrigatórias) em um arquivo ou planilha, armazenando os resultados por execução com timestamp. Isso permite auditoria e acompanhamento de evolução de dados.
+🔧 Refinamentos necessários (para alinhar pré‑projeto e branch refactor)
+Incluir a estrutura de src/warnings ou adaptar a documentação – Decidir se os novos módulos (interactive_handler.py, warning_resolver.py, rules_engine.py, database.py) serão colocados em transform/warnings ou em src/warnings. Atualizar a documentação ou mover o código para evitar ambiguidade.
 
-Configurar TTL de cache via parâmetro – Tornar o cache_ttl configurável (talvez lido de arquivo .env) ou aumentar o padrão, garantindo que leituras sequenciais no mesmo dia reutilizem os dados.
+Implementar o WarningInterceptor e inserir hooks – Criar a classe WarningInterceptor conforme especificado
+GitHub
+ e modificar cada ponto de log.warning para chamar o interceptor quando o modo interativo estiver ativo. Fornecer contexto (aba, linha, coluna, valor, sugestões) ao usuário para decisão.
 
-Evitar dependência de builtins – Refatorar para passar caches e objetos explicitamente através de contexto ou classe singleton em vez de atributos globais no módulo builtins, facilitando testes e paralelismo.
+Persistência e regras – Desenvolver DecisionResolver, RulesEngine e WarningDatabase, incluindo a criação das tabelas SQLite
+GitHub
+. Integrar a gravação de decisões e criação de regras automáticas. Disponibilizar comandos ou UI minimalista para o usuário ver e gerenciar regras.
 
-Adicionar camadas de integrações – Se o pré‑projeto prevê alertas ou integração com outras APIs (Slack, e‑mail, dashboards), criar módulos específicos para enviar warnings críticos e resumos de execução para stakeholders.
+Cache invalidation – Estender BIParamLookup e SheetsFetcher para invalidar caches quando novas decisões alterarem dados de BI ou planilhas, usando os métodos sugeridos no pre‑projeto
+GitHub
+.
 
-TDAH optimization – Quando o documento for disponibilizado, avaliar se requer melhorias de usabilidade (ex.: feedback rápido, interface visual, timers curtos) ou estratégias de redução de distrações. Poderiam ser implementadas como dashboards simples ou notificações imediatas após a execução do ETL.
+PerformanceGuard – Implementar contador de chamadas de API (before_api_call) para garantir que a nova lógica não ultrapasse o limite de duas chamadas por execução
+GitHub
+.
 
-🚀 Quick wins (oportunidades imediatas)
-Prover configuração simples para TTL de cache – Expor o TTL do SheetsFetcher e caches globais em arquivo de configuração (YAML ou .env), permitindo ajuste sem alteração de código.
+Rastreabilidade das micro‑tasks – Associar as 93 tasks a commits ou issues no repositório para permitir acompanhamento. Um script ou checklist pode marcar a conclusão de cada tarefa e atualizar a barra de progresso (conforme TDAH_OPTIMIZATION.md).
 
-Incluir checkpoints nos logs – Registrar início e término de cada etapa do pipeline (pré‑processamento, validações, merges, escrita) e tempo decorrido. Isso facilita identificação de gargalos e aprofunda a transparência sem demandar grandes mudanças.
+Modo produção e supressão – Adicionar verificação de variáveis de ambiente no WarningInterceptor.__init__ para desabilitar interatividade em produção ou quando o warning_suppressor estiver ativo
+GitHub
+.
 
-Extrair relatórios de warnings – Adicionar função simples para exportar _last_taxo_report e _last_impressions_report para CSV/JSON ao final da execução. Isso viabiliza uso imediato dos dados sem modificar o pipeline.
+Documentação atualizada – Depois de implementar as classes e hooks, atualizar o documento ARQUITETURA_WARNINGS.md para refletir o caminho real dos arquivos (transform/warnings ou src/warnings), bem como ajustar exemplos de código às APIs reais da aplicação.
 
-Revisar e documentar dependências globais – Inserir comentários e documentação no código explicando o uso de builtins para caches, com instruções para futuros mantenedores.
+🚀 Quick wins
+Mapeamento de warnings existentes – Executar um grep em transform/transform/utils/validations.py e outros módulos para listar todas as chamadas log.warning. Isso corresponde a tasks 2.3 e 3.4 e pode ser feito rapidamente para identificar pontos de hook.
 
-Adicionar testes de regressão básicos – Criar um conjunto de dados de amostra e validar que o pipeline produz a saída esperada, detectando quebras em futuras modificações.
+Implementar um interceptor passivo – Criar um WarningInterceptor simples que apenas registra o warning e retorna uma decisão “ignore”. Com isso é possível testar a integração sem impacto funcional.
+
+Persistir decisões em memória – Antes de implementar SQLite, usar um dicionário em builtins para armazenar decisões temporárias. Isso permitiria testar o fluxo de interceptação e aplicação de decisões sem configurar banco.
+
+Simular um rule engine mínimo – Criar uma lista de substituições simples (pattern→replacement) aplicada antes das validações. Esse protótipo atende a várias tarefas do backlog sem alterar a lógica de escrita.
+
+Configuração via .env – Adicionar flags INTERACTIVE_MODE e PRODUCTION_MODE lidas via os.environ. Isso permitirá habilitar/desabilitar o modo interativo sem alterar código.
 
 Conclusão
-O código existente mostra um trabalho robusto para implementação de um ETL otimizado para Google Sheets: leitura em lote com cache, validações extensas, tratamento diferenciado de abas especiais e escrita deduplicada. No entanto, a ausência da documentação de pré‑projeto impede verificar se todas as 93 micro‑tarefas e warnings foram contemplados. Há riscos associados à nomenclatura divergente, uso de estado global e falta de persistência de warnings. Recomenda‑se alinhar a documentação e o código, refinando a arquitetura para garantir escalabilidade, auditabilidade e aderência às futuras demandas, incluindo possíveis otimizações voltadas a TDAH.
+O ramo refactor contém uma implementação de ETL robusta e otimizada, porém não integra o sistema de warnings interativo proposto no pré‑projeto. Os documentos de PRE_PROJETO_WARNINGS.md, SPRINT_PLANNING.md, ARQUITETURA_WARNINGS.md e TDAH_OPTIMIZATION.md delineiam uma solução ambiciosa: interceptar warnings, oferecer menus interativos, persistir decisões, aplicar regras e proporcionar uma experiência otimizada para pessoas com TDAH. No código analisado, esses componentes ainda não existem, e será necessário desenvolver diversos módulos novos, além de inserir hooks nos pontos de geração de warnings e gerenciar caches e performance. Ao alinhar documentação e código, é possível evoluir o ETL sem comprometer as otimizações existentes.
 
 
 
-No relatório, identifiquei as principais convergências entre o pré‑projeto e a implementação atual, evidenciando o uso de um único SheetsFetcher para minimizar chamadas à API e o pipeline modular que contempla pré‑processamento, validação, enriquecimento e escrita otimizada
-GitHub
-GitHub
-. Destacou-se também o sistema de warnings e validações robustas que verifica colunas obrigatórias, utm_content e consistência de datas
-GitHub
-GitHub
-.
+No documento você encontrará:
 
-A análise apontou gaps importantes: ausência dos documentos do pré‑projeto no repositório, falta de correspondência entre os 93 micro‑tasks e o código, inexistência de referência explícita à otimização TDAH e uso de estado global via builtins, que pode causar problemas em execuções paralelas
-GitHub
-GitHub
-. O relatório apresenta recomendações para corrigir nomenclaturas, adicionar persistência de warnings, parametrizar caches e evitar dependências globais. Quick wins sugeridos incluem expor TTL de cache em configuração, extrair relatórios de warnings e inserir checkpoints nos logs para melhor rastreabilidade.
+Alinhamentos: Pontos em que os requisitos de pré‑projeto convergem com o código já existente, como o uso de caches e a importação de apply_smart_column_mapping.
 
-Se precisar de adaptações específicas para o pré‑projeto ou esclarecer mais alguma parte da análise, estou à disposição.
+Gaps críticos: Funcionalidades documentadas mas ausentes no código, como o sistema completo de interceptação e resolução de warnings, banco de dados de regras e decisões, e integrações TDAH.
+
+Riscos técnicos: Possíveis pontos de falha relacionados à compatibilidade com a arquitetura existente, estimativas de esforço das 93 micro‑tasks e gerenciamento de mutabilidade global.
+
+Refinamentos necessários: Ajustes propostos nas especificações para alinhar-se à realidade técnica, como modularização de hooks e planejamento incremental.
+
+Quick wins: Melhorias imediatas recomendadas para preparar o código atual à futura integração do sistema de warnings.
+
+Estou à disposição para discutir detalhes específicos ou continuar com a implementação das recomendações.
