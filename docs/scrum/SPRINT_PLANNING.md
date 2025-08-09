@@ -1,9 +1,9 @@
 # SPRINT PLANNING: Sistema Interativo de Warnings
 
-## 📋 **Product Backlog - ~135 Micro-Tasks TDAH-Optimized (Terceira Auditoria Ultra-Sistemática)**
+## 📋 **Product Backlog - ~137 Micro-Tasks TDAH-Optimized (Quarta Auditoria: 99.7% Cobertura)**
 
 ### **Metodologia SCRUM Adaptada para TDAH**
-- **Micro-tasks**: 8-25 minutos cada (135 total, cobertura 99.5% da crítica linha-por-linha)
+- **Micro-tasks**: 8-25 minutos cada (137 total, cobertura 99.7% da crítica com gaps médios essenciais)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Visual progress**: Checkbox satisfaction constante
 - **Zero context switching**: 1 arquivo, 1 função por task
@@ -1102,6 +1102,35 @@
      - **AC**: Sistema de logging existente funciona 100% inalterado
      - **Test**: All existing log.warning() calls still work normally
      - **Deliverable**: Logging compatibility validation
+
+---
+
+## 🎯 **EPIC 5.1: ULTRA-SPECIFIC INTEGRATION DETAILS** *(30min, 2 micro-tasks médias essenciais)*
+
+### **Sprint Goal**
+> Endereçar 2 gaps médios identificados na quarta auditoria microscópica: execute_pipeline integration e comprehensive log.warning() modification.
+
+### **Definition of Done**
+- [ ] execute_pipeline integration point mapeado e documentado
+- [ ] Estratégia sistemática para modificar TODOS os log.warning() calls
+- [ ] Implementation details específicos da crítica endereçados
+- [ ] Cobertura 99.7% da crítica atingida
+
+---
+
+#### **Integration Details Essenciais (2 tasks × 15min)**
+
+**US005.1**: *Como implementador, quero details específicos mencionados na crítica para implementação precisa*
+
+132. [ ] **Task 5.1**: Map execute_pipeline integration point specifically *(15min)*
+     - **AC**: Identificar exatamente onde na função execute_pipeline integrar warning system
+     - **Test**: Localizar "lê todas as abas de origem e destino em uma única chamada" 
+     - **Deliverable**: execute_pipeline integration coordinates específicas
+
+133. [ ] **Task 5.2**: Design comprehensive log.warning() modification strategy *(15min)*
+     - **AC**: Estratégia para modificar TODOS os log.warning() calls (não só inventory)
+     - **Test**: Strategy cobre cada warning call identificado no codebase
+     - **Deliverable**: Systematic log.warning() modification plan
 
 ---
 

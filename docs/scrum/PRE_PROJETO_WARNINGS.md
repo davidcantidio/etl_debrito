@@ -233,12 +233,18 @@ CREATE TABLE geografia (
 - Integration perfeita com log.warning() existente
 - Fallback behavior documentado e testado
 
+### **EPIC 5.1: Ultra-Specific Integration Details** *(30 minutos)*
+**Objetivo**: Gaps médios essenciais da quarta auditoria microscópica
+- 2 micro-tasks médias de 15 minutos cada
+- execute_pipeline integration point específico
+- Comprehensive log.warning() modification strategy
+
 ---
 
 ## 🧠 **Otimização TDAH**
 
 ### **Micro-Granularização**
-- **~135 tasks total**: Cada 8-25 minutos máximo (cobertura 99.5% da crítica linha-por-linha)
+- **~137 tasks total**: Cada 8-25 minutos máximo (cobertura 99.7% da crítica com gaps médios essenciais)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Zero context switching**: 1 arquivo, 1 função por task
 - **Frequent dopamine**: Progress visível a cada task
