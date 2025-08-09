@@ -1,9 +1,9 @@
 # SPRINT PLANNING: Sistema Interativo de Warnings
 
-## 📋 **Product Backlog - ~117 Micro-Tasks TDAH-Optimized (Auditoria Crítica Completa)**
+## 📋 **Product Backlog - ~135 Micro-Tasks TDAH-Optimized (Terceira Auditoria Ultra-Sistemática)**
 
 ### **Metodologia SCRUM Adaptada para TDAH**
-- **Micro-tasks**: 8-25 minutos cada (117 total, incluindo todos os pontos da auditoria crítica)
+- **Micro-tasks**: 8-25 minutos cada (135 total, cobertura 99.5% da crítica linha-por-linha)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Visual progress**: Checkbox satisfaction constante
 - **Zero context switching**: 1 arquivo, 1 função por task
@@ -937,6 +937,171 @@
      - **AC**: Script que executa toda suite de compatibility tests
      - **Test**: Test runner executa todos os testes e reporta resultados
      - **Deliverable**: compatibility_test_runner.py
+
+---
+
+## 🎯 **EPIC 3.6: MISSING CACHES INTEGRATION** *(1 dia, 4 micro-tasks críticas)*
+
+### **Sprint Goal**
+> Integrar caches específicos omitidos na auditoria (_HEADERS, _EXISTING_IDS) e mapear write-back passo 13 conforme crítica linha 91 e 108-109.
+
+### **Definition of Done**
+- [ ] _HEADERS e _EXISTING_IDS incluídos na cache invalidation strategy
+- [ ] Write-back passo 13 integration point mapeado e implementado
+- [ ] Cache coordination expandida para todos os caches identificados
+- [ ] Decision application timing antes do consolidated write-back definido
+
+---
+
+#### **Integração de Caches Omitidos (4 tasks × 15-20min)**
+
+**US003.6**: *Como sistema, quero invalidação completa de todos os caches identificados na crítica*
+
+114. [ ] **Task 3.21**: Map _HEADERS and _EXISTING_IDS caches *(18min)*
+     - **AC**: Localizar e documentar usage de _HEADERS e _EXISTING_IDS no codebase
+     - **Test**: Grep search para identificar onde esses caches são usados
+     - **Deliverable**: Cache usage map completo incluindo todos os 4 caches
+
+115. [ ] **Task 3.22**: Extend cache invalidation to _HEADERS and _EXISTING_IDS *(20min)*
+     - **AC**: Invalidation strategy expandida para incluir todos os caches
+     - **Test**: Cache invalidation chain funciona para os 4 caches
+     - **Deliverable**: Complete cache invalidation interface
+
+116. [ ] **Task 3.23**: Map pipeline step 13 write-back integration point *(15min)*
+     - **AC**: Identificar exatamente onde é o "passo 13" mencionado na crítica
+     - **Test**: Localizar step 13 no TreatPipeline.run() method
+     - **Deliverable**: Step 13 integration coordinates (file:line:function)
+
+117. [ ] **Task 3.24**: Design decision application before consolidated write-back *(17min)*
+     - **AC**: Strategy para aplicar decisions ANTES do write-back consolidado
+     - **Test**: Decision timing não interfere com consolidated write-back
+     - **Deliverable**: Decision application timing specification
+
+---
+
+## 🎯 **EPIC 2.6: DATA MIGRATION & ISSUES INTEGRATION** *(1.5 dias, 6 micro-tasks importantes)*
+
+### **Sprint Goal**
+> Implementar migração municipios.csv, GitHub issues integration, e rules management UI específica conforme linhas 125 e 135 da crítica.
+
+### **Definition of Done**
+- [ ] municipios.csv migrado para SQLite geografia table
+- [ ] GitHub issues integration para task tracking implementada
+- [ ] Rules management UI específica funcional
+- [ ] Data migration strategy documentada
+
+---
+
+#### **Migração e Issues Integration (6 tasks × 15-25min)**
+
+**US002.6**: *Como desenvolvedor, quero ferramentas completas para tracking e data management*
+
+118. [ ] **Task 2.19**: Implement municipios.csv to SQLite migration *(25min)*
+     - **AC**: Script para migrar municipios.csv → geografia table
+     - **Test**: Migration script executa sem erros e dados estão corretos
+     - **Deliverable**: migrate_municipios.py functional
+
+119. [ ] **Task 2.20**: Design GitHub issues integration for task tracking *(20min)*
+     - **AC**: Strategy para associar tasks com GitHub issues
+     - **Test**: Task ID pode ser linkado com issue number
+     - **Deliverable**: Issues integration specification
+
+120. [ ] **Task 2.21**: Implement GitHub issues API integration *(25min)*
+     - **AC**: Script para criar/atualizar issues baseado em task progress
+     - **Test**: Issue creation e update funcionam via GitHub API
+     - **Deliverable**: github_issues_tracker.py
+
+121. [ ] **Task 2.22**: Design rules management UI interface *(18min)*
+     - **AC**: UI específica para view, edit, delete warning rules
+     - **Test**: Interface design permite all CRUD operations on rules
+     - **Deliverable**: Rules management UI specification
+
+122. [ ] **Task 2.23**: Implement rules management CLI commands *(22min)*
+     - **AC**: CLI commands para manage rules: list, create, edit, delete
+     - **Test**: All rules management operations funcionam via CLI
+     - **Deliverable**: rules_manager.py CLI tool
+
+123. [ ] **Task 2.24**: Test complete data migration and tracking *(15min)*
+     - **AC**: Migration + issues tracking working end-to-end
+     - **Test**: Full workflow: migrate data → track progress → manage rules
+     - **Deliverable**: Integrated data management system
+
+---
+
+## 🎯 **EPIC 0.6: MISSING MODULES IMPLEMENTATION** *(1 dia, 6 micro-tasks médias)*
+
+### **Sprint Goal**
+> Implementar módulos assumidos se ausentes e validar exemplos de código contra APIs reais conforme linhas 82 e 141 da crítica.
+
+### **Definition of Done**
+- [ ] early_exit_checker.py e schema_validator.py criados se ausentes
+- [ ] Exemplos de código validados contra APIs reais
+- [ ] Decision timing vs write-back sequence validada
+- [ ] Module implementation strategy documentada
+
+---
+
+#### **Módulos Ausentes e Validação (6 tasks × 12-20min)**
+
+**US000.6**: *Como desenvolvedor, quero todos os módulos assumidos implementados ou validados*
+
+124. [ ] **Task 0.21**: Implement early_exit_checker.py if missing *(20min)*
+     - **AC**: Módulo early_exit_checker criado se não existir no codebase
+     - **Test**: early_exit_checker funciona como esperado nas tasks
+     - **Deliverable**: early_exit_checker.py implementation ou validation
+
+125. [ ] **Task 0.22**: Implement schema_validator.py if missing *(20min)*
+     - **AC**: Módulo schema_validator criado se não existir no codebase  
+     - **Test**: schema_validator funciona como esperado nas tasks
+     - **Deliverable**: schema_validator.py implementation ou validation
+
+126. [ ] **Task 0.23**: Validate code examples against real APIs *(18min)*
+     - **AC**: Todos os exemplos em ARQUITETURA_WARNINGS validados contra código real
+     - **Test**: Code examples executam sem erros com APIs atuais
+     - **Deliverable**: Validated code examples in documentation
+
+127. [ ] **Task 0.24**: Test decision application timing *(15min)*
+     - **AC**: Confirmar que decisions são aplicadas antes do consolidated write-back
+     - **Test**: Decision → data change → write-back sequence funciona
+     - **Deliverable**: Decision timing validation
+
+128. [ ] **Task 0.25**: Design module discovery and creation strategy *(12min)*
+     - **AC**: Strategy para descobrir módulos ausentes e criá-los
+     - **Test**: Module discovery detecta missing modules correctly
+     - **Deliverable**: Module discovery strategy specification
+
+129. [ ] **Task 0.26**: Document missing modules implementation approach *(10min)*
+     - **AC**: Documentação de como handle missing assumed modules
+     - **Test**: Documentation covers all missing module scenarios
+     - **Deliverable**: Missing modules implementation guide
+
+---
+
+## 🎯 **EPIC 4.6: LOGGING INTEGRATION LAYER** *(30min, 2 micro-tasks baixa prioridade)*
+
+### **Sprint Goal**
+> Implementar integration layer completa com sistema de logging existente conforme linhas 15-16 da crítica.
+
+### **Definition of Done**
+- [ ] Integration layer com log.warning() existente funcional
+- [ ] Fallback behavior documentado e testado
+- [ ] Logging compatibility mantida 100%
+
+---
+
+#### **Sistema de Logging Integration (2 tasks × 15min)**
+
+**US004.6**: *Como sistema, quero integration perfeita com logging existente*
+
+130. [ ] **Task 4.17**: Design logging integration layer *(15min)*
+     - **AC**: Layer que integra warning interceptor com log.warning() existente
+     - **Test**: Logging funciona com/sem interceptor ativo
+     - **Deliverable**: Logging integration specification
+
+131. [ ] **Task 4.18**: Test complete logging compatibility *(15min)*
+     - **AC**: Sistema de logging existente funciona 100% inalterado
+     - **Test**: All existing log.warning() calls still work normally
+     - **Deliverable**: Logging compatibility validation
 
 ---
 

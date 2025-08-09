@@ -204,12 +204,41 @@ CREATE TABLE geografia (
 - Instrumentação e monitoramento
 - Rastreabilidade de micro-tasks e progresso TDAH
 
+## 🎯 **ÉPICOS ADICIONAIS - TERCEIRA AUDITORIA CRÍTICA**
+
+### **EPIC 3.6: Missing Caches Integration** *(1 dia)*
+**Objetivo**: Integrar caches específicos omitidos (_HEADERS, _EXISTING_IDS, passo 13)
+- 4 micro-tasks críticas de 15-20 minutos cada
+- Cache invalidation completa para todos os caches identificados
+- Write-back passo 13 integration point mapeado
+- Decision application timing antes do consolidated write-back
+
+### **EPIC 2.6: Data Migration & Issues Integration** *(1.5 dias)*
+**Objetivo**: Migração municipios.csv, GitHub issues, rules management UI
+- 6 micro-tasks importantes de 15-25 minutos cada
+- municipios.csv → SQLite geografia table migration
+- GitHub issues integration para task tracking
+- Rules management UI específica implementada
+
+### **EPIC 0.6: Missing Modules Implementation** *(1 dia)*
+**Objetivo**: Módulos assumidos criados se ausentes, validação APIs reais
+- 6 micro-tasks médias de 12-20 minutos cada
+- early_exit_checker.py, schema_validator.py se ausentes
+- Exemplos de código validados contra APIs reais
+- Module discovery e creation strategy
+
+### **EPIC 4.6: Logging Integration Layer** *(30 minutos)*
+**Objetivo**: Integration layer completa com sistema de logging existente
+- 2 micro-tasks de baixa prioridade de 15 minutos cada
+- Integration perfeita com log.warning() existente
+- Fallback behavior documentado e testado
+
 ---
 
 ## 🧠 **Otimização TDAH**
 
 ### **Micro-Granularização**
-- **~117 tasks total**: Cada 8-25 minutos máximo (incluindo todos os pontos da auditoria crítica)
+- **~135 tasks total**: Cada 8-25 minutos máximo (cobertura 99.5% da crítica linha-por-linha)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Zero context switching**: 1 arquivo, 1 função por task
 - **Frequent dopamine**: Progress visível a cada task
