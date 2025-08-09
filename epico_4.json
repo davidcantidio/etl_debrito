@@ -1,0 +1,762 @@
+{
+  "epic": {
+    "id": "4",
+    "name": "TDAH Tooling Implementation",
+    "summary": "Construir um conjunto de ferramentas de linha de comando que ajudem usuários com TDAH a acompanhar tempo, progresso, commits, conquistas, sessões de foco e resumos diários, integrando essas ferramentas ao sistema interativo de warnings.",
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "goals": [
+      "Fornecer cronômetro de tarefas e barra de progresso personalizáveis para aumentar foco e motivação",
+      "Associar commits a micro‑tasks de forma automática, promovendo rastreabilidade",
+      "Registrar conquistas e pontos para reforço positivo",
+      "Gerenciar sessões de foco e pausas (Pomodoro) de forma ajustável",
+      "Gerar sumário diário das tasks executadas com estatísticas",
+      "Integrar todas as ferramentas à CLI principal sem quebrar o fluxo existente"
+    ],
+    "definition_of_done": [
+      "Todos os testes escritos antes da implementação",
+      "100% de cobertura de testes nos novos módulos",
+      "Ciclo red-green-refactor seguido consistentemente",
+      "Todos os recursos entregues com testes red-green-refactor completos",
+      "Cobertura de testes ≥ 90% nos módulos CLI",
+      "Ferramentas independentes executáveis em paralelo (≥ 60% das tasks)",
+      "Integração com CLI principal validada e sem regressão de performance",
+      "Documentação e exemplos práticos adicionados"
+    ],
+    "duration": "4 dias",
+    "labels": ["tdd", "cli", "tdah", "tooling"],
+    "tasks": [
+      {
+        "id": "4.1a",
+        "title": "Analisar requisitos do cronômetro de tarefas",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Ler o backlog e exemplos de tasks convertidas para entender como um cronômetro pode ser usado no workflow TDAH, incluindo pausa, retomada e alertas sonoros.",
+        "deliverables": ["reports/analysis_task_timer.md"],
+        "acceptance_criteria": [
+          "Documento descrevendo comportamentos desejados (iniciar, pausar, retomar, avisar fim)",
+          "Levantamento de bibliotecas a serem usadas (ex.: time, click)"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [],
+        "risk": "Ignorar requisitos de acessibilidade",
+        "mitigation": "Consultar docs/tdd_guidelines.md e inclusão de feedback de usuários"
+      },
+      {
+        "id": "4.1b.1",
+        "title": "TEST: should_start_pause_and_resume_timer_correctly",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o cronômetro inicia, pausa e retoma contando o tempo corretamente. Pode ser desenvolvido usando mocks básicos de time sem depender de análise prévia.",
+        "test_specs": [
+          "should_start_timer_and_countdown_in_under_100ms",
+          "should_pause_timer_and_stop_counting_immediately",
+          "should_resume_timer_after_pause_without_time_loss"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com mensagens indicando contagem errada ou falta de pausa",
+          "Tempo medido em intervalos simulados (mocks de time.sleep)"
+        ],
+        "deliverables": [
+          "tests/test_task_timer.py::test_should_start_pause_and_resume_timer_correctly"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": ["tests/test_task_timer.py"],
+        "risk": "Testes flakey devido a temporização real",
+        "mitigation": "Usar mocks para tempo e entradas"
+      },
+      {
+        "id": "4.1b.2",
+        "title": "IMPL: minimal task timer CLI",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar cronômetro minimal com start/pause/resume usando biblioteca click para CLI e funções de temporização, passando os testes escritos.",
+        "test_specs": [
+          "should_start_timer_and_countdown_in_under_100ms",
+          "should_pause_timer_and_stop_counting_immediately",
+          "should_resume_timer_after_pause_without_time_loss"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red passa sem modificar outros módulos",
+          "CLI aceita duração em segundos e comandos pause/resume",
+          "Nenhuma regressão em outros testes"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/task_timer.py",
+          "tests/test_task_timer.py::test_should_start_pause_and_resume_timer_correctly"
+        ],
+        "dependencies": ["4.1b.1"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/task_timer.py"
+        ],
+        "risk": "Misturar lógica de temporização com I/O de CLI",
+        "mitigation": "Separar core logic em função testável e CLI como wrapper"
+      },
+      {
+        "id": "4.1b.3",
+        "title": "REFACTOR: modularize task timer and add custom durations",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar o cronômetro para separar a lógica de contagem e CLI, permitir durações customizadas e adicionar aviso sonoro opcional, mantendo todos os testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Função de temporização isolada (core)",
+          "Cli utiliza o core e aceita opções --duration e --beep",
+          "Testes existentes continuam verdes"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/task_timer.py"
+        ],
+        "dependencies": ["4.1b.2"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/task_timer.py"
+        ],
+        "risk": "Complexidade excessiva para opção beep",
+        "mitigation": "Implementar beep como callback simples e documentar"
+      },
+      {
+        "id": "4.2a",
+        "title": "Analisar requisitos da barra de progresso CLI",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Avaliar como a barra de progresso deve representar micro‑tasks concluídas, incluindo percentual, tempo restante e cor, e verificar exemplos em exemplos_tasks_convertidas.md.",
+        "deliverables": ["reports/analysis_progress_bar.md"],
+        "acceptance_criteria": [
+          "Documento listando campos da barra (total, concluído, restante, percent)",
+          "Especificação de output e atualização dinâmica"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [],
+        "risk": "Não considerar atualização de barra em pipelines longos",
+        "mitigation": "Planejar opção de taxa de atualização ajustável"
+      },
+      {
+        "id": "4.2b.1",
+        "title": "TEST: should_render_and_update_progress_bar_correctly",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que a barra de progresso é renderizada inicialmente com 0% e atualizada corretamente conforme tarefas são completadas. Usa mocks de stdout para teste independente.",
+        "test_specs": [
+          "should_render_progress_bar_at_zero_percent_with_50_char_width",
+          "should_update_progress_bar_percentage_in_under_50ms_per_update"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com mensagem sobre percentuais incorretos",
+          "Simulação de duas atualizações (0%, 50%)"
+        ],
+        "deliverables": [
+          "tests/test_progress_bar.py::test_should_render_and_update_progress_bar_correctly"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": ["tests/test_progress_bar.py"],
+        "risk": "Testar impressão em terminal ser instável",
+        "mitigation": "Capturar stdout com StringIO ou mocks"
+      },
+      {
+        "id": "4.2b.2",
+        "title": "IMPL: minimal progress bar component",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Criar componente de barra de progresso em transform/warnings/cli/progress_bar.py que imprime e atualiza percentuais conforme número de tarefas completadas, atendendo aos testes.",
+        "test_specs": [
+          "should_render_progress_bar_at_zero_percent_with_50_char_width",
+          "should_update_progress_bar_percentage_in_under_50ms_per_update"
+        ],
+        "acceptance_criteria": [
+          "Barra inicializa em 0% com length fixo",
+          "Método update() incrementa progresso e refaz impressão",
+          "Testes anteriores passam"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/progress_bar.py",
+          "tests/test_progress_bar.py::test_should_render_and_update_progress_bar_correctly"
+        ],
+        "dependencies": ["4.2b.1"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/progress_bar.py"
+        ],
+        "risk": "Sobrescrita de linhas causar flicker",
+        "mitigation": "Usar carriage return (\\r) e flush adequado"
+      },
+      {
+        "id": "4.2b.3",
+        "title": "REFACTOR: add customization options to progress bar",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar a barra de progresso para permitir configuração de comprimento, símbolos e cores, mantendo testes intactos.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Barra aceita parâmetros length, char, color",
+          "Testes originais passam sem alteração",
+          "Documentação mínima adicionada"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/progress_bar.py"
+        ],
+        "dependencies": ["4.2b.2"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/progress_bar.py"
+        ],
+        "risk": "API se tornar inconsistente com futuros usos",
+        "mitigation": "Definir defaults claros e documentar opções"
+      },
+      {
+        "id": "4.3a",
+        "title": "Analisar script de associação de commits e tasks",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Investigar como mapear commits a IDs de tasks de forma automática, considerando perguntas ao usuário e convenções de mensagens de commit.",
+        "deliverables": ["reports/analysis_commit_association.md"],
+        "acceptance_criteria": [
+          "Checklist com perguntas ao usuário (p.ex. ID da task)",
+          "Template de mensagem de commit proposto"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [],
+        "risk": "Não cobrir edge cases como múltiplas tasks em um commit",
+        "mitigation": "Sugerir múltiplos IDs separados por vírgula"
+      },
+      {
+        "id": "4.3b.1",
+        "title": "TEST: should_prepend_task_id_to_commit_message",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o script adiciona corretamente o ID da task ao início da mensagem de commit.",
+        "test_specs": [
+          "should_prepend_single_task_id_to_commit_message_with_brackets",
+          "should_prepend_multiple_task_ids_separated_by_commas_max_3_ids"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se prefixo de ID estiver incorreto",
+          "Verificar comportamento com um e com vários IDs"
+        ],
+        "deliverables": [
+          "tests/test_commit_association.py::test_should_prepend_task_id_to_commit_message"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": ["tests/test_commit_association.py"],
+        "risk": "Testar integração com git real ser complexo",
+        "mitigation": "Mockar subprocess ou usar repositório temporário"
+      },
+      {
+        "id": "4.3b.2",
+        "title": "IMPL: minimal commit association script",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar script em transform/warnings/cli/commit_helper.py que lê IDs de tasks do usuário e prefixa a mensagem de commit antes de executar `git commit`.",
+        "test_specs": [
+          "should_prepend_single_task_id_to_commit_message_with_brackets",
+          "should_prepend_multiple_task_ids_separated_by_commas_max_3_ids"
+        ],
+        "acceptance_criteria": [
+          "Mensagens de commit têm ID(s) no início no formato '[task-id]'",
+          "Script passa testes e não requer dependências externas além de git",
+          "Não sobrescreve mensagens sem confirmação"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/commit_helper.py",
+          "tests/test_commit_association.py::test_should_prepend_task_id_to_commit_message"
+        ],
+        "dependencies": ["4.3b.1"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/commit_helper.py"
+        ],
+        "risk": "Alterar mensagens de commit acidentalmente",
+        "mitigation": "Adicionar confirmação interativa e flag --yes para CI"
+      },
+      {
+        "id": "4.3b.3",
+        "title": "REFACTOR: support commit message templates and hooks",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar o script para suportar templates de mensagens, múltiplas tarefas, e instalação opcional como hook de pre-commit, mantendo todos os testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Funções separadas para coleta de ID, construção de mensagem e execução do commit",
+          "Instalação de hook descrita em README",
+          "Testes originais permanecem verdes"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/commit_helper.py"
+        ],
+        "dependencies": ["4.3b.2"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/commit_helper.py"
+        ],
+        "risk": "Complexidade excessiva no hook",
+        "mitigation": "Manter interface simples e documentar uso avançado"
+      },
+      {
+        "id": "4.4a",
+        "title": "Analisar sistema de conquistas e pontos",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Definir critérios para conquistas (ex.: número de tasks concluídas, duração total) e como serão persistidas e exibidas ao usuário.",
+        "deliverables": ["reports/analysis_achievements.md"],
+        "acceptance_criteria": [
+          "Lista de conquistas e requisitos (bronze, prata, ouro)",
+          "Modelo de armazenamento proposto"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [],
+        "risk": "Criar conquistas arbitrárias sem valor motivador",
+        "mitigation": "Consultar guidelines TDAH e feedback de usuários"
+      },
+      {
+        "id": "4.4b.1",
+        "title": "TEST: should_award_achievement_when_threshold_reached",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o sistema concede uma conquista quando o usuário completa um número definido de tarefas ou tempo acumulado.",
+        "test_specs": [
+          "should_award_bronze_badge_after_5_tasks_with_15_points",
+          "should_award_time_based_achievement_after_60_minutes_with_bonus_multiplier"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se conquista não for registrada ao atingir o limiar",
+          "Cobertura de duas conquistas diferentes"
+        ],
+        "deliverables": [
+          "tests/test_achievements.py::test_should_award_achievement_when_threshold_reached"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": ["tests/test_achievements.py"],
+        "risk": "Persistência de conquistas interferir em múltiplos testes",
+        "mitigation": "Isolar storage em cada teste com SQLite em memória"
+      },
+      {
+        "id": "4.4b.2",
+        "title": "IMPL: minimal achievements tracker",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar classe `AchievementsTracker` em transform/warnings/cli/achievements.py que acompanha tarefas concluídas e tempo total, atribuindo badges conforme thresholds.",
+        "test_specs": [
+          "should_award_bronze_badge_after_5_tasks_with_15_points",
+          "should_award_time_based_achievement_after_60_minutes_with_bonus_multiplier"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red passa",
+          "Badges são persistidos e recuperados corretamente",
+          "Interface simples: record_task(duration) → retorna lista de novas conquistas"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/achievements.py",
+          "tests/test_achievements.py::test_should_award_achievement_when_threshold_reached"
+        ],
+        "dependencies": ["4.4b.1"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/achievements.py"
+        ],
+        "risk": "Persistir conquistas sem conflito em execuções paralelas",
+        "mitigation": "Usar locks ou banco isolado por execução"
+      },
+      {
+        "id": "4.4b.3",
+        "title": "REFACTOR: externalize achievements definitions and add points",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar para carregar conquistas de arquivo de configuração e adicionar sistema de pontos acumulativos, mantendo testes existentes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Configurações de conquistas lidas de JSON/YAML",
+          "Sistema de pontos somado a cada tarefa e exibido ao usuário",
+          "Nenhum teste quebra"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/achievements.py",
+          "config/achievements.yaml"
+        ],
+        "dependencies": ["4.4b.2"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/achievements.py",
+          "config/achievements.yaml"
+        ],
+        "risk": "Erro de parsing de configuração",
+        "mitigation": "Adicionar validação de schema e testes de carregamento"
+      },
+      {
+        "id": "4.5a",
+        "title": "Analisar gerenciador de sessões de foco",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Planejar como implementar sessões Pomodoro (foco e pausa) com configurações customizáveis e notificações discretas.",
+        "deliverables": ["reports/analysis_focus_sessions.md"],
+        "acceptance_criteria": [
+          "Modelo de sessão (duração foco, pausa curta, pausa longa)",
+          "Definição de estados e eventos (início, pausa, término)"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [],
+        "risk": "Não considerar acessibilidade e flexibilidade",
+        "mitigation": "Definir valores default e parâmetros customizáveis"
+      },
+      {
+        "id": "4.5b.1",
+        "title": "TEST: should_manage_focus_and_break_sessions",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o gerenciador inicia uma sessão de foco, agenda pausa curta e pausa longa após ciclos, e registra tempos corretamente.",
+        "test_specs": [
+          "should_start_focus_session_and_return_correct_end_time_within_1s_accuracy",
+          "should_schedule_short_break_after_focus_session_exactly_5_minutes",
+          "should_schedule_long_break_after_four_focus_sessions_exactly_15_minutes"
+        ],
+        "acceptance_criteria": [
+          "Teste falha indicando cálculo errado de tempos de sessão",
+          "Cobertura de pelo menos dois ciclos completos (foco + pausa)"
+        ],
+        "deliverables": [
+          "tests/test_focus_manager.py::test_should_manage_focus_and_break_sessions"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": ["tests/test_focus_manager.py"],
+        "risk": "Simulação de tempo real em testes causar lentidão",
+        "mitigation": "Mockar temporizador e usar loops rápidos"
+      },
+      {
+        "id": "4.5b.2",
+        "title": "IMPL: minimal focus session manager",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar classe FocusManager em transform/warnings/cli/focus_manager.py que inicia sessões de foco/pausa conforme configuração padrão e retorna horários finais, passando os testes.",
+        "test_specs": [
+          "should_start_focus_session_and_return_correct_end_time_within_1s_accuracy",
+          "should_schedule_short_break_after_focus_session_exactly_5_minutes",
+          "should_schedule_long_break_after_four_focus_sessions_exactly_15_minutes"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red passa",
+          "Gerenciador usa relógio mockável (injeção de dependência)",
+          "Permite configurar durações de foco e pausa"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/focus_manager.py",
+          "tests/test_focus_manager.py::test_should_manage_focus_and_break_sessions"
+        ],
+        "dependencies": ["4.5b.1"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/focus_manager.py"
+        ],
+        "risk": "Estado interno inconsistentes entre sessões",
+        "mitigation": "Resetar estado em cada início de nova sessão"
+      },
+      {
+        "id": "4.5b.3",
+        "title": "REFACTOR: add event hooks and notifications to focus manager",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar para separar lógica de tempo de lógica de notificação, adicionando hooks de eventos (on_start, on_break) para integração futura com UI/CLI, sem quebrar testes existentes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "FocusManager expõe callbacks de evento configuráveis",
+          "Notificação isolada da lógica central",
+          "Testes permanecem verdes"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/focus_manager.py"
+        ],
+        "dependencies": ["4.5b.2"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/focus_manager.py"
+        ],
+        "risk": "API de eventos ficar complexa",
+        "mitigation": "Manter interface simples e documentar exemplos"
+      },
+      {
+        "id": "4.6a",
+        "title": "Analisar gerador de resumo diário",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Definir formato do resumo diário, incluindo número de tarefas concluídas, tempo gasto, conquistas e próximos passos, e onde será salvo (arquivo, console).",
+        "deliverables": ["reports/analysis_daily_summary.md"],
+        "acceptance_criteria": [
+          "Template de resumo em Markdown ou texto simples",
+          "Campos obrigatórios e opcionais definidos"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [],
+        "risk": "Resumo não ser útil ou motivador para o usuário",
+        "mitigation": "Incluir recomendações e feedback do usuário em design"
+      },
+      {
+        "id": "4.6b.1",
+        "title": "TEST: should_generate_daily_summary_with_stats",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o resumo diário contém contagem de tasks, tempo total gasto, conquistas recentes e se reinicia o contador diário após gerar o resumo.",
+        "test_specs": [
+          "should_include_number_of_tasks_and_total_time_in_summary_within_100_chars",
+          "should_include_recent_achievements_in_summary_max_5_badges",
+          "should_reset_daily_stats_after_summary_generation_in_under_10ms"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se algum campo faltar ou estatísticas não resetarem",
+          "Cobertura de ao menos dois dias consecutivos"
+        ],
+        "deliverables": [
+          "tests/test_daily_summary.py::test_should_generate_daily_summary_with_stats"
+        ],
+        "dependencies": [],
+        "branch": "feature/tdah-tooling",
+        "files_touched": ["tests/test_daily_summary.py"],
+        "risk": "Salvar arquivos de resumo em locais incorretos",
+        "mitigation": "Usar diretório configurável e limpar após testes"
+      },
+      {
+        "id": "4.6b.2",
+        "title": "IMPL: minimal daily summary generator",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar gerador em transform/warnings/cli/daily_summary.py que coleta dados do AchievementsTracker e FocusManager e produz resumo diário, resetando estatísticas após a geração.",
+        "test_specs": [
+          "should_include_number_of_tasks_and_total_time_in_summary_within_100_chars",
+          "should_include_recent_achievements_in_summary_max_5_badges",
+          "should_reset_daily_stats_after_summary_generation_in_under_10ms"
+        ],
+        "acceptance_criteria": [
+          "Resumo contém todos os campos esperados",
+          "Reset diário ocorre corretamente",
+          "Testes da fase red passam"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/daily_summary.py",
+          "tests/test_daily_summary.py::test_should_generate_daily_summary_with_stats"
+        ],
+        "dependencies": ["4.6b.1"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/daily_summary.py"
+        ],
+        "risk": "Excesso de acoplamento com outros módulos",
+        "mitigation": "Utilizar interfaces definidas (AchievementsTracker e FocusManager) para obter dados"
+      },
+      {
+        "id": "4.6b.3",
+        "title": "REFACTOR: export summary formats and schedule automation",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar o gerador para permitir exportação em múltiplos formatos (texto, Markdown, JSON) e agendar execução automática via cron ou scheduler, mantendo testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Resumo pode ser salvo em diferentes formatos com opções --format",
+          "Scheduler configurável documentado",
+          "Nenhum teste quebra"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/daily_summary.py",
+          "config/daily_summary_schedule.yaml"
+        ],
+        "dependencies": ["4.6b.2"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/daily_summary.py",
+          "config/daily_summary_schedule.yaml"
+        ],
+        "risk": "Scheduler interagir mal com pipeline principal",
+        "mitigation": "Rodar scheduler em processo separado e documentar"
+      },
+      {
+        "id": "4.7b.1",
+        "title": "TEST: should_integrate_cli_tools_into_main_cli",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o comando principal da CLI lista as novas ferramentas (timer, progress, commit, achievements, focus, summary) e as executa corretamente.",
+        "test_specs": [
+          "should_list_all_6_new_commands_in_main_cli_under_tdah_section",
+          "should_invoke_subcommand_correctly_from_main_cli_in_under_200ms"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se comandos não aparecem ou executam errado",
+          "Cobertura de pelo menos duas subcomandos"
+        ],
+        "deliverables": [
+          "tests/test_cli_integration.py::test_should_integrate_cli_tools_into_main_cli"
+        ],
+        "dependencies": [
+          "4.1b.3",
+          "4.2b.3",
+          "4.3b.3",
+          "4.4b.3",
+          "4.5b.3",
+          "4.6b.3"
+        ],
+        "branch": "feature/tdah-tooling",
+        "files_touched": ["tests/test_cli_integration.py"],
+        "risk": "Comandos conflitarem com opções existentes",
+        "mitigation": "Usar namespaces e prefixos claros"
+      },
+      {
+        "id": "4.7b.2",
+        "title": "IMPL: integrate CLI tools into main entrypoint",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Modificar o entrypoint de linha de comando (ex.: `etldebrito` ou script principal) para registrar subcomandos para cada ferramenta TDAH, mantendo organização modular.",
+        "test_specs": [
+          "should_list_all_6_new_commands_in_main_cli_under_tdah_section",
+          "should_invoke_subcommand_correctly_from_main_cli_in_under_200ms"
+        ],
+        "acceptance_criteria": [
+          "CLI principal exibe nova seção 'TDAH Tools'",
+          "Cada comando chama a função correta de seu módulo",
+          "Testes da fase red passam sem regressão"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/main_cli.py",
+          "tests/test_cli_integration.py::test_should_integrate_cli_tools_into_main_cli"
+        ],
+        "dependencies": ["4.7b.1"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/main_cli.py"
+        ],
+        "risk": "Adicionar dependências cruzadas entre módulos CLI",
+        "mitigation": "Usar registro dinâmico de comandos e injeção"
+      },
+      {
+        "id": "4.7b.3",
+        "title": "REFACTOR: standardize CLI interface and help texts",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar a CLI principal para padronizar os textos de ajuda, opções globais e organizar a hierarquia de comandos, mantendo todos os testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Todos os comandos exibem ajuda consistente",
+          "Opções comuns (ex.: --verbose) aplicáveis em subcomandos",
+          "Testes permanecem verdes"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/main_cli.py",
+          "docs/cli_usage.md"
+        ],
+        "dependencies": ["4.7b.2"],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "transform/warnings/cli/main_cli.py",
+          "docs/cli_usage.md"
+        ],
+        "risk": "Mudança na interface quebrar scripts existentes",
+        "mitigation": "Adicionar aviso de depreciação e flag de compatibilidade"
+      },
+      {
+        "id": "4.8a",
+        "title": "Documentar e exemplificar as ferramentas TDAH",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Escrever documentação detalhada e exemplos de uso das ferramentas TDAH (timer, progress, commit, achievements, focus, summary), incluindo screenshots e exemplos reais.",
+        "deliverables": [
+          "docs/cli_usage.md",
+          "docs/tdah_tooling_examples.md"
+        ],
+        "acceptance_criteria": [
+          "Cada ferramenta com exemplo de execução e saída esperada",
+          "Comandos e opções claramente descritos"
+        ],
+        "dependencies": [
+          "4.7b.3",
+          "4.6b.3",
+          "4.5b.3",
+          "4.4b.3"
+        ],
+        "branch": "feature/tdah-tooling",
+        "files_touched": [
+          "docs/tdah_tooling_examples.md"
+        ],
+        "risk": "Docs ficarem desatualizadas rapidamente",
+        "mitigation": "Adicionar check de documentação no CI para atualizar após mudanças"
+      }
+    ],
+    "checklist_epic_level": [
+      "Todos os testes escritos antes da implementação",
+      "100% de cobertura de testes nos novos módulos",
+      "Ciclo red-green-refactor seguido consistentemente",
+      "Nenhuma regressão em testes existentes",
+      "Code review aprovado com foco em qualidade dos testes",
+      "Análises completas para cada ferramenta concluídas com documentação anexada",
+      "Testes RED escritos antes das implementações GREEN",
+      "Ciclo red-green-refactor seguido para cada módulo (timer, progress, commit, achievements, focus, summary, integração)",
+      "Cobertura de testes ≥ 90% em todos os módulos CLI",
+      "Mínimo de 60% das tasks executáveis em paralelo (análises e testes podem rodar em paralelo)",
+      "Integração com CLI principal validada e sem regressão nas chamadas de API"
+    ],
+    "automation_hooks": {
+      "create_labels": ["tdd", "cli", "tdah", "tooling"],
+      "project_board": {
+        "name": "TDD Development Board",
+        "columns": ["Red (Failing Tests)", "Green (Implementation)", "Refactor", "Done"]
+      },
+      "default_branch": "refactor",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": ["pytest", "coverage", "black", "flake8"],
+      "issue_template_fields": [
+        "title", "description", "tdd_phase", "test_specs",
+        "acceptance_criteria", "deliverables", "dependencies",
+        "estimate_minutes", "risk", "mitigation"
+      ],
+      "milestone": "EPIC 4 - TDAH Tooling Implementation"
+    }
+  }
+}
