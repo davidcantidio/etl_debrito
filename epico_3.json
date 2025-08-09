@@ -1,0 +1,527 @@
+{
+  "epic": {
+    "id": "3",
+    "name": "Interactive Warning Resolution System",
+    "summary": "Implementar um sistema interativo de captura e resolução de warnings que registra decisões do usuário em tempo real, persiste em banco de dados e aplica automaticamente as regras em execuções futuras, sem degradar a performance do pipeline.",
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "goals": [
+      "Implementar captura de warnings em tempo real sem afetar a performance do pipeline em mais de 5% do tempo base de execução",
+      "Criar interface interativa que solicite decisão do usuário apenas para warnings desconhecidos",
+      "Persistir decisões em SQLite garantindo propriedades ACID e recuperá-las para aplicação automática"
+    ],
+    "definition_of_done": [
+      "Todos os testes escritos antes da implementação e cobertura ≥ 90%",
+      "As fases red-green-refactor são seguidas para cada funcionalidade",
+      "Sistema captura, persiste e aplica decisões sem exceder 2 chamadas de API",
+      "Pelo menos 60% das tarefas podem ser executadas em paralelo"
+    ],
+    "duration": "1 semana",
+    "labels": ["tdd", "interactive-system", "warnings", "database"],
+    "tasks": [
+      {
+        "id": "3.1a",
+        "title": "Analisar requisitos de captura de warnings",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Revisar a documentação de arquitetura de warnings e o código atual para entender como e onde warnings são gerados e quais hooks estão disponíveis.",
+        "deliverables": ["reports/analysis_warning_capture.md"],
+        "acceptance_criteria": [
+          "Documento descrevendo os pontos de geração de warnings",
+          "Identificação de possíveis hooks para interceptação"
+        ],
+        "dependencies": [],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [],
+        "risk": "Subestimar complexidade de pontos de hook",
+        "mitigation": "Consultar código e auditorias anteriores"
+      },
+      {
+        "id": "3.1b.1",
+        "title": "TEST: should_capture_warnings_in_under_10ms_without_extra_api_calls",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o interceptor captura warnings de validação em menos de 10 ms por warning e não aumenta o número de chamadas de API.",
+        "test_specs": [
+          "should_capture_warnings_in_under_10ms_per_warning_with_zero_api_increase",
+          "should_maintain_pipeline_performance_within_5_percent_when_intercepting"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com mensagem indicando tempos ou contagens excedidas",
+          "Testa ao menos dois tipos de warnings diferentes"
+        ],
+        "deliverables": [
+          "tests/test_warning_interceptor.py::test_should_capture_warnings_in_under_10ms_without_extra_api_calls"
+        ],
+        "dependencies": [],
+        "branch": "feature/interactive-warnings",
+        "files_touched": ["tests/test_warning_interceptor.py"],
+        "risk": "Medir tempo em testes pode ser instável",
+        "mitigation": "Usar mocks e timers controlados no teste"
+      },
+      {
+        "id": "3.1b.2",
+        "title": "IMPL: minimal warning interceptor to pass capture tests",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar código mínimo em transform/warnings/warning_interceptor.py para interceptar warnings, armazenar informações básicas e garantir que os testes de desempenho e contagem de API passem.",
+        "test_specs": [
+          "should_capture_warnings_in_under_10ms_per_warning_with_zero_api_increase",
+          "should_maintain_pipeline_performance_within_5_percent_when_intercepting"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red agora passa",
+          "Nenhum teste anterior é quebrado",
+          "Implementação não adiciona chamadas de API"
+        ],
+        "deliverables": [
+          "tests/test_warning_interceptor.py::test_should_capture_warnings_in_under_10ms_without_extra_api_calls",
+          "transform/warnings/warning_interceptor.py"
+        ],
+        "dependencies": ["3.1b.1"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/warning_interceptor.py"
+        ],
+        "risk": "Interceptação afetar fluxo de execução",
+        "mitigation": "Encapsular lógica de interceptação e adicionar logs de debug"
+      },
+      {
+        "id": "3.1b.3",
+        "title": "REFACTOR: optimize and modularize warning interceptor",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar o interceptor para melhorar clareza e modularidade, separando captura, logging e encaminhamento de warnings, mantendo todos os testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Código do interceptor segmentado em funções/classes claras",
+          "Nenhum teste deixa de passar",
+          "Complexidade ciclomática mantida ou reduzida"
+        ],
+        "deliverables": [
+          "transform/warnings/warning_interceptor.py"
+        ],
+        "dependencies": ["3.1b.2"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/warning_interceptor.py"
+        ],
+        "risk": "Refatoração introduzir regressões",
+        "mitigation": "Executar bateria completa de testes após cada alteração"
+      },
+      {
+        "id": "3.2a",
+        "title": "Analisar requisitos da interface interativa de decisão",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Estudar o design proposto para o sistema interativo (arquitetura de decisão) e identificar comportamentos esperados, como quando solicitar decisões e como reutilizá-las.",
+        "deliverables": ["reports/analysis_interactive_decision.md"],
+        "acceptance_criteria": [
+          "Documento listando triggers para decisões interativas",
+          "Fluxo básico de interação usuário-sistema descrito"
+        ],
+        "dependencies": [],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [],
+        "risk": "Não capturar todos os casos de decisão necessários",
+        "mitigation": "Revisar logs e entrevistas anteriores"
+      },
+      {
+        "id": "3.2b.1",
+        "title": "TEST: should_prompt_user_only_for_unknown_warnings",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o sistema solicita uma decisão do usuário apenas para warnings desconhecidos, e reutiliza decisões salvas para warnings conhecidos.",
+        "test_specs": [
+          "should_prompt_user_for_decision_when_warning_is_unknown",
+          "should_not_prompt_user_again_for_known_warning"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com mensagem indicando prompts incorretos",
+          "Testa tanto warnings novos quanto repetidos"
+        ],
+        "deliverables": [
+          "tests/test_interactive_handler.py::test_should_prompt_user_only_for_unknown_warnings"
+        ],
+        "dependencies": [],
+        "branch": "feature/interactive-warnings",
+        "files_touched": ["tests/test_interactive_handler.py"],
+        "risk": "Simular interações de usuário em testes pode ser complexo",
+        "mitigation": "Usar mocks de entrada de usuário e decisões predefinidas"
+      },
+      {
+        "id": "3.2b.2",
+        "title": "IMPL: minimal interactive decision handler",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar handler interativo mínimo em transform/warnings/interactive_handler.py para mostrar o prompt ao usuário em warnings desconhecidos e registrar a decisão sem consulta quando o warning já for conhecido.",
+        "test_specs": [
+          "should_prompt_user_for_decision_when_warning_is_unknown",
+          "should_not_prompt_user_again_for_known_warning"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red passa",
+          "Decisão do usuário é capturada e reutilizada",
+          "Nenhum warning conhecido gera prompt"
+        ],
+        "deliverables": [
+          "tests/test_interactive_handler.py::test_should_prompt_user_only_for_unknown_warnings",
+          "transform/warnings/interactive_handler.py"
+        ],
+        "dependencies": ["3.2b.1"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/interactive_handler.py"
+        ],
+        "risk": "Manipulação de estado global de decisões",
+        "mitigation": "Armazenar decisões em objeto de contexto isolado"
+      },
+      {
+        "id": "3.2b.3",
+        "title": "REFACTOR: improve user prompt and decision flow",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar a interface de decisão para separar a camada de I/O (prompt) da lógica de decisão e permitir testes mais fáceis.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Funções de entrada/saída isoladas da lógica",
+          "Testes existentes permanecem verdes",
+          "Interface preparada para extensões futuras (CLI/GUI)"
+        ],
+        "deliverables": [
+          "transform/warnings/interactive_handler.py"
+        ],
+        "dependencies": ["3.2b.2"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/interactive_handler.py"
+        ],
+        "risk": "Quebrar a compatibilidade com decisões persistidas",
+        "mitigation": "Garantir compatibilidade e cobertura de testes antes de merge"
+      },
+      {
+        "id": "3.3a",
+        "title": "Analisar schema e operações de persistência no SQLite",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Rever o schema SQLite (tabelas user_decisions, warning_rules) e entender operações básicas de inserir e recuperar decisões.",
+        "deliverables": ["reports/analysis_persistence.md"],
+        "acceptance_criteria": [
+          "Documento com diagrama do schema",
+          "Lista de operações CRUD necessárias"
+        ],
+        "dependencies": [],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [],
+        "risk": "Ignorar constraints necessárias (ACID)",
+        "mitigation": "Validar com docs do SQLite e guidelines TDD"
+      },
+      {
+        "id": "3.3b.1",
+        "title": "TEST: should_save_and_retrieve_user_decisions_acid_compliant",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que uma decisão do usuário é salva corretamente no SQLite com propriedades ACID e pode ser recuperada posteriormente.",
+        "test_specs": [
+          "should_save_decision_in_db_with_acid_compliance_and_rollback_on_error",
+          "should_retrieve_saved_decision_by_warning_hash_in_under_5ms"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com mensagens indicando falhas na persistência",
+          "Usa transações explícitas para checar atomicidade"
+        ],
+        "deliverables": [
+          "tests/test_decision_database.py::test_should_save_and_retrieve_user_decisions_acid_compliant"
+        ],
+        "dependencies": [],
+        "branch": "feature/interactive-warnings",
+        "files_touched": ["tests/test_decision_database.py"],
+        "risk": "Teste interagir com banco real prejudicar paralelismo",
+        "mitigation": "Usar banco SQLite em disco temporário exclusivo para o teste"
+      },
+      {
+        "id": "3.3b.2",
+        "title": "IMPL: minimal decision persistence layer",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar código mínimo para persistir e recuperar decisões em transform/warnings/decision_database.py usando SQLite, de forma transacional.",
+        "test_specs": [
+          "should_save_decision_in_db_with_acid_compliance_and_rollback_on_error",
+          "should_retrieve_saved_decision_by_warning_hash_in_under_5ms"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red passa",
+          "Dados persistidos são recuperáveis por chave única",
+          "Nenhum deadlock ou exceção é gerada"
+        ],
+        "deliverables": [
+          "tests/test_decision_database.py::test_should_save_and_retrieve_user_decisions_acid_compliant",
+          "transform/warnings/decision_database.py"
+        ],
+        "dependencies": ["3.3b.1"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/decision_database.py"
+        ],
+        "risk": "Abstração mínima esconder detalhes críticos de transação",
+        "mitigation": "Documentar claramente os limites da implementação e usar PRAGMAs adequados"
+      },
+      {
+        "id": "3.3b.3",
+        "title": "REFACTOR: optimize database access patterns",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar a camada de persistência para melhorar encapsulamento (padrão Repository) e adicionar pooling ou caching adequado, mantendo os testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Camada de persistência isolada atrás de interface clara",
+          "Nenhum teste quebra",
+          "Potencial de troca de banco no futuro"
+        ],
+        "deliverables": [
+          "transform/warnings/decision_database.py"
+        ],
+        "dependencies": ["3.3b.2"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/decision_database.py"
+        ],
+        "risk": "Introduzir overhead desnecessário",
+        "mitigation": "Medir performance antes e depois; manter código simples"
+      },
+      {
+        "id": "3.4a",
+        "title": "Analisar engine de regras para auto-resolução",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Revisar o design proposto para o RulesEngine e como ele aplica decisões salvas a novas ocorrências de warnings.",
+        "deliverables": ["reports/analysis_rules_engine.md"],
+        "acceptance_criteria": [
+          "Especificação de como as regras são armazenadas e avaliadas",
+          "Lista de situações onde a auto-resolução deve ocorrer"
+        ],
+        "dependencies": [],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [],
+        "risk": "Não cobrir cenários de conflito entre regras",
+        "mitigation": "Documentar casos de conflito e planejar testes"
+      },
+      {
+        "id": "3.4b.1",
+        "title": "TEST: should_apply_saved_decision_and_skip_prompt_on_repeat_warning",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que, quando um warning recorrente ocorre, a decisão previamente salva é aplicada automaticamente e nenhum prompt é exibido ao usuário.",
+        "test_specs": [
+          "should_apply_saved_decision_when_warning_occurs_again",
+          "should_not_prompt_user_again_for_known_warning"
+        ],
+        "acceptance_criteria": [
+          "Teste falha por decisão não aplicada ou prompt indevido",
+          "Cobertura de pelo menos dois tipos de warnings",
+          "Verificar persistência e reutilização da decisão"
+        ],
+        "deliverables": [
+          "tests/test_rules_engine.py::test_should_apply_saved_decision_and_skip_prompt_on_repeat_warning"
+        ],
+        "dependencies": ["3.3b.2", "3.2b.2"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": ["tests/test_rules_engine.py"],
+        "risk": "Complexidade de estados de decisão tornar testes frágeis",
+        "mitigation": "Isolar estado de decisões em cada teste com fixtures"
+      },
+      {
+        "id": "3.4b.2",
+        "title": "IMPL: minimal rules engine",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar versão mínima do RulesEngine em transform/warnings/rules_engine.py, capaz de buscar decisões salvas e aplicá-las automaticamente sem pedir nova decisão.",
+        "test_specs": [
+          "should_apply_saved_decision_when_warning_occurs_again",
+          "should_not_prompt_user_again_for_known_warning"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red passa",
+          "Uso correto do database para recuperar decisões",
+          "Integração transparente com o interceptor e o handler"
+        ],
+        "deliverables": [
+          "tests/test_rules_engine.py::test_should_apply_saved_decision_and_skip_prompt_on_repeat_warning",
+          "transform/warnings/rules_engine.py"
+        ],
+        "dependencies": ["3.4b.1"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/rules_engine.py"
+        ],
+        "risk": "Erros na lógica de matching de warnings",
+        "mitigation": "Usar hashing ou chaves definidas para buscar decisões"
+      },
+      {
+        "id": "3.4b.3",
+        "title": "REFACTOR: modularize rules engine for extensibility",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar o RulesEngine para separar a lógica de matching da lógica de aplicação de ações, preparando para futuras extensões (novas regras, UI).",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Camadas de busca e aplicação separadas",
+          "Testes continuam verdes",
+          "Código fica mais legível e fácil de estender"
+        ],
+        "deliverables": [
+          "transform/warnings/rules_engine.py"
+        ],
+        "dependencies": ["3.4b.2"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/rules_engine.py"
+        ],
+        "risk": "Refatoração causar regressão nas decisões aplicadas",
+        "mitigation": "Executar conjunto completo de testes antes do merge"
+      },
+      {
+        "id": "3.5b.1",
+        "title": "TEST: should_handle_multiple_warnings_concurrently_without_conflicts",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o sistema consegue capturar e resolver múltiplos warnings simultaneamente (threads ou async) sem race conditions ou deadlocks.",
+        "test_specs": [
+          "should_handle_multiple_warnings_concurrently_without_conflicts",
+          "should_not_deadlock_when_two_warnings_arrive_at_same_time"
+        ],
+        "acceptance_criteria": [
+          "Teste falha indicando conflito ou deadlock",
+          "Exercita pelo menos dois cenários de concorrência"
+        ],
+        "deliverables": [
+          "tests/test_concurrency.py::test_should_handle_multiple_warnings_concurrently_without_conflicts"
+        ],
+        "dependencies": ["3.1b.2", "3.2b.2", "3.3b.2", "3.4b.2"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": ["tests/test_concurrency.py"],
+        "risk": "Simulação de concorrência em testes gerar flakiness",
+        "mitigation": "Usar threads controladas ou async com timeout reduzido"
+      },
+      {
+        "id": "3.5b.2",
+        "title": "IMPL: concurrency support in warning resolution",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar suporte à concorrência no interceptor, handler e rules engine para garantir que múltiplos warnings sejam processados em paralelo sem conflitos.",
+        "test_specs": [
+          "should_handle_multiple_warnings_concurrently_without_conflicts",
+          "should_not_deadlock_when_two_warnings_arrive_at_same_time"
+        ],
+        "acceptance_criteria": [
+          "Teste da fase red passa",
+          "Uso adequado de locks ou estruturas thread-safe",
+          "Sem impacto significativo de performance"
+        ],
+        "deliverables": [
+          "tests/test_concurrency.py::test_should_handle_multiple_warnings_concurrently_without_conflicts",
+          "transform/warnings/warning_interceptor.py",
+          "transform/warnings/interactive_handler.py",
+          "transform/warnings/rules_engine.py"
+        ],
+        "dependencies": ["3.5b.1"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/warning_interceptor.py",
+          "transform/warnings/interactive_handler.py",
+          "transform/warnings/rules_engine.py"
+        ],
+        "risk": "Concorrência aumentar complexidade e risco de deadlocks",
+        "mitigation": "Usar abstrações de concorrência de alto nível e revisar design"
+      },
+      {
+        "id": "3.5b.3",
+        "title": "REFACTOR: improve concurrency primitives and documentation",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar o suporte à concorrência para utilizar primitivas mais robustas (ex.: fila de tarefas, asyncio) e documentar claramente o comportamento esperado em cenários paralelos.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Todos os testes continuam verdes",
+          "Documentação adicionada explicando modelo de concorrência",
+          "Sem regressão de performance"
+        ],
+        "deliverables": [
+          "transform/warnings/warning_interceptor.py",
+          "transform/warnings/interactive_handler.py",
+          "transform/warnings/rules_engine.py",
+          "docs/concurrency_model.md"
+        ],
+        "dependencies": ["3.5b.2"],
+        "branch": "feature/interactive-warnings",
+        "files_touched": [
+          "transform/warnings/warning_interceptor.py",
+          "transform/warnings/interactive_handler.py",
+          "transform/warnings/rules_engine.py",
+          "docs/concurrency_model.md"
+        ],
+        "risk": "Refatoração pode introduzir novos bugs de sincronização",
+        "mitigation": "Executar testes de stress e code review focado em concorrência"
+      }
+    ],
+    "checklist_epic_level": [
+      "Todos os testes escritos antes da implementação",
+      "100% de cobertura de testes nos novos módulos",
+      "Ciclo red-green-refactor seguido consistentemente",
+      "Nenhuma regressão em testes existentes",
+      "Code review aprovado com foco em qualidade dos testes",
+      "Análises completas sobre captura, decisão, persistência e regras realizadas",
+      "Todos os testes RED escritos antes das implementações GREEN",
+      "Ciclo red-green-refactor seguido para cada funcionalidade",
+      "Cobertura de testes ≥ 90% em todos os módulos modificados",
+      "Mínimo de 60% das tarefas (especialmente testes RED) executáveis em paralelo",
+      "Performance do pipeline preservada (2 chamadas de API) durante captura e resolução de warnings"
+    ],
+    "automation_hooks": {
+      "create_labels": ["tdd", "interactive-system", "warnings", "database"],
+      "project_board": {
+        "name": "TDD Development Board",
+        "columns": ["Red (Failing Tests)", "Green (Implementation)", "Refactor", "Done"]
+      },
+      "default_branch": "refactor",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": ["pytest", "coverage", "black", "flake8"],
+      "issue_template_fields": [
+        "title", "description", "tdd_phase", "test_specs",
+        "acceptance_criteria", "deliverables", "dependencies",
+        "estimate_minutes", "risk", "mitigation"
+      ],
+      "milestone": "EPIC 3 - Interactive Warning Resolution"
+    }
+  }
+}
