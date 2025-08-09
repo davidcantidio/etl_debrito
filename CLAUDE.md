@@ -84,6 +84,15 @@ python main.py --help
 - **Desenvolvimento**: Testar mudanças em plataforma específica
 - **Production**: Executar pipelines independentes via cron
 
+### 📦 Instalação das Dependências:
+```bash
+# Instalar dependências com Poetry
+poetry install
+
+# Ativar ambiente virtual (opcional, Poetry faz automaticamente)
+poetry shell
+```
+
 ### Executar Pipeline Completo:
 ```bash
 # Via Notebook (recomendado para desenvolvimento)
@@ -97,6 +106,8 @@ python testar_pipeline_real.py
 ```bash
 # Executar todos os testes
 python -m pytest tests/
+# ou com Poetry:
+poetry run pytest tests/
 
 # Teste específico de performance
 python -m pytest tests/test_no_extra_gets.py
