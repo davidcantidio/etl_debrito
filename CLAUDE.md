@@ -227,7 +227,23 @@ API_OPTIMIZATIONS = {
 - [`docs/scrum/ARQUITETURA_WARNINGS.md`](docs/scrum/ARQUITETURA_WARNINGS.md) - Especificação técnica
 - [`docs/scrum/TDAH_OPTIMIZATION.md`](docs/scrum/TDAH_OPTIMIZATION.md) - Estratégias TDAH específicas
 
+**Análise crítica disponível**: [`prject_critic.md`](prject_critic.md) - Comparação detalhada entre pré-projeto e implementação atual
+
 **Próximos passos**: Refinamento do planejamento → Início da implementação
+
+## 🔍 **Riscos Identificados e Quick Wins**
+
+### **Riscos Técnicos** *(identificados na análise crítica)*
+1. **Estado Global (builtins)**: Uso de `builtins.fetcher` e caches globais pode causar problemas de concorrência
+2. **TTL Hardcoded**: Cache fixo em 300s pode expirar durante execuções longas
+3. **Ordem de Execução Pinterest**: Dependência rígida entre pinterestGeral e demográficos
+4. **Thread Safety**: Caches globais sem proteção para acesso paralelo
+
+### **Quick Wins Recomendados**
+- ✅ **TTL Configurável**: Expor TTL do cache em arquivo de configuração
+- ✅ **Exportar Warnings**: Salvar relatórios de validação em CSV/JSON
+- ✅ **Checkpoints nos Logs**: Adicionar timestamps por etapa do pipeline
+- ✅ **Testes de Regressão**: Criar suite básica com dados de amostra
 
 ---
 

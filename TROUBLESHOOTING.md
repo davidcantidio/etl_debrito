@@ -301,6 +301,67 @@ for sheet_name, df in backup_data.items():
     df.to_csv(f"backup_{sheet_name}_{pd.Timestamp.now():%Y%m%d_%H%M}.csv")
 ```
 
+### 12. Pinterest Execution Order Dependency
+**Log Pattern**: `RuntimeError: ERRO: pinterestGeral ainda não foi executado`  
+**Location**: Pinterest demographic merge operations  
+**Root Cause**: pinterestIdade/Genero/Regiao depend on pinterestGeral being processed first
+
+**Solution**:
+```python
+# ALWAYS process pinterestGeral BEFORE demographic sheets:
+sheet_order = [
+    "pinterestGeral",  # MUST BE FIRST
+    "pinterestIdade", 
+    "pinterestGenero",
+    "pinterestRegiao"
+]
+
+# Or check if cache exists before processing:
+if hasattr(builtins, '_pinterest_geral_tratado'):
+    # Safe to process demographic sheets
+    pass
+else:
+    # Process pinterestGeral first
+    pass
+```
+
+### 13. Global State Concurrency Risks
+**Log Pattern**: Unpredictable behavior in parallel executions  
+**Location**: builtins.fetcher, _pinterest_geral_tratado, cache globals  
+**Root Cause**: Shared global state without thread safety
+
+**Solution**:
+```python
+# SHORT-TERM: Ensure single-threaded execution
+# LONG-TERM: Refactor to use explicit context passing
+
+# Example of safer pattern:
+class PipelineContext:
+    def __init__(self):
+        self.fetcher = None
+        self.pinterest_cache = {}
+        self._lock = threading.Lock()
+    
+    def get_pinterest_cache(self, key):
+        with self._lock:
+            return self.pinterest_cache.get(key)
+```
+
+### 14. Cache TTL Expiration During Long Runs
+**Log Pattern**: Unexpected API calls after 5 minutes  
+**Location**: SheetsFetcher cache expiration  
+**Root Cause**: Hardcoded TTL of 300 seconds
+
+**Solution**:
+```python
+# Create sheets_config.yaml or .env:
+SHEETS_CACHE_TTL=900  # 15 minutes for long pipelines
+
+# Or dynamically set based on sheet count:
+ttl = max(300, len(sheet_names) * 30)  # 30s per sheet minimum
+fetcher = SheetsFetcher(cache_ttl=ttl)
+```
+
 ---
 
 **🆘 If all else fails**: Check `logs/pipeline_debug.log` for the exact error location and compare with working patterns in CLAUDE.md files.
