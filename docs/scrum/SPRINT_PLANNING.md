@@ -1,9 +1,9 @@
 # SPRINT PLANNING: Sistema Interativo de Warnings
 
-## 📋 **Product Backlog - ~110 Micro-Tasks TDAH-Optimized (Refinado com Auditoria Crítica)**
+## 📋 **Product Backlog - ~117 Micro-Tasks TDAH-Optimized (Auditoria Crítica Completa)**
 
 ### **Metodologia SCRUM Adaptada para TDAH**
-- **Micro-tasks**: 10-25 minutos cada (~110 total, incluindo pontos omitidos)
+- **Micro-tasks**: 8-25 minutos cada (117 total, incluindo todos os pontos da auditoria crítica)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Visual progress**: Checkbox satisfaction constante
 - **Zero context switching**: 1 arquivo, 1 função por task
@@ -94,6 +94,65 @@
     - **AC**: Configuração final funcionando em prod/dev/test
     - **Test**: Deploy test em cada environment  
     - **Deliverable**: Working configuration para próximo epic
+
+---
+
+## 🎯 **EPIC 0.5: INTEGRATION ARCHITECTURE FIXES** *(1 dia, 8 micro-tasks críticas)*
+
+### **Sprint Goal**
+> Resolver inconsistências arquiteturais críticas identificadas na auditoria: builtins vs dependency injection, mapeamento completo de warning points, e interfaces específicas.
+
+### **Definition of Done**
+- [ ] Pattern de injeção de dependência definido (não builtins)
+- [ ] Inventário completo de todos os log.warning() calls
+- [ ] Funções específicas de validação mapeadas para hooks
+- [ ] Interfaces de invalidação de cache projetadas
+
+---
+
+#### **Refinamentos Arquiteturais Críticos (8 tasks × 15-20min)**
+
+**US000.5**: *Como desenvolvedor, quero resolver inconsistências arquiteturais identificadas na crítica*
+
+97. [ ] **Task 0.13**: Resolve builtins vs dependency injection pattern *(20min)*
+    - **AC**: Definir pattern consistente para compartilhar objetos entre módulos
+    - **Test**: TreatPipeline vs main branch - resolver divergência
+    - **Deliverable**: Arquitetura de injeção sem uso de builtins globais
+
+98. [ ] **Task 0.14**: Create complete warning points inventory (grep-based) *(15min)*
+    - **AC**: Lista completa de todos os log.warning() calls no codebase
+    - **Test**: Executar grep recursivo e catalogar resultados
+    - **Deliverable**: Inventário detalhado para hook placement
+
+99. [ ] **Task 0.15**: Map specific validation functions for hooking *(18min)*
+    - **AC**: validate_columns, check_required_columns, validate_taxonomy_consistency mapeadas
+    - **Test**: Confirmar que cada função listada na crítica foi identificada
+    - **Deliverable**: Hook points específicos por função
+
+100. [ ] **Task 0.16**: Design cache invalidation interfaces *(20min)*
+     - **AC**: Interfaces para BIParamLookup.invalidate() e SheetsFetcher.clear_cache()
+     - **Test**: Definir assinaturas de métodos necessários
+     - **Deliverable**: Interface specification para invalidação
+
+101. [ ] **Task 0.17**: Resolve pipeline reports integration strategy *(18min)*
+     - **AC**: Como modificar _last_taxo_report e _last_impressions_report
+     - **Test**: Definir strategy para warning decisions → reports
+     - **Deliverable**: Integration pattern para relatórios de pipeline
+
+102. [ ] **Task 0.18**: Test builtins elimination approach *(15min)*
+     - **AC**: Confirmar que dependency injection funciona sem builtins
+     - **Test**: Mock test da nova arquitetura
+     - **Deliverable**: Proof-of-concept sem vazamento de estado global
+
+103. [ ] **Task 0.19**: Design warning context preservation *(17min)*
+     - **AC**: Como manter contexto entre validation → decision → application
+     - **Test**: Flow de dados sem perder informação
+     - **Deliverable**: Context flow specification
+
+104. [ ] **Task 0.20**: Create architectural consistency checklist *(12min)*
+     - **AC**: Checklist para validar consistency durante implementação
+     - **Test**: Aplicar checklist nos épicos seguintes
+     - **Deliverable**: Architectural validation checklist
 
 ---
 
@@ -275,6 +334,55 @@
     - **AC**: Strategy completa e safe para implementação
     - **Test**: Review strategy contra todos os risks identificados
     - **Deliverable**: Implementation roadmap
+
+---
+
+## 🎯 **EPIC 1.5: DETAILED HOOK MAPPING** *(1 dia, 6 micro-tasks críticas)*
+
+### **Sprint Goal**
+> Mapear pontos específicos de integração mencionados na crítica: funções exatas de validação, pipeline reports integration, e hooks precisos.
+
+### **Definition of Done**
+- [ ] Hook points específicos mapeados para cada função de validação
+- [ ] Estratégia de integração com relatórios de pipeline definida
+- [ ] Testes específicos para cada hook point
+- [ ] Context flow validado para cada função
+
+---
+
+#### **Mapeamento Específico de Funções (6 tasks × 10-15min)**
+
+**US001.5**: *Como desenvolvedor, quero hooks específicos para cada função de validação mencionada na crítica*
+
+31. [ ] **Task 1.16**: Hook validate_columns specifically *(10min)*
+    - **AC**: Hook específico na função validate_columns identificado
+    - **Test**: Trigger warning dessa função e interceptar
+    - **Deliverable**: Hook coordinates para validate_columns
+
+32. [ ] **Task 1.17**: Hook check_required_columns specifically *(10min)*
+    - **AC**: Hook específico na função check_required_columns
+    - **Test**: Missing column scenario intercepted
+    - **Deliverable**: Hook coordinates para check_required_columns
+
+33. [ ] **Task 1.18**: Hook validate_taxonomy_consistency specifically *(10min)*
+    - **AC**: Hook específico na função validate_taxonomy_consistency  
+    - **Test**: Taxonomy inconsistency intercepted
+    - **Deliverable**: Hook coordinates para validate_taxonomy_consistency
+
+34. [ ] **Task 1.19**: Hook validate_no_blank_cells specifically *(10min)*
+    - **AC**: Hook específico na função validate_no_blank_cells
+    - **Test**: Blank cell warning intercepted
+    - **Deliverable**: Hook coordinates para validate_no_blank_cells
+
+35. [ ] **Task 1.20**: Hook validate_aggregates specifically *(10min)*
+    - **AC**: Hook específico na função validate_aggregates
+    - **Test**: Aggregate validation warning intercepted  
+    - **Deliverable**: Hook coordinates para validate_aggregates
+
+36. [ ] **Task 1.21**: Design pipeline report integration strategy *(15min)*
+    - **AC**: Como modificar _last_taxo_report e _last_impressions_report com decisions
+    - **Test**: Strategy para anexar warning decisions aos relatórios
+    - **Deliverable**: Report integration pattern detalhado
 
 ---
 
@@ -672,6 +780,163 @@
     - **AC**: Rules work across multiple ETL executions
     - **Test**: Create rule, restart ETL, verify rule active
     - **Deliverable**: Cross-session rule persistence
+
+---
+
+## 🎯 **EPIC 2.5: TDAH TOOLING IMPLEMENTATION** *(2 dias, 8 micro-tasks especializadas)*
+
+### **Sprint Goal**
+> Implementar ferramentas CLI e sistemas de rastreabilidade mencionados na crítica: task timer, progress dashboard, commit tracking, achievement system.
+
+### **Definition of Done**
+- [ ] Task timer CLI funcional
+- [ ] Progress bar generator implementado
+- [ ] Sistema de associação task→commit
+- [ ] Achievement tracking básico funcionando
+
+---
+
+#### **Ferramentas TDAH Específicas (8 tasks × 20-25min)**
+
+**US002.5**: *Como desenvolvedor com TDAH, quero ferramentas CLI que suportem minha produtividade*
+
+94. [ ] **Task 2.11**: Create task timer CLI tool *(25min)*
+    - **AC**: CLI que time tasks e mostra progresso real vs estimado
+    - **Test**: Timer funciona para uma task real
+    - **Deliverable**: tdah_timer.py funcional
+
+95. [ ] **Task 2.12**: Implement progress bar generator *(20min)*
+    - **AC**: Gerador de barras de progresso visual para épicos
+    - **Test**: Progress bar atualiza conforme task completion
+    - **Deliverable**: progress_visualizer.py
+
+96. [ ] **Task 2.13**: Create commit-task association script *(25min)*
+    - **AC**: Script que associa commits com tasks específicas
+    - **Test**: Commit message indica task ID automaticamente
+    - **Deliverable**: task_commit_tracker.py
+
+97. [ ] **Task 2.14**: Design achievement tracking system *(20min)*
+    - **AC**: Sistema básico de achievements para milestones
+    - **Test**: Achievement unlocked após epic completion
+    - **Deliverable**: achievements.py básico
+
+98. [ ] **Task 2.15**: Implement focus session manager *(22min)*
+    - **AC**: Manager para sessões de foco com breaks automáticos
+    - **Test**: Focus session com timer e break reminders
+    - **Deliverable**: focus_manager.py
+
+99. [ ] **Task 2.16**: Create daily summary generator *(18min)*
+    - **AC**: Gerador de summaries diários de progresso
+    - **Test**: Summary mostra tasks completed, time spent, achievements
+    - **Deliverable**: daily_summary.py
+
+100. [ ] **Task 2.17**: Test all TDAH tools integration *(20min)*
+     - **AC**: Todas as ferramentas funcionam em conjunto
+     - **Test**: Full workflow com todas as ferramentas
+     - **Deliverable**: TDAH toolchain integrada
+
+101. [ ] **Task 2.18**: Create TDAH tools documentation *(15min)*
+     - **AC**: Documentação de como usar cada ferramenta
+     - **Test**: Seguir documentação para usar tools
+     - **Deliverable**: TDAH_TOOLS.md
+
+---
+
+## 🎯 **EPIC 3.5: CACHE MANAGEMENT SPECIFICS** *(1.5 dias, 6 micro-tasks críticas)*
+
+### **Sprint Goal**  
+> Implementar invalidação específica de caches conforme crítica: métodos específicos por cache, coordenação multi-classe, testes de cadeia.
+
+### **Definition of Done**
+- [ ] BIParamLookup.invalidate() implementado
+- [ ] SheetsFetcher.clear_cache() implementado
+- [ ] Coordenação multi-classe de caches funcional
+- [ ] Testes de invalidação em cadeia passando
+
+---
+
+#### **Cache Invalidation Específica (6 tasks × 15-20min)**
+
+**US003.5**: *Como sistema, quero invalidação específica de caches quando dados mudam*
+
+102. [ ] **Task 3.15**: Implement BIParamLookup.invalidate() method *(18min)*
+     - **AC**: Método para forçar reload de BI parametrização
+     - **Test**: Cache invalidation força reload de dados
+     - **Deliverable**: BIParamLookup com método invalidate
+
+103. [ ] **Task 3.16**: Implement SheetsFetcher.clear_cache() method *(15min)*
+     - **AC**: Método para limpar cache de worksheets específicos
+     - **Test**: Cache clearing funciona para sheets específicos
+     - **Deliverable**: SheetsFetcher com método clear_cache
+
+104. [ ] **Task 3.17**: Design multi-class cache coordination *(20min)*
+     - **AC**: Coordenação entre diferentes tipos de cache
+     - **Test**: Mudança em um cache invalida caches dependentes
+     - **Deliverable**: Cache coordination strategy
+
+105. [ ] **Task 3.18**: Test cache invalidation chain *(15min)*
+     - **AC**: Invalidação de um cache propaga para outros necessários
+     - **Test**: BI change → multiple cache invalidation
+     - **Deliverable**: Working cache invalidation chain
+
+106. [ ] **Task 3.19**: Implement cache statistics tracking *(17min)*
+     - **AC**: Tracking de hit rate e invalidation frequency
+     - **Test**: Statistics mostram cache effectiveness
+     - **Deliverable**: Cache statistics module
+
+107. [ ] **Task 3.20**: Create cache management CLI *(20min)*
+     - **AC**: CLI para manual cache management e debugging
+     - **Test**: Cache status, invalidation, e statistics via CLI
+     - **Deliverable**: cache_manager.py CLI tool
+
+---
+
+## 🎯 **EPIC 4.5: COMPATIBILITY TEST SUITE** *(1 dia, 6 micro-tasks essenciais)*
+
+### **Sprint Goal**
+> Criar suite sistemática de testes de compatibilidade conforme crítica: testes automatizados, cenários de graceful degradation, compatibility matrix.
+
+### **Definition of Done**
+- [ ] Testes de compatibilidade com todos os sistemas existentes
+- [ ] Cenários de graceful degradation validados
+- [ ] Test runner automatizado funcionando
+- [ ] Compatibility matrix completa e validada
+
+---
+
+#### **Testes Sistemáticos de Compatibilidade (6 tasks × 15-25min)**
+
+**US004.5**: *Como sistema, quero garantir compatibilidade total com sistemas existentes*
+
+108. [ ] **Task 4.11**: Test compatibility with warning_suppressor.py *(15min)*
+     - **AC**: Warning interceptor funciona com/sem suppressor ativo
+     - **Test**: Diferentes cenários de supressão
+     - **Deliverable**: Compatibility test para suppressor
+
+109. [ ] **Task 4.12**: Test compatibility with production_mode.py *(15min)*
+     - **AC**: Sistema funciona corretamente em todos os modos
+     - **Test**: Normal, quiet, minimal modes com interactividade
+     - **Deliverable**: Production mode compatibility tests
+
+110. [ ] **Task 4.13**: Test compatibility with smart_reload.py *(12min)*
+     - **AC**: Hot reload não interfere com warning system
+     - **Test**: Reload durante warning interception
+     - **Deliverable**: Smart reload compatibility test
+
+111. [ ] **Task 4.14**: Test performance preservation (2 API calls) *(20min)*
+     - **AC**: Sistema mantém exatamente 2 API calls
+     - **Test**: PerformanceGuard detecta violations
+     - **Deliverable**: Performance preservation test
+
+112. [ ] **Task 4.15**: Test graceful degradation scenarios *(18min)*
+     - **AC**: Sistema funciona normalmente quando interactividade falha
+     - **Test**: Database down, timeout, user abort scenarios
+     - **Deliverable**: Graceful degradation test suite
+
+113. [ ] **Task 4.16**: Create automated compatibility test runner *(25min)*
+     - **AC**: Script que executa toda suite de compatibility tests
+     - **Test**: Test runner executa todos os testes e reporta resultados
+     - **Deliverable**: compatibility_test_runner.py
 
 ---
 

@@ -135,6 +135,13 @@ CREATE TABLE geografia (
 - Integração com warning_suppressor.py e production_mode.py
 - PerformanceGuard para garantir 2 API calls
 
+### **EPIC 0.5: Integration Architecture Fixes** *(1 dia)*
+**Objetivo**: Resolver inconsistências arquiteturais críticas identificadas na auditoria
+- 8 micro-tasks de 15-20 minutos cada
+- Pattern de injeção de dependência (não builtins)
+- Inventário completo de warning points
+- Interfaces específicas de invalidação de cache
+
 ### **EPIC 1: Discovery & Compatibility** *(5 dias)*
 **Objetivo**: Entender sistemas existentes e pontos de integração
 - 25 micro-tasks de 10-15 minutos cada
@@ -142,18 +149,39 @@ CREATE TABLE geografia (
 - Identificação de hooks seguros
 - Verificação de módulos assumidos (early_exit_checker, schema_validator)
 
+### **EPIC 1.5: Detailed Hook Mapping** *(1 dia)*
+**Objetivo**: Mapear pontos específicos de integração mencionados na crítica
+- 6 micro-tasks de 10-15 minutos cada
+- Hook points específicos para cada função de validação
+- Estratégia de integração com relatórios de pipeline
+- Testes específicos para cada hook point
+
 ### **EPIC 2: Quick Wins & Minimal Prototype** *(1.5 semanas)*
 **Objetivo**: Implementar quick wins estratégicos e protótipo básico
-- 30 micro-tasks de 10-20 minutos cada  
+- 35 micro-tasks de 8-20 minutos cada  
 - Interceptor passivo (log-only), decisões em memória, rule engine mínimo
 - PerformanceGuard, configuração .env, context básico
 - Compatibilidade total com sistemas existentes
 
+### **EPIC 2.5: TDAH Tooling Implementation** *(2 dias)*
+**Objetivo**: Implementar ferramentas CLI e sistemas de rastreabilidade
+- 8 micro-tasks de 20-25 minutos cada
+- Task timer CLI, progress dashboard, commit tracking
+- Achievement tracking básico funcionando
+- TDAH toolchain integrada
+
 ### **EPIC 3: Classes Integration** *(2 semanas)*  
 **Objetivo**: Integração com nova arquitetura de classes distribuídas (Campanha, Anuncio, Plano)
-- 40 micro-tasks de 8-15 minutos cada
+- 28 micro-tasks de 8-15 minutos cada
 - Sistema de cache invalidation multi-classe
 - Regras específicas por tipo de dados
+
+### **EPIC 3.5: Cache Management Specifics** *(1.5 dias)*
+**Objetivo**: Implementar invalidação específica de caches conforme crítica
+- 6 micro-tasks de 15-20 minutos cada
+- BIParamLookup.invalidate() e SheetsFetcher.clear_cache()
+- Coordenação multi-classe de caches
+- Testes de invalidação em cadeia
 
 ### **EPIC 4: Enhanced Context & Integration** *(1 semana)*
 **Objetivo**: Aproveitar otimizações existentes para contexto rico
@@ -161,6 +189,13 @@ CREATE TABLE geografia (
 - Integração com sheet_name_normalizer, apply_smart_column_mapping
 - Uso de caches existentes (_last_taxo_report, _last_impressions_report)
 - Context enhancement com dados BI e sugestões inteligentes
+
+### **EPIC 4.5: Compatibility Test Suite** *(1 dia)*
+**Objetivo**: Criar suite sistemática de testes de compatibilidade
+- 6 micro-tasks de 15-25 minutos cada
+- Testes automatizados de regressão
+- Cenários de graceful degradation
+- Compatibility matrix completa e validada
 
 ### **EPIC 5: Performance & Production** *(1 semana)*
 **Objetivo**: Garantir performance e preparar para produção
@@ -174,7 +209,7 @@ CREATE TABLE geografia (
 ## 🧠 **Otimização TDAH**
 
 ### **Micro-Granularização**
-- **~110 tasks total**: Cada 10-25 minutos máximo (estimativa realista com refinamentos)
+- **~117 tasks total**: Cada 8-25 minutos máximo (incluindo todos os pontos da auditoria crítica)
 - **Immediate feedback**: Cada task testável independentemente  
 - **Zero context switching**: 1 arquivo, 1 função por task
 - **Frequent dopamine**: Progress visível a cada task

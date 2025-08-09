@@ -339,7 +339,66 @@ class EnvironmentConfig:
 
 ## 🔗 **Pontos de Integração**
 
-### **1. Hook Points Identificados**
+### **1. Architecture Pattern Resolution** ⚠️ **CRÍTICO**
+
+#### **Builtins vs Dependency Injection**
+**Problema Identificado**: Branch `refactor` usa instanciação local (`TreatPipeline` instancia seu próprio `SheetsFetcher`), enquanto documentação assume uso de `builtins` para compartilhamento.
+
+```python
+# CURRENT (branch refactor - LOCAL INSTANTIATION):
+class TreatPipeline:
+    def __init__(self, config):
+        self.sheets_fetcher = SheetsFetcher(config)  # Local instance
+        self.transform_engine = TransformEngine()
+
+# DOCUMENTED (using builtins - GLOBAL STATE):
+if hasattr(builtins, 'warning_interceptor') and builtins.warning_interceptor:
+    decision = builtins.warning_interceptor.intercept(...)
+```
+
+#### **Recommended Pattern: Dependency Injection**
+```python
+# SOLUTION: Constructor injection without builtins
+class TreatPipeline:
+    def __init__(self, 
+                 config,
+                 sheets_fetcher: SheetsFetcher = None,
+                 warning_interceptor: WarningInterceptor = None):
+        self.sheets_fetcher = sheets_fetcher or SheetsFetcher(config)
+        self.warning_interceptor = warning_interceptor
+        
+    def _handle_warning(self, warning_msg: str, context: dict):
+        """Central warning handling with injected interceptor."""
+        if self.warning_interceptor and self.warning_interceptor.is_active():
+            return self.warning_interceptor.intercept(warning_msg, context)
+        else:
+            log.warning(warning_msg)  # Fallback behavior
+            
+# USAGE:
+interceptor = WarningInterceptor() if interactive_mode else None
+pipeline = TreatPipeline(config, warning_interceptor=interceptor)
+```
+
+#### **Migration Strategy**
+```python
+# Phase 1: Add optional injection to existing pattern
+class ValidationUtils:
+    def __init__(self, warning_interceptor: Optional[WarningInterceptor] = None):
+        self._warning_interceptor = warning_interceptor
+        
+    def _log_or_intercept(self, warning_msg: str, context: dict = None):
+        if self._warning_interceptor:
+            return self._warning_interceptor.intercept(warning_msg, context)
+        log.warning(warning_msg)  # Existing behavior preserved
+
+# Phase 2: Update TreatPipeline to pass interceptor to utilities
+class TreatPipeline:
+    def __init__(self, config, warning_interceptor=None):
+        self.warning_interceptor = warning_interceptor
+        self.validation_utils = ValidationUtils(warning_interceptor)
+```
+
+### **2. Hook Points Identificados**
 
 #### **Primary Hook: validation.py**
 ```python
@@ -347,21 +406,28 @@ class EnvironmentConfig:
 log.warning("[Validação] %d valor(es) de '%s' fora da BI_PARAMETRIZAÇÃO", 
            len(missing_values), column_name)
 
-# AFTER:
-if hasattr(builtins, 'warning_interceptor') and builtins.warning_interceptor:
-    context = WarningContext(
-        warning_type="bi_parametrization",
-        sheet_name=current_sheet,
-        column_name=column_name,
-        current_value=missing_values[0],  # First missing value
-        suggested_values=get_fuzzy_matches(missing_values[0]),
-        dataframe_sample=df.head(3)
-    )
-    decision = builtins.warning_interceptor.intercept(warning_msg, context)
-    if decision.action_taken != UserDecision.IGNORE:
-        apply_decision_to_dataframe(decision, context, df)
-else:
-    log.warning(warning_msg)  # Original behavior
+# AFTER (using dependency injection pattern):
+def check_required_columns(self, df, required_columns, sheet_name):
+    """Updated with interceptor injection."""
+    missing_values = find_missing_values(df, required_columns)
+    
+    if missing_values:
+        warning_msg = f"[Validação] {len(missing_values)} valor(es) de '{column_name}' fora da BI_PARAMETRIZAÇÃO"
+        
+        if self._warning_interceptor:
+            context = WarningContext(
+                warning_type="bi_parametrization",
+                sheet_name=sheet_name,
+                column_name=column_name,
+                current_value=missing_values[0],
+                suggested_values=get_fuzzy_matches(missing_values[0]),
+                dataframe_sample=df.head(3)
+            )
+            decision = self._warning_interceptor.intercept(warning_msg, context)
+            if decision.action_taken != UserDecision.IGNORE:
+                return apply_decision_to_dataframe(decision, context, df)
+        else:
+            log.warning(warning_msg)  # Original behavior preserved
 ```
 
 #### **Secondary Hook: schema_validator.py**
