@@ -1,0 +1,24 @@
+gantt
+    title Epic 6: Data Migration & Issues Integration
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
+
+    section Analysis Phase
+    Analisar municipios.csv e esquema geografia    :, task-6.1a, 2025-08-10, 1d
+    Analisar integração com GitHub Issues    :, task-6.2a, 2025-08-11, 1d
+    Analisar CLI para gestão de regras de warnings    :, task-6.3a, 2025-08-12, 1d
+
+    section Red Phase
+    should_import_municipios_csv_into_sqlite    :crit, task-6.1b.1, 2025-08-13, 1d
+    should_create_github_issue_for_unresolved_wa    :crit, task-6.2b.1, 2025-08-14, 1d
+    should_list_add_and_remove_warning_rules_via    :crit, task-6.3b.1, 2025-08-15, 1d
+
+    section Green Phase
+    migration script for municipios.csv    :active, task-6.1b.2, 2025-08-16, 1d
+    minimal GitHub issue creator    :active, task-6.2b.2, 2025-08-17, 1d
+    minimal rules management CLI    :active, task-6.3b.2, 2025-08-18, 1d
+
+    section Refactor Phase
+    integrate geografia with ORM and caches    :done, task-6.1b.3, 2025-08-19, 1d
+    abstract GitHub API layer    :done, task-6.2b.3, 2025-08-20, 1d
+    modularize rules CLI and add update comm    :done, task-6.3b.3, 2025-08-21, 1d

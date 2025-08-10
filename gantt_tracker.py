@@ -71,14 +71,15 @@ class CommitTracker:
                 if not commit_line:
                     continue
                 
-                commit_hash = commit_line.split()[0]
-                
-                # Try enhanced pattern first, then legacy
-                match = re.search(self.commit_pattern, commit_line)
-                if match:
-                    # Enhanced pattern: [EPIC-X] tdd-phase: conv-type: description [Task X.Y | Zmin]
-                    epic_id, tdd_phase, conv_type, description, task_id, time_minutes = match.groups()
-                    commit_date = self.get_commit_date(commit_hash)
+                try:
+                    commit_hash = commit_line.split()[0]
+                    
+                    # Try enhanced pattern first, then legacy
+                    match = re.search(self.commit_pattern, commit_line)
+                    if match:
+                        # Enhanced pattern: [EPIC-X] tdd-phase: conv-type: description [Task X.Y | Zmin]
+                        epic_id, tdd_phase, conv_type, description, task_id, time_minutes = match.groups()
+                        commit_date = self.get_commit_date(commit_hash)
                     
                     # Update epic data with enhanced info
                     epic_data[epic_id]['tdd_phases'][tdd_phase] += 1
@@ -136,18 +137,20 @@ class CommitTracker:
                             epic_data[epic_id]['total_time_minutes'] += int(time_min)
                             epic_data[epic_id]['total_tasks'] += 1
                             epic_data[epic_id]['tdd_phases'][tdd_status] += 1
+                    except Exception as e:
+                        print(f"⚠️ Erro ao parse body do commit {commit_hash}: {e}")
+                
+                # Atualizar datas
+                if not epic_data[epic_id]['first_commit']:
+                    epic_data[epic_id]['first_commit'] = commit_date
+                epic_data[epic_id]['last_commit'] = commit_date
+                
+                # Status do épico baseado em tipo de commit
+                if 'commit_type' in locals() and commit_type == 'milestone':
+                    epic_data[epic_id]['commit_status'] = 'done'
+                elif epic_data[epic_id]['commit_status'] != 'done':
+                    epic_data[epic_id]['commit_status'] = 'active'
                     
-                    # Atualizar datas
-                    if not epic_data[epic_id]['first_commit']:
-                        epic_data[epic_id]['first_commit'] = commit_date
-                    epic_data[epic_id]['last_commit'] = commit_date
-                    
-                    # Status do épico baseado em tipo de commit
-                    if commit_type == 'milestone':
-                        epic_data[epic_id]['commit_status'] = 'done'
-                    elif epic_data[epic_id]['commit_status'] != 'done' and task_match:
-                        epic_data[epic_id]['commit_status'] = 'active'
-                        
                 except Exception as e:
                     print(f"⚠️ Erro ao processar commit {commit_hash}: {e}")
                     continue

@@ -1,0 +1,31 @@
+gantt
+    title Epic 3: Interactive Warning Resolution System
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
+
+    section Analysis Phase
+    Analisar requisitos de captura de warnings    :, task-3.1a, 2025-08-10, 1d
+    Analisar requisitos da interface interativa de dec    :, task-3.2a, 2025-08-11, 1d
+    Analisar schema e operações de persistência no SQL    :, task-3.3a, 2025-08-12, 1d
+    Analisar engine de regras para auto-resolução    :, task-3.4a, 2025-08-13, 1d
+
+    section Red Phase
+    should_capture_warnings_in_under_10ms_withou    :crit, task-3.1b.1, 2025-08-14, 1d
+    should_prompt_user_only_for_unknown_warnings    :crit, task-3.2b.1, 2025-08-15, 1d
+    should_save_and_retrieve_user_decisions_acid    :crit, task-3.3b.1, 2025-08-16, 1d
+    should_apply_saved_decision_and_skip_prompt_    :crit, task-3.4b.1, 2025-08-17, 1d
+    should_handle_multiple_warnings_concurrently    :crit, task-3.5b.1, 2025-08-18, 1d
+
+    section Green Phase
+    minimal warning interceptor to pass capture     :active, task-3.1b.2, 2025-08-19, 1d
+    minimal interactive decision handler    :active, task-3.2b.2, 2025-08-20, 1d
+    minimal decision persistence layer    :active, task-3.3b.2, 2025-08-21, 1d
+    minimal rules engine    :active, task-3.4b.2, 2025-08-22, 1d
+    concurrency support in warning resolution    :active, task-3.5b.2, 2025-08-23, 1d
+
+    section Refactor Phase
+    optimize and modularize warning intercep    :done, task-3.1b.3, 2025-08-24, 1d
+    improve user prompt and decision flow    :done, task-3.2b.3, 2025-08-25, 1d
+    optimize database access patterns    :done, task-3.3b.3, 2025-08-26, 1d
+    modularize rules engine for extensibilit    :done, task-3.4b.3, 2025-08-27, 1d
+    improve concurrency primitives and docum    :done, task-3.5b.3, 2025-08-28, 1d

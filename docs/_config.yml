@@ -7,9 +7,7 @@ description: >-
 # Build settings
 theme: minima
 plugins:
-  - jekyll-feed
   - jekyll-sitemap
-  - jekyll-seo-tag
 
 # Site settings
 url: "https://davidcantidio.github.io"
@@ -53,11 +51,6 @@ minima:
   social_links:
     github: davidcantidio
     
-# Collections (if needed for future docs)
-collections:
-  docs:
-    output: true
-    permalink: /:collection/:name/
 
 # Exclude from processing
 exclude:
@@ -81,10 +74,6 @@ kramdown:
   input: GFM
   syntax_highlighter: rouge
 
-# Pagination
-paginate: 5
-paginate_path: "/page:num/"
-
 # Default front matter
 defaults:
   - scope:
@@ -92,8 +81,3 @@ defaults:
       type: "pages"
     values:
       layout: "default"
-  - scope:
-      path: ""
-      type: "posts"
-    values:
-      layout: "post"

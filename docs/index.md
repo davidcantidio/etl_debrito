@@ -10,7 +10,7 @@ description: Enhanced Gantt Progress Tracker with Real-time Commit Analysis
 
 ## 📊 Interactive Dashboards
 
-### [🎮 Enhanced Progress Tracker →](./gantt_progress.html)
+### [🎮 Enhanced Progress Tracker →](./gantt_progress.html) | [📊 Interactive Dashboard →](./dashboard.html)
 Rich interactive dashboard with:
 - Real-time commit tracking with `[EPIC-X]` pattern
 - Time accuracy metrics (planned vs actual)
@@ -126,6 +126,7 @@ Task: ID | Time: Xmin | Status: red/green/refactor
 
 ### **For Project Management:**
 - Visit [Enhanced Dashboard](./gantt_progress.html) for detailed metrics
+- View [Interactive Dashboard](./dashboard.html) for task management
 - Monitor this page for high-level timeline view
 - All updates are automatic based on actual development progress
 

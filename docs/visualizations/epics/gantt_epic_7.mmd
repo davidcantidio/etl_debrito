@@ -1,0 +1,20 @@
+gantt
+    title Epic 7: Missing Caches Integration
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
+
+    section Analysis Phase
+    Analisar caches ausentes e pontos de registro    :, task-7.1a, 2025-08-10, 1d
+    Analisar integração de invalidação com write-back    :, task-7.2a, 2025-08-11, 1d
+
+    section Red Phase
+    should_register_and_invalidate_missing_cache    :crit, task-7.1b.1, 2025-08-12, 1d
+    should_invalidate_caches_after_write_back    :crit, task-7.2b.1, 2025-08-13, 1d
+
+    section Green Phase
+    register missing caches in CacheController    :active, task-7.1b.2, 2025-08-14, 1d
+    hook cache invalidation into write-back    :active, task-7.2b.2, 2025-08-15, 1d
+
+    section Refactor Phase
+    dynamic cache registration via configura    :done, task-7.1b.3, 2025-08-16, 1d
+    make write-back invalidation configurabl    :done, task-7.2b.3, 2025-08-17, 1d

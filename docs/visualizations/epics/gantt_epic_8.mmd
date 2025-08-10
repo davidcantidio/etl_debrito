@@ -1,0 +1,31 @@
+gantt
+    title Epic 8: Task Time Monitoring & Analytics
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
+
+    section Analysis Phase
+    Analisar integração com Task Timer existente (Epic    :, task-8.1a, 2025-08-10, 1d
+    Analisar schema de database para analytics    :, task-8.2a, 2025-08-11, 1d
+    Analisar accuracy metrics para achievements integr    :, task-8.3a, 2025-08-12, 1d
+    Analisar daily summary extensions para time analyt    :, task-8.4a, 2025-08-13, 1d
+
+    section Red Phase
+    should_track_task_with_estimate_and_actual_t    :crit, task-8.1b.1, 2025-08-14, 1d
+    should_create_task_tracking_schema_with_prop    :crit, task-8.2b.1, 2025-08-15, 1d
+    should_calculate_accuracy_metrics_and_trigge    :crit, task-8.3b.1, 2025-08-16, 1d
+    should_include_time_accuracy_analysis_in_dai    :crit, task-8.4b.1, 2025-08-17, 1d
+    should_provide_complete_cli_workflow_for_tas    :crit, task-8.5b.1, 2025-08-18, 1d
+
+    section Green Phase
+    enhanced task timer with tracking    :active, task-8.1b.2, 2025-08-19, 1d
+    task tracking database schema    :active, task-8.2b.2, 2025-08-20, 1d
+    accuracy metrics calculator and achievements    :active, task-8.3b.2, 2025-08-21, 1d
+    enhanced daily summary with time analytics    :active, task-8.4b.2, 2025-08-22, 1d
+    integrated cli commands for complete workflo    :active, task-8.5b.2, 2025-08-23, 1d
+
+    section Refactor Phase
+    modularize tracking logic and add batch     :done, task-8.1b.3, 2025-08-24, 1d
+    add database connection pooling and tran    :done, task-8.2b.3, 2025-08-25, 1d
+    optimize metrics calculation for large d    :done, task-8.3b.3, 2025-08-26, 1d
+    modularize summary plugins and add expor    :done, task-8.4b.3, 2025-08-27, 1d
+    optimize cli performance and add help do    :done, task-8.5b.3, 2025-08-28, 1d

@@ -1,0 +1,57 @@
+gantt
+    title Analysis Phase Tasks (35 total)
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
+
+    section Epic 0: Environment & Production Safet
+    Mapear comportamento atual do warning_suppressor    :, 0.1, 2025-08-10, 1d
+    Analisar impacto do production_mode no logging    :, 0.2, 2025-08-11, 1d
+    Verificar existência e papel de early_exit_checker    :, 0.7, 2025-08-12, 1d
+    Verificar existência e papel de schema_validator.p    :, 0.8, 2025-08-13, 1d
+
+    section Epic 0.5: Integration Architecture Fixes
+    Analisar uso atual de builtins no codebase    :, 0.13a, 2025-08-14, 1d
+    Mapear validate_columns para hooks    :, 0.15a, 2025-08-15, 1d
+    Mapear check_required_columns para hooks    :, 0.15b, 2025-08-16, 1d
+    Mapear validate_taxonomy_consistency e consolidar    :, 0.15c, 2025-08-17, 1d
+    Analisar estrutura atual dos relatórios    :, 0.17a, 2025-08-18, 1d
+
+    section Epic 2: Discovery & Compatibility
+    Analisar warning_suppressor.py (linhas 1-30)    :, 1.1a, 2025-08-19, 1d
+    Analisar production_mode.py (linhas 1-100)    :, 1.2a, 2025-08-20, 1d
+    Analisar early_exit_checker e schema_validator    :, 1.3a, 2025-08-21, 1d
+
+    section Epic 3: Interactive Warning Resolution
+    Analisar requisitos de captura de warnings    :, 3.1a, 2025-08-22, 1d
+    Analisar requisitos da interface interativa de dec    :, 3.2a, 2025-08-23, 1d
+    Analisar schema e operações de persistência no SQL    :, 3.3a, 2025-08-24, 1d
+    Analisar engine de regras para auto-resolução    :, 3.4a, 2025-08-25, 1d
+
+    section Epic 4: TDAH Tooling Implementation
+    Analisar requisitos do cronômetro de tarefas    :, 4.1a, 2025-08-26, 1d
+    Analisar requisitos da barra de progresso CLI    :, 4.2a, 2025-08-27, 1d
+    Analisar script de associação de commits e tasks    :, 4.3a, 2025-08-28, 1d
+    Analisar sistema de conquistas e pontos    :, 4.4a, 2025-08-29, 1d
+    Analisar gerenciador de sessões de foco    :, 4.5a, 2025-08-30, 1d
+    Analisar gerador de resumo diário    :, 4.6a, 2025-08-31, 1d
+    Documentar e exemplificar as ferramentas TDAH    :, 4.8a, 2025-09-01, 1d
+
+    section Epic 5: Cache Management Specifics
+    Analisar BIParamLookup.invalidate() existente e co    :, 5.1a, 2025-09-02, 1d
+    Analisar mecanismo de clear_cache() em SheetsFetch    :, 5.2a, 2025-09-03, 1d
+    Analisar coordenação entre caches (multi-class inv    :, 5.3a, 2025-09-04, 1d
+
+    section Epic 6: Data Migration & Issues Integr
+    Analisar municipios.csv e esquema geografia    :, 6.1a, 2025-09-05, 1d
+    Analisar integração com GitHub Issues    :, 6.2a, 2025-09-06, 1d
+    Analisar CLI para gestão de regras de warnings    :, 6.3a, 2025-09-07, 1d
+
+    section Epic 7: Missing Caches Integration
+    Analisar caches ausentes e pontos de registro    :, 7.1a, 2025-09-08, 1d
+    Analisar integração de invalidação com write-back    :, 7.2a, 2025-09-09, 1d
+
+    section Epic 8: Task Time Monitoring & Analyti
+    Analisar integração com Task Timer existente (Epic    :, 8.1a, 2025-09-10, 1d
+    Analisar schema de database para analytics    :, 8.2a, 2025-09-11, 1d
+    Analisar accuracy metrics para achievements integr    :, 8.3a, 2025-09-12, 1d
+    Analisar daily summary extensions para time analyt    :, 8.4a, 2025-09-13, 1d
