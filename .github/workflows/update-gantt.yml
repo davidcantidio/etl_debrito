@@ -11,6 +11,7 @@ on:
       - 'gantt_tracker.py'
       - 'commit_helper.py'
       - '.github/workflows/update-gantt.yml'
+      - 'trigger_workflow.txt'
   
   # Trigger em Issues relacionadas aos épicos  
   issues:
