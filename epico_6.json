@@ -1,0 +1,468 @@
+{
+  "epic": {
+    "id": "6",
+    "name": "Data Migration & Issues Integration",
+    "summary": "Migrar o arquivo municipios.csv para uma tabela SQLite, integrar o sistema de warnings com issues do GitHub e criar uma interface de linha de comando para gerenciar regras de warnings, garantindo que todas as operações sejam testadas via TDD.",
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "goals": [
+      "Migrar municipios.csv para a tabela geografia do SQLite, substituindo leituras diretas de CSV por consultas via ORM ou API interna",
+      "Emitir issues no GitHub para warnings não resolvidos e garantir que não haja duplicidade de issues",
+      "Fornecer CLI para listar, adicionar e remover regras de warnings no banco, permitindo gestão ágil das regras pelos usuários",
+      "Garantir que a migração e a integração com issues não aumentem o número de chamadas de API acima do limite de 2 por pipeline"
+    ],
+    "definition_of_done": [
+      "Tabela geografia preenchida com dados de municipios.csv e utilizada pelo pipeline",
+      "Script de issues cria um novo issue para warnings sem decisão e reutiliza issues existentes para o mesmo warning",
+      "CLI para regras lista todas as regras, permite adição e remoção, com testes e cobertura ≥ 90%",
+      "Todos os testes red-green-refactor executados e passando",
+      "≥ 60% das tasks executáveis em paralelo (análises e testes são independentes)",
+      "Documentação atualizada explicando migração, integração de issues e uso da CLI",
+      "Todas as micro‑tarefas seguem ciclo TDD red‑green‑refactor",
+      "Performance de migração ≤ 30s para municipios.csv completo",
+      "GitHub API integration thread‑safe com rate limiting"
+    ],
+    "duration": "1.5 dias",
+    "labels": [
+      "tdd",
+      "migration",
+      "github-integration",
+      "cli"
+    ],
+    "tasks": [
+      {
+        "id": "6.1a",
+        "title": "Analisar municipios.csv e esquema geografia",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Estudar o conteúdo de municipios.csv (colunas cidade, estado, regiao) e planejar a estrutura da tabela geografia em SQLite, incluindo índices e tipos de dados.",
+        "deliverables": [
+          "reports/analysis_municipios_migration.md"
+        ],
+        "acceptance_criteria": [
+          "Documento descrevendo colunas e proposta de esquema com índices",
+          "Plano de migração (script ou ORM) definido"
+        ],
+        "dependencies": [],
+        "branch": "feature/data-issues",
+        "files_touched": [],
+        "risk": "Perder dados ou ordens regionais ao migrar",
+        "mitigation": "Verificar integridade com validações pós-migração"
+      },
+      {
+        "id": "6.1b.1",
+        "title": "TEST: should_import_municipios_csv_into_sqlite",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o script de migração cria a tabela geografia e insere todas as linhas de municipios.csv, permitindo consultas por cidade e estado.",
+        "test_specs": [
+          "should_import_csv_with_performance_under_30_seconds",
+          "should_create_geografia_table_with_proper_indexing_under_5_seconds",
+          "should_validate_data_integrity_100_percent_accuracy"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se a tabela não existir ou colunas não coincidirem",
+          "Falha se contagem de linhas no DB for diferente do CSV"
+        ],
+        "deliverables": [
+          "tests/test_migration.py::test_should_import_municipios_csv_into_sqlite"
+        ],
+        "dependencies": [
+          "6.1a"
+        ],
+        "branch": "feature/data-issues",
+        "files_touched": [
+          "tests/test_migration.py"
+        ],
+        "risk": "Testes demorarem por ler CSV grande",
+        "mitigation": "Usar amostra pequena ou CSV minimizado em testes"
+      },
+      {
+        "id": "6.1b.2",
+        "title": "IMPL: migration script for municipios.csv",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Criar script em transform/warnings/migration/migrate_municipios.py que lê municipios.csv e popula a tabela geografia no SQLite, usando transações para garantir ACID.",
+        "test_specs": [
+          "should_create_geografia_table_with_correct_columns",
+          "should_insert_all_rows_from_csv_into_geografia"
+        ],
+        "acceptance_criteria": [
+          "Script cria tabela se não existir e insere linhas corretamente",
+          "Executável via CLI (python migrate_municipios.py)",
+          "Testes vermelhos passam"
+        ],
+        "deliverables": [
+          "transform/warnings/migration/migrate_municipios.py",
+          "tests/test_migration.py::test_should_import_municipios_csv_into_sqlite"
+        ],
+        "dependencies": [
+          "6.1b.1"
+        ],
+        "branch": "feature/data-issues",
+        "files_touched": [
+          "transform/warnings/migration/migrate_municipios.py"
+        ],
+        "risk": "Misturar migração com lógica de produção",
+        "mitigation": "Isolar script de migração e documentar uso"
+      },
+      {
+        "id": "6.1b.3",
+        "title": "REFACTOR: integrate geografia with ORM and caches",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar a migração para utilizar o ORM (orm_models.py) e alimentar o cache de geografia, permitindo lookup eficiente e testável.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Migração usa ORM para inserções e queries",
+          "Cache de geografia populado e acessível via método get_city_state()",
+          "Nenhum teste quebra"
+        ],
+        "deliverables": [
+          "transform/warnings/migration/migrate_municipios.py",
+          "transform/warnings/caches/geografia_cache.py"
+        ],
+        "dependencies": [
+          "6.1b.2"
+        ],
+        "branch": "feature/data-issues",
+        "files_touched": [
+          "transform/warnings/migration/migrate_municipios.py",
+          "transform/warnings/caches/geografia_cache.py"
+        ],
+        "risk": "ORM adicionar overhead e dependências extras",
+        "mitigation": "Usar bulk inserts e sessão única; documentar performance"
+      },
+      {
+        "id": "6.2a",
+        "title": "Analisar integração com GitHub Issues",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Estudar a API do GitHub disponível (conector habilitado) para criar issues automaticamente, definir estrutura de issue (título, corpo, labels) e mapear quando deve ser criado.",
+        "deliverables": [
+          "reports/analysis_github_issues.md"
+        ],
+        "acceptance_criteria": [
+          "Documento descrevendo campos de issues e autorização necessária",
+          "Definição de critérios de abertura de issue (warning não resolvido)"
+        ],
+        "dependencies": [],
+        "branch": "feature/data-issues",
+        "files_touched": [],
+        "risk": "Políticas de rate limit ou permissões do GitHub atrapalharem testes",
+        "mitigation": "Usar o conector local para simular API e token de teste"
+      },
+      {
+        "id": "6.2b.1",
+        "title": "TEST: should_create_github_issue_for_unresolved_warning",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que, ao detectar um warning sem decisão armazenada, é criado um issue no GitHub com título informativo e corpo contendo contexto do warning, e que não cria duplicatas para o mesmo contexto.",
+        "test_specs": [
+          "should_create_issue_with_api_response_under_5_seconds",
+          "should_prevent_duplicates_with_query_latency_under_2_seconds",
+          "should_handle_rate_limiting_gracefully_under_60_seconds"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se um novo issue não for criado para warning novo",
+          "Falha se um segundo issue for criado para o mesmo warning/contexto"
+        ],
+        "deliverables": [
+          "tests/test_github_issues.py::test_should_create_github_issue_for_unresolved_warning"
+        ],
+        "dependencies": [
+          "6.2a"
+        ],
+        "branch": "feature/data-issues",
+        "files_touched": [
+          "tests/test_github_issues.py"
+        ],
+        "risk": "Criar issues de verdade em repositórios de produção",
+        "mitigation": "Usar conector em ambiente de teste ou repositório sandbox; limpar issues após teste"
+      },
+      {
+        "id": "6.2b.2",
+        "title": "IMPL: minimal GitHub issue creator",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar módulo transform/warnings/integration/github_issues.py que usa o conector github para abrir um issue para warnings não resolvidos, verificando antes se já existe um issue aberto.",
+        "test_specs": [
+          "should_create_new_issue_for_unresolved_warning",
+          "should_not_create_duplicate_issue_for_same_context"
+        ],
+        "acceptance_criteria": [
+          "Módulo cria issue com título '[WARNING] {tipo}' e corpo com contexto",
+          "Consulta issues existentes por label ou título para evitar duplicatas",
+          "Testes passam sem regressão"
+        ],
+        "deliverables": [
+          "transform/warnings/integration/github_issues.py",
+          "tests/test_github_issues.py::test_should_create_github_issue_for_unresolved_warning"
+        ],
+        "dependencies": [
+          "6.2b.1"
+        ],
+        "branch": "feature/data-issues",
+        "files_touched": [
+          "transform/warnings/integration/github_issues.py"
+        ],
+        "risk": "Problemas de autenticação com token do GitHub",
+        "mitigation": "Usar variável de ambiente GITHUB_TOKEN e tratar exceptions"
+      },
+      {
+        "id": "6.2b.3",
+        "title": "REFACTOR: abstract GitHub API layer",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar o módulo de issues para separar a lógica de negócio da camada de API, permitindo substituição por outros rastreadores (ex.: Jira) no futuro.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Interface GitHubClient com métodos create_issue() e find_issue() extraída",
+          "Implementação concreta injeta conector do projeto",
+          "Testes existentes continuam passando"
+        ],
+        "deliverables": [
+          "transform/warnings/integration/github_client.py",
+          "transform/warnings/integration/github_issues.py"
+        ],
+        "dependencies": [
+          "6.2b.2"
+        ],
+        "branch": "feature/data-issues",
+        "files_touched": [
+          "transform/warnings/integration/github_client.py",
+          "transform/warnings/integration/github_issues.py"
+        ],
+        "risk": "Abstração excessiva dificultar uso simples",
+        "mitigation": "Manter interface mínima e documentar implementações"
+      },
+      {
+        "id": "6.3a",
+        "title": "Analisar CLI para gestão de regras de warnings",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Planejar CLI para regras: listar todas as regras, adicionar nova regra (pattern, action, replacement) e remover regra, definindo comandos e opções.",
+        "deliverables": [
+          "reports/analysis_rule_cli.md"
+        ],
+        "acceptance_criteria": [
+          "Lista de comandos planejados (list, add, remove)",
+          "Especificação de parâmetros (pattern, action, value)",
+          "Fluxo de confirmação para remoção"
+        ],
+        "dependencies": [],
+        "branch": "feature/data-issues",
+        "files_touched": [],
+        "risk": "Especificar interface complexa demais para uso simples",
+        "mitigation": "Incluir exemplos de uso no planejamento"
+      },
+      {
+        "id": "6.3b.1",
+        "title": "TEST: should_list_add_and_remove_warning_rules_via_cli",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que a CLI de regras lista todas as regras existentes, adiciona uma nova regra e remove uma regra específica com confirmação.",
+        "test_specs": [
+          "should_list_rules_with_response_time_under_100_milliseconds",
+          "should_add_rule_with_database_commit_under_500_milliseconds",
+          "should_remove_rule_with_confirmation_flow_under_3_seconds"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se lista não exibe regras persistidas",
+          "Falha se regra adicionada não aparece após inserção",
+          "Falha se remoção não ocorre ou remove regra errada"
+        ],
+        "deliverables": [
+          "tests/test_rule_cli.py::test_should_list_add_and_remove_warning_rules_via_cli"
+        ],
+        "dependencies": [
+          "6.1b.3"
+        ],
+        "branch": "feature/data-issues",
+        "files_touched": [
+          "tests/test_rule_cli.py"
+        ],
+        "risk": "Testar CLI exigir interação do usuário",
+        "mitigation": "Usar framework click.testing para invocar comandos e capturar output"
+      },
+      {
+        "id": "6.3b.2",
+        "title": "IMPL: minimal rules management CLI",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar comando de linha de comando em transform/warnings/cli/rules_cli.py que lista, adiciona e remove regras de warnings, utilizando o banco SQLite para persistência.",
+        "test_specs": [
+          "should_list_rules_when_no_arguments_provided",
+          "should_add_new_rule_with_pattern_action_and_value",
+          "should_remove_rule_after_confirmation"
+        ],
+        "acceptance_criteria": [
+          "Comando 'rules list' imprime todas as regras",
+          "Comando 'rules add --pattern=<p> --action=<a> --value=<v>' insere nova regra no banco",
+          "Comando 'rules remove <id>' remove regra após confirmação",
+          "Testes passam sem regressão"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/rules_cli.py",
+          "tests/test_rule_cli.py::test_should_list_add_and_remove_warning_rules_via_cli"
+        ],
+        "dependencies": [
+          "6.3b.1"
+        ],
+        "branch": "feature/data-issues",
+        "files_touched": [
+          "transform/warnings/cli/rules_cli.py"
+        ],
+        "risk": "Persistir regras com valores inválidos",
+        "mitigation": "Validar entradas e fornecer mensagens de erro claras"
+      },
+      {
+        "id": "6.3b.3",
+        "title": "REFACTOR: modularize rules CLI and add update command",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar a CLI de regras para separar lógica de persistência e comandos, e adicionar comando de atualização (update), mantendo testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Módulo separado para persistência de regras",
+          "Novo comando 'rules update <id> --pattern=... --action=... --value=...' implementado",
+          "Testes existentes passam"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/rules_cli.py",
+          "transform/warnings/cli/rules_persistence.py"
+        ],
+        "dependencies": [
+          "6.3b.2"
+        ],
+        "branch": "feature/data-issues",
+        "files_touched": [
+          "transform/warnings/cli/rules_cli.py",
+          "transform/warnings/cli/rules_persistence.py"
+        ],
+        "risk": "Refatoração dificultar uso simples do CLI",
+        "mitigation": "Manter interface amigável e documentar comandos novos"
+      }
+    ],
+    "checklist_epic_level": [
+      "Migração de municipios.csv concluída e validada com ORM e cache",
+      "Integração com GitHub Issues implementada e sem duplicação de issues",
+      "CLI de regras criada com comandos list, add, remove (e update) funcionando",
+      "Cobertura de testes ≥ 90% nos módulos de migração, issues e CLI",
+      "Análises documentadas anexadas para cada função principal",
+      "≥ 60% das micro‑tarefas executadas em paralelo (análises e testes isolados)",
+      "Documentação atualizada com instruções de migração, integração de issues e uso da CLI",
+      "Implementação follow red‑green‑refactor micro‑cycles (5‑15 min)",
+      "Migration performance: ≤ 30s CSV, ≤ 100ms CLI response, ≤ 5s issue creation",
+      "Thread safety validado para CLI concurrent access"
+    ],
+    "automation_hooks": {
+      "create_labels": [
+        "tdd",
+        "migration",
+        "github-integration",
+        "cli"
+      ],
+      "project_board": {
+        "name": "TDD Development Board",
+        "columns": [
+          "Red (Failing Tests)",
+          "Green (Implementation)",
+          "Refactor",
+          "Done"
+        ]
+      },
+      "default_branch": "refactor",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": [
+        "pytest",
+        "coverage",
+        "black",
+        "flake8"
+      ],
+      "issue_template_fields": [
+        "title",
+        "description",
+        "tdd_phase",
+        "test_specs",
+        "acceptance_criteria",
+        "deliverables",
+        "dependencies",
+        "estimate_minutes",
+        "risk",
+        "mitigation"
+      ],
+      "milestone": "EPIC 6 - Data Migration & Issues Integration"
+    },
+    "performance_constraints": {
+      "migration_performance": {
+        "csv_processing_max_time": "30s",
+        "database_transaction_max_time": "5s",
+        "memory_usage_max": "100MB",
+        "data_integrity_requirement": "100%"
+      },
+      "github_integration": {
+        "api_response_max_time": "5s",
+        "duplicate_query_max_time": "2s",
+        "rate_limiting_compliance": "5000 requests/hour",
+        "issue_creation_success_rate": "99.9%"
+      },
+      "cli_performance": {
+        "list_operations_max_time": "100ms",
+        "crud_operations_max_time": "500ms",
+        "interactive_flow_max_time": "3s",
+        "database_commit_max_time": "500ms"
+      },
+      "threading_requirements": {
+        "thread_safety": "mandatory",
+        "concurrent_cli_access": true,
+        "database_transaction_isolation": "SERIALIZABLE"
+      }
+    },
+    "quality_gates": {
+      "migration_quality": {
+        "data_integrity": "100% CSV→SQLite accuracy",
+        "performance_benchmark": "P99 ≤ 45s full migration",
+        "reliability": "Zero data loss tolerance",
+        "rollback_capability": "Full transaction rollback on failure"
+      },
+      "github_integration_quality": {
+        "api_reliability": "99.9% success rate",
+        "duplicate_prevention": "100% accuracy",
+        "error_handling": "Graceful degradation on API failures",
+        "security": "Token management with environment variables"
+      },
+      "cli_quality": {
+        "user_experience": "≤100ms response for read operations",
+        "data_consistency": "100% database ACID compliance",
+        "concurrent_access": "Thread-safe operations validated",
+        "error_messages": "Clear validation and error reporting"
+      },
+      "overall_system": {
+        "api_limit_compliance": "Maintain ≤2 API calls per pipeline",
+        "test_coverage": "≥90% on all new modules",
+        "documentation": "Complete migration and CLI usage guides",
+        "backward_compatibility": "No breaking changes to existing ETL"
+      }
+    }
+  }
+}
