@@ -80,38 +80,42 @@ class CommitTracker:
                         # Enhanced pattern: [EPIC-X] tdd-phase: conv-type: description [Task X.Y | Zmin]
                         epic_id, tdd_phase, conv_type, description, task_id, time_minutes = match.groups()
                         commit_date = self.get_commit_date(commit_hash)
-                    
-                    # Update epic data with enhanced info
-                    epic_data[epic_id]['tdd_phases'][tdd_phase] += 1
-                    epic_data[epic_id]['tdd_current_phase'] = tdd_phase
-                    
-                    # If task info is in commit message directly
-                    if task_id and time_minutes:
-                        task_info = {
-                            'task_id': task_id,
-                            'time_minutes': int(time_minutes),
-                            'tdd_phase': tdd_phase,
-                            'conv_type': conv_type,
-                            'description': description,
-                            'date': commit_date,
-                            'commit_hash': commit_hash
-                        }
                         
-                        epic_data[epic_id]['tasks_completed'].append(task_info)
-                        epic_data[epic_id]['total_time_minutes'] += int(time_minutes)
-                        epic_data[epic_id]['total_tasks'] += 1
+                        # Update epic data with enhanced info
+                        epic_data[epic_id]['tdd_phases'][tdd_phase] += 1
+                        epic_data[epic_id]['tdd_current_phase'] = tdd_phase
+                        
+                        # If task info is in commit message directly
+                        if task_id and time_minutes:
+                            task_info = {
+                                'task_id': task_id,
+                                'time_minutes': int(time_minutes),
+                                'tdd_phase': tdd_phase,
+                                'conv_type': conv_type,
+                                'description': description,
+                                'date': commit_date,
+                                'commit_hash': commit_hash
+                            }
+                            
+                            epic_data[epic_id]['tasks_completed'].append(task_info)
+                            epic_data[epic_id]['total_time_minutes'] += int(time_minutes)
+                            epic_data[epic_id]['total_tasks'] += 1
                     
-                else:
-                    # Try legacy pattern for backward compatibility
-                    legacy_match = re.search(self.legacy_pattern, commit_line)
-                    if not legacy_match:
-                        continue
-                    
-                    epic_id, commit_type, description = legacy_match.groups()
-                    commit_date = self.get_commit_date(commit_hash)
-                    # Default to 'green' phase for legacy commits
-                    tdd_phase = 'green'
-                    conv_type = commit_type
+                    else:
+                        # Try legacy pattern for backward compatibility
+                        legacy_match = re.search(self.legacy_pattern, commit_line)
+                        if not legacy_match:
+                            continue
+                        
+                        epic_id, commit_type, description = legacy_match.groups()
+                        commit_date = self.get_commit_date(commit_hash)
+                        # Default to 'green' phase for legacy commits
+                        tdd_phase = 'green'
+                        conv_type = commit_type
+                
+                except Exception as e:
+                    print(f"Error processing commit line: {commit_line[:50]}... - {e}")
+                    continue
                 
                 # Only parse body for legacy commits (enhanced commits have task info in header)
                 if not match:  # This is a legacy commit
