@@ -1,0 +1,200 @@
+# 🔧 ETL Debrito - Configuração da Integração GitHub para Gantt Charts
+# =====================================================================
+
+# Mapeamento de Épicos para GitHub Issues
+epic_issue_mapping:
+  "0": 1      # Environment & Production Safety
+  "0.5": 2    # Integration Architecture Fixes  
+  "2": 3      # Discovery & Compatibility
+  "3": 4      # Interactive Warning Resolution System
+  "4": 5      # TDAH Tooling Implementation
+  "5": 6      # Cache Management Specifics
+  "6": 7      # Data Migration & Issues Integration
+  "7": 8      # Missing Caches Integration
+  "8": 9      # Task Time Monitoring & Analytics
+
+# Mapeamento de Épicos para GitHub Milestones
+epic_milestone_mapping:
+  "0": 1      # Foundation Complete
+  "3": 2      # Core System Ready
+  "8": 3      # Analytics & Monitoring Live
+
+# Status automático baseado na fase do épico
+epic_status_rules:
+  foundation:
+    epics: ["0", "0.5"]
+    status: "done"          # Fundação já estabelecida
+    critical: false
+    
+  core_development:
+    epics: ["2", "3", "5"]
+    status: "crit"          # Critical path
+    critical: true
+    
+  integration:
+    epics: ["6", "7"]
+    status: "active"        # Em desenvolvimento
+    critical: false
+    
+  tooling:
+    epics: ["4"]
+    status: "pending"       # Dependente do core
+    critical: false
+    
+  observability:
+    epics: ["8"]
+    status: "pending"       # Fase final
+    critical: false
+
+# Task status rules baseado em TDD phase e características
+task_status_rules:
+  milestone_indicators:
+    - "milestone"           # Deliverable contém "milestone"
+    - "delivery"            # Task de entrega
+    - "integration"         # Integração importante
+    - "complete"            # Completar algo importante
+    
+  critical_indicators:
+    - "core"                # Funcionalidade core
+    - "system"              # Sistema principal
+    - "api"                 # API importante
+    - "database"            # Database operations
+    
+  critical_time_threshold: 30  # Tasks >= 30min são críticas
+  
+  tdd_phase_mapping:
+    "red": "crit"           # Test phase = crítico
+    "green": "active"       # Implementation = ativo
+    "refactor": "active"    # Refactor = ativo
+    "analysis": "pending"   # Analysis = pendente
+
+# GitHub Repository Settings
+github:
+  repository: "davidcantidio/etl_debrito"
+  base_url: "https://github.com"
+  
+  # Branch para os diagramas
+  diagrams_branch: "main"
+  
+  # Labels para Issues dos épicos
+  epic_labels:
+    - "epic"
+    - "tdd"
+    - "etl-debrito"
+    
+  # Template para Issues de épicos
+  issue_template_body: |
+    ## 🎯 Epic Overview
+    **Epic ID:** {epic_id}
+    **Name:** {epic_name}
+    **Duration:** {duration_days} days
+    **Status:** {status}
+    
+    ## 📋 Tasks Summary
+    - **Total Tasks:** {total_tasks}
+    - **Critical Tasks:** {critical_tasks}  
+    - **Milestones:** {milestone_tasks}
+    - **Estimated Time:** {total_minutes} minutes
+    
+    ## 🔗 Related Links
+    - [📊 Gantt Chart](../blob/main/docs/gantt_schedule.mmd)
+    - [🧠 Project Mindmap](../blob/main/docs/mindmap.mmd)
+    - [🔄 Dependencies](../blob/main/docs/flow_dependencies.mmd)
+    
+    ## ✅ Acceptance Criteria
+    - [ ] All TDD phases completed (Red → Green → Refactor)
+    - [ ] Code coverage ≥ 90%
+    - [ ] Performance requirements met
+    - [ ] Integration tests passing
+    - [ ] Documentation updated
+    
+    ---
+    🤖 Auto-generated from Epic JSON file
+
+# Configurações do diagrama Gantt
+gantt_config:
+  # Configurações de tempo
+  date_format: "YYYY-MM-DD"
+  axis_format: "%d/%m"
+  start_date: "2025-08-11"    # Segunda-feira
+  exclude_weekends: true
+  weekend_start: "saturday"   # Fim de semana sab-dom
+  
+  # Configurações visuais
+  title: "ETL Debrito — Cronograma TDD Profissional com GitHub Integration"
+  
+  # Seções lógicas do projeto
+  sections:
+    "Fundações":
+      epics: ["0", "0.5"]
+      description: "Base segura e arquitetura"
+      
+    "Núcleo":
+      epics: ["2", "3", "5", "7"]
+      description: "Sistema principal e cache"
+      
+    "Dados & Produtividade": 
+      epics: ["6", "4"]
+      description: "Migração e ferramentas TDAH"
+      
+    "Observabilidade":
+      epics: ["8"]
+      description: "Monitoramento e analytics"
+  
+  # Markers verticais importantes
+  vertical_markers:
+    today:
+      label: "Today"
+      dynamic: true         # Data atual
+      
+    sprint_start:
+      label: "Sprint Start"
+      date: "2025-08-11"
+      
+    mvp_deadline:
+      label: "MVP Target"
+      date: "2025-08-25"
+      
+    beta_release:
+      label: "Beta Release"
+      date: "2025-09-01"
+
+# Workflow automation settings
+automation:
+  # Auto-update triggers
+  triggers:
+    - "epico_*.json changes"
+    - "issue state changes"
+    - "milestone updates" 
+    - "manual dispatch"
+    
+  # Commit message template
+  commit_message: |
+    🎯 Auto-update Gantt charts with GitHub integration
+    
+    - Updated Mindmap, Flowchart, and Professional Gantt
+    - Interactive links to Issues: {repository}
+    - Status tags: {status_summary}
+    - Weekend exclusions and vertical markers
+    
+    🤖 Generated with Claude Code
+    
+    Co-authored-by: Claude <noreply@anthropic.com>
+  
+  # Notification settings
+  notifications:
+    issue_comments: true      # Comentar em Issues relacionadas
+    pr_updates: false         # Não spam em PRs
+    slack_webhook: null       # Configure se necessário
+
+# Cache e Performance
+cache:
+  ttl_seconds: 300           # 5 minutos
+  max_entries: 100
+  enable_smart_reload: true
+  
+# Debugging e Logs
+debug:
+  verbose_output: false
+  log_api_calls: false
+  save_intermediate_files: false

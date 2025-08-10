@@ -1,0 +1,185 @@
+name: 🎯 Epic Implementation
+description: Template para Issues relacionadas aos épicos TDD do projeto ETL Debrito
+title: "[Epic {epic_id}] {epic_name}"
+labels: ["epic", "tdd", "etl-debrito"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🧠 ETL Debrito - Epic Implementation Issue
+        
+        Este template é usado para tracking de épicos TDD do projeto. 
+        O sistema Gantt automaticamente conecta esta Issue ao cronograma do projeto.
+
+  - type: dropdown
+    id: epic_id
+    attributes:
+      label: Epic ID
+      description: Selecione o ID do épico correspondente
+      options:
+        - "0 - Environment & Production Safety"
+        - "0.5 - Integration Architecture Fixes"
+        - "2 - Discovery & Compatibility"
+        - "3 - Interactive Warning Resolution System"
+        - "4 - TDAH Tooling Implementation"
+        - "5 - Cache Management Specifics"
+        - "6 - Data Migration & Issues Integration"
+        - "7 - Missing Caches Integration"
+        - "8 - Task Time Monitoring & Analytics"
+    validations:
+      required: true
+
+  - type: input
+    id: epic_name
+    attributes:
+      label: Epic Name
+      description: Nome completo do épico
+      placeholder: ex. Interactive Warning Resolution System
+    validations:
+      required: true
+
+  - type: dropdown
+    id: epic_status
+    attributes:
+      label: Current Status
+      description: Status atual do épico
+      options:
+        - "pending - Não iniciado"
+        - "active - Em desenvolvimento"
+        - "crit - Critical path (alta prioridade)"
+        - "done - Completado"
+    validations:
+      required: true
+
+  - type: textarea
+    id: epic_overview
+    attributes:
+      label: Epic Overview
+      description: Descrição geral do épico e seus objetivos
+      placeholder: |
+        Descreva:
+        - Objetivo principal do épico
+        - Contexto e importância
+        - Principais deliverables esperados
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks_summary
+    attributes:
+      label: Tasks Summary
+      description: Resumo das tasks principais do épico
+      placeholder: |
+        Liste as principais tasks:
+        - [ ] Task 1: Descrição
+        - [ ] Task 2: Descrição
+        - [ ] Task 3: Descrição
+      render: markdown
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: tdd_phases
+    attributes:
+      label: TDD Implementation Status
+      description: Status das fases TDD (Red-Green-Refactor)
+      options:
+        - label: "🔴 RED Phase: Testes falhando escritos"
+          required: false
+        - label: "🟢 GREEN Phase: Implementação para passar os testes"
+          required: false
+        - label: "🟨 REFACTOR Phase: Otimização e limpeza do código"
+          required: false
+        - label: "📋 ANALYSIS Phase: Análise e documentação completa"
+          required: false
+
+  - type: checkboxes
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Critérios de aceitação para considerar o épico completo
+      options:
+        - label: "Todos os testes TDD passando"
+          required: false
+        - label: "Cobertura de código ≥ 90%"
+          required: false
+        - label: "Performance requirements atendidos"
+          required: false
+        - label: "Testes de integração passando"
+          required: false
+        - label: "Documentação atualizada"
+          required: false
+        - label: "Code review aprovado"
+          required: false
+
+  - type: input
+    id: estimated_duration
+    attributes:
+      label: Estimated Duration (days)
+      description: Duração estimada em dias de trabalho (6h/dia)
+      placeholder: ex. 3
+    validations:
+      required: false
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Épicos ou tasks que este épico depende
+      placeholder: |
+        Liste dependências:
+        - Epic 0: Environment setup necessário
+        - Epic 2: Discovery deve estar completo
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: Current Blockers
+      description: Blockers ou impedimentos atuais
+      placeholder: |
+        Liste impedimentos:
+        - Aguardando definição de arquitetura X
+        - Dependência externa Y não disponível
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: integration_links
+    attributes:
+      label: GitHub Integration
+      description: Links automáticos gerados pelo sistema Gantt
+      options:
+        - label: "📊 Gantt Chart - Timeline do projeto conectado"
+          required: false
+        - label: "🧠 Project Mindmap - Visão hierárquica"
+          required: false
+        - label: "🔄 Dependencies - Fluxo de dependências"
+          required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## 🔗 Links Automáticos
+        
+        Esta Issue será automaticamente conectada ao sistema de Gantt charts do projeto:
+        
+        - 📊 **[Gantt Timeline](../blob/main/docs/gantt_schedule.mmd)** - Timeline interativo
+        - 🧠 **[Project Mindmap](../blob/main/docs/mindmap.mmd)** - Estrutura hierárquica  
+        - 🔄 **[Dependencies Flow](../blob/main/docs/flow_dependencies.mmd)** - Mapa de dependências
+        
+        **Visualização interativa:** Copie o conteúdo dos arquivos .mmd para [mermaid.live](https://mermaid.live/)
+        
+        ## 🤖 Automação
+        
+        - ✅ Status desta Issue atualiza automaticamente o Gantt chart
+        - ✅ Mudanças nos épicos triggeram rebuild dos diagramas
+        - ✅ Comentários automáticos quando diagramas são atualizados
+        
+        ---
+        *🎯 Template para épicos TDD - ETL Debrito Project*

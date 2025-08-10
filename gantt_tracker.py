@@ -25,10 +25,13 @@ import json
 
 
 class CommitTracker:
-    """Parser inteligente de commits padronizados [EPIC-X]."""
+    """Parser inteligente de commits padronizados [EPIC-X] com TDD phases."""
     
     def __init__(self):
-        self.commit_pattern = r'\[EPIC-(\d+\.?\d*)\]\s+(\w+):\s+(.*)'
+        # Enhanced pattern for TDD workflow: [EPIC-X] tdd-phase: conv-type: description [Task X.Y | Zmin]
+        self.commit_pattern = r'\[EPIC-(\d+\.?\d*)\]\s+(analysis|red|green|refactor):\s+(\w+):\s+(.*?)(?:\s*\[Task\s+([\w.-]+)\s*\|\s*(\d+)min\])?'
+        # Legacy pattern for backward compatibility  
+        self.legacy_pattern = r'\[EPIC-(\d+\.?\d*)\]\s+(\w+):\s+(.*)'
         self.task_pattern = r'Task:\s+([\w.-]+)\s*\|\s*Time:\s+(\d+)min\s*\|\s*Status:\s+(red|green|refactor)'
         
     def get_commit_date(self, commit_hash: str) -> datetime:
@@ -50,7 +53,9 @@ class CommitTracker:
             'first_commit': None,
             'last_commit': None,
             'commit_status': 'pending',
-            'tdd_phases': {'red': 0, 'green': 0, 'refactor': 0}
+            'tdd_phases': {'analysis': 0, 'red': 0, 'green': 0, 'refactor': 0},
+            'tdd_current_phase': 'analysis',
+            'completion_percent': 0
         })
         
         try:
@@ -68,37 +73,69 @@ class CommitTracker:
                 
                 commit_hash = commit_line.split()[0]
                 
-                # Parse header do commit
+                # Try enhanced pattern first, then legacy
                 match = re.search(self.commit_pattern, commit_line)
-                if not match:
-                    continue
-                
-                epic_id, commit_type, description = match.groups()
-                commit_date = self.get_commit_date(commit_hash)
-                
-                # Parse body do commit para task info
-                try:
-                    cmd_body = f'git log -1 --format="%B" {commit_hash}'
-                    body = subprocess.check_output(cmd_body, shell=True, text=True)
+                if match:
+                    # Enhanced pattern: [EPIC-X] tdd-phase: conv-type: description [Task X.Y | Zmin]
+                    epic_id, tdd_phase, conv_type, description, task_id, time_minutes = match.groups()
+                    commit_date = self.get_commit_date(commit_hash)
                     
-                    task_match = re.search(self.task_pattern, body)
-                    if task_match:
-                        task_id, time_min, tdd_status = task_match.groups()
-                        
+                    # Update epic data with enhanced info
+                    epic_data[epic_id]['tdd_phases'][tdd_phase] += 1
+                    epic_data[epic_id]['tdd_current_phase'] = tdd_phase
+                    
+                    # If task info is in commit message directly
+                    if task_id and time_minutes:
                         task_info = {
                             'task_id': task_id,
-                            'time_minutes': int(time_min),
-                            'tdd_status': tdd_status,
-                            'commit_type': commit_type,
+                            'time_minutes': int(time_minutes),
+                            'tdd_phase': tdd_phase,
+                            'conv_type': conv_type,
                             'description': description,
                             'date': commit_date,
                             'commit_hash': commit_hash
                         }
                         
                         epic_data[epic_id]['tasks_completed'].append(task_info)
-                        epic_data[epic_id]['total_time_minutes'] += int(time_min)
+                        epic_data[epic_id]['total_time_minutes'] += int(time_minutes)
                         epic_data[epic_id]['total_tasks'] += 1
-                        epic_data[epic_id]['tdd_phases'][tdd_status] += 1
+                    
+                else:
+                    # Try legacy pattern for backward compatibility
+                    legacy_match = re.search(self.legacy_pattern, commit_line)
+                    if not legacy_match:
+                        continue
+                    
+                    epic_id, commit_type, description = legacy_match.groups()
+                    commit_date = self.get_commit_date(commit_hash)
+                    # Default to 'green' phase for legacy commits
+                    tdd_phase = 'green'
+                    conv_type = commit_type
+                
+                # Only parse body for legacy commits (enhanced commits have task info in header)
+                if not match:  # This is a legacy commit
+                    try:
+                        cmd_body = f'git log -1 --format="%B" {commit_hash}'
+                        body = subprocess.check_output(cmd_body, shell=True, text=True)
+                        
+                        task_match = re.search(self.task_pattern, body)
+                        if task_match:
+                            task_id, time_min, tdd_status = task_match.groups()
+                            
+                            task_info = {
+                                'task_id': task_id,
+                                'time_minutes': int(time_min),
+                                'tdd_phase': tdd_status,  # For legacy, tdd_status is the phase
+                                'conv_type': conv_type,
+                                'description': description,
+                                'date': commit_date,
+                                'commit_hash': commit_hash
+                            }
+                            
+                            epic_data[epic_id]['tasks_completed'].append(task_info)
+                            epic_data[epic_id]['total_time_minutes'] += int(time_min)
+                            epic_data[epic_id]['total_tasks'] += 1
+                            epic_data[epic_id]['tdd_phases'][tdd_status] += 1
                     
                     # Atualizar datas
                     if not epic_data[epic_id]['first_commit']:
@@ -118,7 +155,32 @@ class CommitTracker:
         except Exception as e:
             print(f"❌ Erro ao buscar commits: {e}")
         
+        # Calculate completion percentage for each epic
+        for epic_id, data in epic_data.items():
+            data['completion_percent'] = self._calculate_completion_percent(data)
+        
         return dict(epic_data)
+    
+    def _calculate_completion_percent(self, epic_data: Dict) -> int:
+        """Calculate completion percentage based on TDD phases."""
+        phases = epic_data['tdd_phases']
+        
+        # TDD Phase weights: analysis=10%, red=30%, green=70%, refactor=100%
+        phase_weights = {
+            'analysis': 10,
+            'red': 30,
+            'green': 70,
+            'refactor': 100
+        }
+        
+        # Find the highest phase with activity
+        current_phase = 'analysis'
+        for phase in ['refactor', 'green', 'red', 'analysis']:
+            if phases[phase] > 0:
+                current_phase = phase
+                break
+        
+        return phase_weights.get(current_phase, 0)
 
 
 class MermaidGanttParser:

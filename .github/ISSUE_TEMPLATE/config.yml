@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🧠 Project Mindmap
+    url: https://github.com/davidcantidio/etl_debrito/blob/main/docs/mindmap.mmd
+    about: Visualize a estrutura completa do projeto em formato mindmap
+  - name: 📊 Gantt Timeline
+    url: https://github.com/davidcantidio/etl_debrito/blob/main/docs/gantt_schedule.mmd
+    about: Cronograma profissional do projeto com integração GitHub
+  - name: 🔄 Dependencies Flow
+    url: https://github.com/davidcantidio/etl_debrito/blob/main/docs/flow_dependencies.mmd
+    about: Mapa de dependências entre épicos e tasks críticas
+  - name: 🌐 Mermaid Live Editor
+    url: https://mermaid.live/
+    about: Ferramenta para visualização interativa dos diagramas .mmd
+  - name: 📚 Documentação Completa
+    url: https://github.com/davidcantidio/etl_debrito/blob/main/CLAUDE.md
+    about: Documentação técnica completa do projeto ETL Debrito

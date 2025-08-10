@@ -3,10 +3,10 @@
 🎯 ETL Debrito - Commit Helper CLI
 =================================
 
-Interactive helper para criar commits padronizados seguindo o padrão:
-[EPIC-X] type: description
+Interactive helper para criar commits padronizados seguindo o padrão TDD enhanced:
+[EPIC-X] tdd-phase: conv-type: description [Task ID | Xmin]
 
-Task: ID | Time: Xmin | Status: red/green/refactor
+Enhanced pattern com TDD phases para Projects v2 integration.
 
 Uso:
     python commit_helper.py           # Modo interativo
@@ -29,20 +29,25 @@ class CommitHelper:
     """Helper interativo para commits padronizados."""
     
     def __init__(self):
+        # TDD Phases (primary categorization)
+        self.tdd_phases = {
+            'analysis': '📋 Análise, planejamento e documentação',
+            'red': '🔴 Escrevendo/ajustando testes que falham', 
+            'green': '🟢 Implementando código para passar nos testes',
+            'refactor': '🟨 Melhorando código sem quebrar testes'
+        }
+        
+        # Conventional commit types (secondary categorization)
         self.commit_types = {
             'feat': 'Nova funcionalidade ou capability',
             'fix': 'Correção de bug ou problema',  
-            'test': 'Adicionar/modificar testes (TDD red phase)',
-            'refactor': 'Refatoração sem mudança de funcionalidade',
+            'test': 'Adicionar/modificar testes',
+            'refactor': 'Refatoração de código',
             'docs': 'Atualizar documentação, comentários',
-            'milestone': 'Marco importante ou épico completo',
-            'wip': 'Work in progress (evitar quando possível)'
-        }
-        
-        self.tdd_statuses = {
-            'red': 'Escrevendo/ajustando testes que falham',
-            'green': 'Implementando código para passar nos testes',
-            'refactor': 'Melhorando código sem quebrar testes'
+            'perf': 'Melhoria de performance',
+            'style': 'Formatação, linting, style fixes',
+            'chore': 'Tarefas de manutenção, build, etc.',
+            'milestone': 'Marco importante ou épico completo'
         }
         
         self.epics_cache = self.load_available_epics()
@@ -103,6 +108,29 @@ class CommitHelper:
                     return input("Digite o Epic ID: ")
                 else:
                     print(f"❌ Opção inválida. Use 1-{len(epic_list)+1}")
+            except ValueError:
+                print("❌ Digite um número válido")
+    
+    def select_tdd_phase(self) -> str:
+        """Seleção interativa da fase TDD."""
+        print("\n🧪 Fase TDD:")
+        print("-" * 40)
+        
+        phases_list = list(self.tdd_phases.items())
+        for i, (phase_name, description) in enumerate(phases_list, 1):
+            print(f"  {i}. {phase_name:<10} - {description}")
+        
+        print()
+        
+        while True:
+            try:
+                choice = input(f"Selecione a fase TDD (1-{len(phases_list)}): ")
+                choice_num = int(choice)
+                
+                if 1 <= choice_num <= len(phases_list):
+                    return phases_list[choice_num - 1][0]
+                else:
+                    print(f"❌ Opção inválida. Use 1-{len(phases_list)}")
             except ValueError:
                 print("❌ Digite um número válido")
     
@@ -185,48 +213,27 @@ class CommitHelper:
             except ValueError:
                 print("❌ Digite um número válido para minutos")
         
-        # TDD Status
-        print("\n🧪 Status TDD:")
-        for i, (status, description) in enumerate(self.tdd_statuses.items(), 1):
-            print(f"  {i}. {status:<10} - {description}")
-        
-        while True:
-            try:
-                choice = input("Status TDD (1-3): ")
-                choice_num = int(choice)
-                
-                if 1 <= choice_num <= 3:
-                    status_list = list(self.tdd_statuses.keys())
-                    task_info['status'] = status_list[choice_num - 1]
-                    break
-                else:
-                    print("❌ Opção inválida. Use 1-3")
-            except ValueError:
-                print("❌ Digite um número válido")
+        # Task info não precisa mais de TDD status (agora é fase separada)
         
         return task_info
     
-    def build_commit_message(self, epic_id: str, commit_type: str, 
+    def build_commit_message(self, epic_id: str, tdd_phase: str, commit_type: str, 
                            description: str, body: Optional[str] = None,
                            task_info: Optional[Dict] = None) -> str:
-        """Constrói a mensagem do commit completa."""
+        """Constrói a mensagem do commit completa usando padrão TDD enhanced."""
         
-        # Header
-        header = f"[EPIC-{epic_id}] {commit_type}: {description}"
+        # Enhanced header: [EPIC-X] tdd-phase: conv-type: description [Task X.Y | Zmin]
+        header = f"[EPIC-{epic_id}] {tdd_phase}: {commit_type}: {description}"
+        
+        # Add task info directly in header if provided
+        if task_info:
+            header += f" [Task {task_info['id']} | {task_info['time']}min]"
         
         parts = [header]
         
         # Body (se fornecido)
         if body:
             parts.extend(["", body])
-        
-        # Task info (se fornecida)
-        if task_info:
-            task_line = f"Task: {task_info['id']} | Time: {task_info['time']}min | Status: {task_info['status']}"
-            if body:
-                parts.append(task_line)
-            else:
-                parts.extend(["", task_line])
         
         return "\n".join(parts)
     
@@ -286,13 +293,14 @@ class CommitHelper:
         try:
             # Coleta de informações
             epic_id = self.select_epic()
+            tdd_phase = self.select_tdd_phase()
             commit_type = self.select_commit_type()
             description = self.get_commit_description()
             body = self.get_extended_body()
             task_info = self.get_task_info()
             
             # Construir mensagem
-            message = self.build_commit_message(epic_id, commit_type, description, body, task_info)
+            message = self.build_commit_message(epic_id, tdd_phase, commit_type, description, body, task_info)
             
             # Preview e confirmação
             if self.preview_commit(message):
@@ -315,6 +323,7 @@ class CommitHelper:
         return True
     
     def quick_commit(self, epic_id: Optional[str] = None, 
+                    tdd_phase: Optional[str] = None,
                     commit_type: Optional[str] = None,
                     description: Optional[str] = None):
         """Modo rápido para commits simples sem task info."""
@@ -322,13 +331,16 @@ class CommitHelper:
         if not epic_id:
             epic_id = self.select_epic()
         
+        if not tdd_phase:
+            tdd_phase = self.select_tdd_phase()
+        
         if not commit_type:
             commit_type = self.select_commit_type()
         
         if not description:
             description = self.get_commit_description()
         
-        message = self.build_commit_message(epic_id, commit_type, description)
+        message = self.build_commit_message(epic_id, tdd_phase, commit_type, description)
         
         if self.preview_commit(message):
             return self.create_commit(message)
@@ -347,31 +359,39 @@ class CommitHelper:
         
         hook_content = '''#!/bin/sh
 # ETL Debrito - Commit Message Validation Hook
-# Validates commit messages follow [EPIC-X] pattern
+# Validates commit messages follow enhanced TDD pattern
 
-commit_regex='^\\[EPIC-[0-9]+\\.?[0-9]*\\] (feat|fix|test|refactor|docs|milestone|wip): .+'
+# Enhanced TDD pattern: [EPIC-X] tdd-phase: conv-type: description [Task X.Y | Zmin]
+enhanced_regex='^\\[EPIC-[0-9]+\\.?[0-9]*\\] (analysis|red|green|refactor): (feat|fix|test|refactor|docs|perf|style|chore|milestone): .+'
 
-if ! grep -qE "$commit_regex" "$1"; then
-    echo ""
-    echo "❌ COMMIT MESSAGE FORMAT INVALID!"
-    echo ""
-    echo "Required format:"
-    echo "  [EPIC-X] type: description"
-    echo ""
-    echo "Valid types: feat, fix, test, refactor, docs, milestone, wip"
-    echo ""
-    echo "Examples:"
-    echo "  [EPIC-3] feat: implement warning interceptor"
-    echo "  [EPIC-0] fix: resolve logging configuration"
-    echo "  [EPIC-8] test: add timer accuracy tests"
-    echo ""
-    echo "Use 'python commit_helper.py' for guided commit creation"
-    echo ""
-    exit 1
+# Legacy pattern for backward compatibility
+legacy_regex='^\\[EPIC-[0-9]+\\.?[0-9]*\\] (feat|fix|test|refactor|docs|milestone|wip): .+'
+
+if grep -qE "$enhanced_regex" "$1" || grep -qE "$legacy_regex" "$1"; then
+    # Success - commit message is valid
+    exit 0
 fi
 
-# Success - commit message is valid
-exit 0
+echo ""
+echo "❌ COMMIT MESSAGE FORMAT INVALID!"
+echo ""
+echo "Enhanced TDD format (recommended):"
+echo "  [EPIC-X] tdd-phase: conv-type: description [Task X.Y | Zmin]"
+echo ""
+echo "TDD phases: analysis, red, green, refactor"
+echo "Conv types: feat, fix, test, refactor, docs, perf, style, chore, milestone"
+echo ""
+echo "Examples:"
+echo "  [EPIC-3] red: test: add warning interceptor tests [Task 3.2 | 15min]"
+echo "  [EPIC-0] green: feat: implement config loader [Task 0.1 | 20min]"
+echo "  [EPIC-8] refactor: refactor: optimize timer accuracy"
+echo ""
+echo "Legacy format (still supported):"
+echo "  [EPIC-X] type: description"
+echo ""
+echo "Use 'python commit_helper.py' for guided commit creation"
+echo ""
+exit 1
 '''
         
         try:
@@ -388,15 +408,20 @@ exit 0
             return False
     
     def validate_message(self, message: str) -> bool:
-        """Valida se uma mensagem segue o padrão."""
+        """Valida se uma mensagem segue o padrão (enhanced ou legacy)."""
         lines = message.strip().split('\n')
         if not lines:
             return False
         
         header = lines[0]
-        pattern = r'^\[EPIC-\d+\.?\d*\] (feat|fix|test|refactor|docs|milestone|wip): .+'
         
-        return bool(re.match(pattern, header))
+        # Enhanced TDD pattern
+        enhanced_pattern = r'^\[EPIC-\d+\.?\d*\] (analysis|red|green|refactor): (feat|fix|test|refactor|docs|perf|style|chore|milestone): .+'
+        
+        # Legacy pattern
+        legacy_pattern = r'^\[EPIC-\d+\.?\d*\] (feat|fix|test|refactor|docs|milestone|wip): .+'
+        
+        return bool(re.match(enhanced_pattern, header) or re.match(legacy_pattern, header))
 
 
 def main():
@@ -410,10 +435,19 @@ Exemplos de uso:
   python commit_helper.py --quick            # Modo rápido (sem task info)
   python commit_helper.py --setup            # Instalar git hooks
   
-Padrão de commit:
-  [EPIC-X] type: description
+Enhanced TDD Pattern (recomendado):
+  [EPIC-X] tdd-phase: conv-type: description [Task X.Y | Zmin]
   
-  Task: ID | Time: Xmin | Status: red/green/refactor
+  TDD Phases: analysis, red, green, refactor
+  Conv Types: feat, fix, test, refactor, docs, perf, style, chore, milestone
+  
+Exemplos:
+  [EPIC-3] red: test: add warning interceptor tests [Task 3.2 | 15min]
+  [EPIC-0] green: feat: implement config loader [Task 0.1 | 20min]
+  [EPIC-8] refactor: refactor: optimize timer accuracy
+  
+Legacy Pattern (ainda suportado):
+  [EPIC-X] type: description
         """
     )
     

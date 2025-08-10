@@ -1,0 +1,606 @@
+{
+  "epic": {
+    "id": "8",
+    "name": "Task Time Monitoring & Analytics",
+    "summary": "Implementar sistema completo de monitoramento de tarefas que compare tempo estimado vs tempo real, forneça analytics de precisão das estimativas e integre com as ferramentas TDAH existentes para criar um workflow otimizado de produtividade e melhoria contínua.",
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "goals": [
+      "Capturar tempo real de execução vs estimativas para todas as tarefas",
+      "Fornecer analytics de accuracy das estimativas (% dentro do target, variance médio)",
+      "Integrar com achievements system para gamificação de precisão temporal",
+      "Gerar insights para melhoria contínua das estimativas futuras",
+      "Manter workflow simples e não-intrusivo para o desenvolvedor"
+    ],
+    "definition_of_done": [
+      "Timer CLI aceita task-id e estimate parameters",
+      "Database schema para task_tracking implementado e funcional", 
+      "Achievements tracker inclui métricas de accuracy temporal",
+      "Daily summary mostra analytics de time variance",
+      "CLI workflow completo testado e documentado",
+      "Cobertura de testes ≥ 90% nos novos módulos",
+      "≥ 60% das tasks executáveis em paralelo",
+      "Integração sem breaking changes com Epic 4 TDAH tools"
+    ],
+    "duration": "1 dia",
+    "labels": [
+      "tdd",
+      "productivity",
+      "analytics",
+      "time-tracking"
+    ],
+    "tasks": [
+      {
+        "id": "8.1a",
+        "title": "Analisar integração com Task Timer existente (Epic 4.1)",
+        "tdd_skip_reason": "analysis/documentation", 
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Revisar implementação atual do Task Timer (Epic 4.1) e planejar extensões para task-id, estimates e persistence de dados sem breaking changes.",
+        "deliverables": ["reports/analysis_timer_integration.md"],
+        "acceptance_criteria": [
+          "Documento descrevendo pontos de extensão do timer atual",
+          "Plano de backward compatibility garantido"
+        ],
+        "dependencies": [],
+        "branch": "feature/time-monitoring",
+        "files_touched": [],
+        "risk": "Breaking changes no timer existente",
+        "mitigation": "Extensões opcionais via novos parameters"
+      },
+      {
+        "id": "8.1b.1", 
+        "title": "TEST: should_track_task_with_estimate_and_actual_time",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o timer aceita task-id e estimate, persiste no banco e calcula variance entre tempo estimado e real.",
+        "test_specs": [
+          "should_accept_task_id_and_estimate_parameters_with_validation",
+          "should_persist_task_data_to_database_with_integrity_constraints", 
+          "should_calculate_variance_percentage_with_accuracy_under_1_percent"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se task-id ou estimate não forem aceitos",
+          "Teste falha se dados não forem persistidos corretamente",
+          "Teste falha se variance calculation estiver incorreto"
+        ],
+        "deliverables": [
+          "tests/test_task_tracking.py::test_should_track_task_with_estimate_and_actual_time"
+        ],
+        "dependencies": ["8.1a"],
+        "branch": "feature/time-monitoring", 
+        "files_touched": ["tests/test_task_tracking.py"],
+        "risk": "Complexidade de setup de database em testes",
+        "mitigation": "Usar SQLite in-memory para testes isolados"
+      },
+      {
+        "id": "8.1b.2",
+        "title": "IMPL: enhanced task timer with tracking",
+        "tdd_phase": "green", 
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar extensões no task timer para aceitar task-id e estimate, criar tabela task_tracking e persistir dados com timestamps.",
+        "test_specs": [
+          "should_accept_task_id_and_estimate_parameters",
+          "should_persist_task_data_to_database",
+          "should_calculate_variance_percentage_accurately" 
+        ],
+        "acceptance_criteria": [
+          "Timer CLI aceita --task-id e --estimate flags",
+          "Dados persistidos em task_tracking table",
+          "Variance calculado corretamente (actual - estimated)",
+          "Testes da fase red passam"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/task_timer_enhanced.py",
+          "tests/test_task_tracking.py::test_should_track_task_with_estimate_and_actual_time"
+        ],
+        "dependencies": ["8.1b.1"],
+        "branch": "feature/time-monitoring",
+        "files_touched": [
+          "transform/warnings/cli/task_timer_enhanced.py",
+          "transform/warnings/database/task_tracking_schema.py"
+        ],
+        "risk": "Schema conflicts com database existente",
+        "mitigation": "Usar migration scripts e validar schema compatibility"
+      },
+      {
+        "id": "8.1b.3",
+        "title": "REFACTOR: modularize tracking logic and add batch operations", 
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar tracking logic para módulo separado, adicionar batch operations para performance e melhorar error handling.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "TaskTracker classe isolada com clear interface",
+          "Batch insert/update operations para performance",
+          "Error handling robusto para database failures",
+          "Todos os testes continuam verdes"
+        ],
+        "deliverables": [
+          "transform/warnings/analytics/task_tracker.py"
+        ],
+        "dependencies": ["8.1b.2"],
+        "branch": "feature/time-monitoring",
+        "files_touched": [
+          "transform/warnings/analytics/task_tracker.py"
+        ],
+        "risk": "Refatoração introduzir regressões de performance",
+        "mitigation": "Benchmark antes/depois e manter API simples"
+      },
+      {
+        "id": "8.2a", 
+        "title": "Analisar schema de database para analytics",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10, 
+        "story_points": 2,
+        "description": "Projetar schema completo para task_tracking, metrics agregados e integração com achievements existente.",
+        "deliverables": ["reports/analysis_database_schema.md"],
+        "acceptance_criteria": [
+          "Schema task_tracking com campos necessários definido",
+          "Relacionamento com achievements table planejado", 
+          "Queries para analytics identificadas"
+        ],
+        "dependencies": [],
+        "branch": "feature/time-monitoring",
+        "files_touched": [],
+        "risk": "Schema design inadequado para analytics complexos",
+        "mitigation": "Consultar patterns de time-tracking applications"
+      },
+      {
+        "id": "8.2b.1",
+        "title": "TEST: should_create_task_tracking_schema_with_proper_constraints",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1, 
+        "description": "Escrever teste que verifica criação da tabela task_tracking com constraints apropriados, índices e relacionamentos.",
+        "test_specs": [
+          "should_create_task_tracking_table_with_required_columns",
+          "should_enforce_constraints_and_data_types_correctly",
+          "should_create_indexes_for_query_performance_under_10ms"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se tabela não for criada corretamente",
+          "Teste falha se constraints não forem enforced",
+          "Teste falha se performance de queries for inadequada"
+        ],
+        "deliverables": [
+          "tests/test_database_schema.py::test_should_create_task_tracking_schema_with_proper_constraints"
+        ],
+        "dependencies": ["8.2a"],
+        "branch": "feature/time-monitoring",
+        "files_touched": ["tests/test_database_schema.py"],
+        "risk": "Conflicts com schema migrations existentes",
+        "mitigation": "Coordenar com Epic 6 migration system"
+      },
+      {
+        "id": "8.2b.2",
+        "title": "IMPL: task tracking database schema",
+        "tdd_phase": "green",
+        "estimate_minutes": 8, 
+        "story_points": 2,
+        "description": "Implementar migration script para criar task_tracking table, índices e constraints necessários para analytics.",
+        "test_specs": [
+          "should_create_task_tracking_table_with_required_columns",
+          "should_enforce_constraints_and_data_types",
+          "should_create_performance_indexes"
+        ],
+        "acceptance_criteria": [
+          "Migration script cria tabela com sucesso",
+          "Constraints funcionam (NOT NULL, foreign keys, etc)",
+          "Índices criados para performance de queries",
+          "Testes da fase red passam"
+        ],
+        "deliverables": [
+          "transform/warnings/database/migrations/008_task_tracking.py",
+          "tests/test_database_schema.py::test_should_create_task_tracking_schema_with_proper_constraints"
+        ],
+        "dependencies": ["8.2b.1"],
+        "branch": "feature/time-monitoring",
+        "files_touched": [
+          "transform/warnings/database/migrations/008_task_tracking.py"
+        ],
+        "risk": "Migration conflicts com database existente", 
+        "mitigation": "Testar migration em database copy antes de aplicar"
+      },
+      {
+        "id": "8.2b.3",
+        "title": "REFACTOR: add database connection pooling and transaction management",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar para adicionar connection pooling, transaction management e error recovery para database operations.",
+        "test_specs": [
+          "all_existing_tests_still_pass"  
+        ],
+        "acceptance_criteria": [
+          "Connection pooling implementado para performance",
+          "Transactions usadas para data consistency", 
+          "Error recovery em caso de database failures",
+          "Todos os testes continuam verdes"
+        ],
+        "deliverables": [
+          "transform/warnings/database/connection_manager.py"
+        ],
+        "dependencies": ["8.2b.2"],
+        "branch": "feature/time-monitoring",
+        "files_touched": [
+          "transform/warnings/database/connection_manager.py"
+        ],
+        "risk": "Connection pooling afetar threading do sistema existente",
+        "mitigation": "Usar thread-safe connection pools e testar concorrência"
+      },
+      {
+        "id": "8.3a",
+        "title": "Analisar accuracy metrics para achievements integration",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Definir métricas de accuracy (% tasks dentro do target, variance médio) e como integrar com achievements system existente (Epic 4.4).",
+        "deliverables": ["reports/analysis_accuracy_metrics.md"],
+        "acceptance_criteria": [
+          "Métricas de accuracy claramente definidas",
+          "Integração com achievements system planejada",
+          "Thresholds para diferentes níveis de achievement definidos"
+        ],
+        "dependencies": [],
+        "branch": "feature/time-monitoring", 
+        "files_touched": [],
+        "risk": "Métricas inadequadas não motivarem melhoria",
+        "mitigation": "Consultar literature sobre time estimation e productivity"
+      },
+      {
+        "id": "8.3b.1",
+        "title": "TEST: should_calculate_accuracy_metrics_and_trigger_achievements",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica cálculo de accuracy metrics (% within 10% of estimate, variance médio) e trigger de achievements baseados em precision.",
+        "test_specs": [
+          "should_calculate_accuracy_percentage_with_precision_under_1_percent",
+          "should_calculate_variance_statistics_with_correct_formulas",
+          "should_trigger_precision_achievements_at_defined_thresholds"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se accuracy calculation estiver incorreto",
+          "Teste falha se achievements não forem triggered adequadamente",
+          "Teste falha se métricas estatísticas estiverem erradas"
+        ],
+        "deliverables": [
+          "tests/test_accuracy_metrics.py::test_should_calculate_accuracy_metrics_and_trigger_achievements"  
+        ],
+        "dependencies": ["8.3a", "8.1b.2"],
+        "branch": "feature/time-monitoring",
+        "files_touched": ["tests/test_accuracy_metrics.py"],
+        "risk": "Integração complexa com achievements system existente",
+        "mitigation": "Usar interfaces bem definidas e mocks para isolation"
+      },
+      {
+        "id": "8.3b.2", 
+        "title": "IMPL: accuracy metrics calculator and achievements integration",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar calculator de accuracy metrics e integração com achievements tracker para premiar precision em time estimation.", 
+        "test_specs": [
+          "should_calculate_accuracy_percentage_correctly",
+          "should_calculate_variance_statistics_accurately", 
+          "should_trigger_precision_achievements_appropriately"
+        ],
+        "acceptance_criteria": [
+          "Accuracy percentage calculado corretamente (within threshold %)",
+          "Variance statistics (mean, std dev) calculados adequadamente",
+          "Integration com achievements system funcional",
+          "Testes da fase red passam"
+        ],
+        "deliverables": [
+          "transform/warnings/analytics/accuracy_calculator.py",
+          "tests/test_accuracy_metrics.py::test_should_calculate_accuracy_metrics_and_trigger_achievements"
+        ],
+        "dependencies": ["8.3b.1"],
+        "branch": "feature/time-monitoring",
+        "files_touched": [
+          "transform/warnings/analytics/accuracy_calculator.py"
+        ],
+        "risk": "Statistical calculations incorretos",
+        "mitigation": "Usar bibliotecas proven (numpy/scipy) e validar com casos conhecidos"
+      },
+      {
+        "id": "8.3b.3",
+        "title": "REFACTOR: optimize metrics calculation for large datasets",
+        "tdd_phase": "refactor", 
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar metrics calculation para performance com grandes datasets, adicionar caching e batch processing.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Metrics calculation otimizado para >1000 tasks",
+          "Caching implementado para queries frequentes",
+          "Batch processing para updates em massa",
+          "Todos os testes continuam verdes"
+        ],
+        "deliverables": [
+          "transform/warnings/analytics/accuracy_calculator.py"
+        ],
+        "dependencies": ["8.3b.2"],
+        "branch": "feature/time-monitoring", 
+        "files_touched": [
+          "transform/warnings/analytics/accuracy_calculator.py"
+        ],
+        "risk": "Otimizações prematuras complicarem código",
+        "mitigation": "Profile primeiro, otimizar apenas bottlenecks reais"
+      },
+      {
+        "id": "8.4a",
+        "title": "Analisar daily summary extensions para time analytics",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Planejar extensões no daily summary (Epic 4.6) para incluir time accuracy analysis, trends e insights para improvement.", 
+        "deliverables": ["reports/analysis_daily_summary_extensions.md"],
+        "acceptance_criteria": [
+          "Seções adicionais para daily summary identificadas", 
+          "Templates para time accuracy reports definidos",
+          "Insights algorithms para improvement suggestions planejados"
+        ],
+        "dependencies": [],
+        "branch": "feature/time-monitoring",
+        "files_touched": [],
+        "risk": "Daily summary ficar muito complexo/overwhelming",
+        "mitigation": "Manter design limpo com seções opcionais"
+      },
+      {
+        "id": "8.4b.1",
+        "title": "TEST: should_include_time_accuracy_analysis_in_daily_summary", 
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que daily summary inclui seção de time accuracy com variance trends e improvement suggestions.",
+        "test_specs": [
+          "should_include_accuracy_percentage_in_daily_summary",
+          "should_show_variance_trends_over_time_periods",
+          "should_provide_actionable_improvement_suggestions"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se accuracy metrics não aparecerem no summary",
+          "Teste falha se trends não forem calculados corretamente", 
+          "Teste falha se suggestions não forem actionable"
+        ],
+        "deliverables": [
+          "tests/test_enhanced_daily_summary.py::test_should_include_time_accuracy_analysis_in_daily_summary"
+        ],
+        "dependencies": ["8.4a", "8.3b.2"],
+        "branch": "feature/time-monitoring",
+        "files_touched": ["tests/test_enhanced_daily_summary.py"],
+        "risk": "Integration complexa com daily summary existente",
+        "mitigation": "Usar plugin architecture para extensibility"
+      },
+      {
+        "id": "8.4b.2",
+        "title": "IMPL: enhanced daily summary with time analytics",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar extensões no daily summary para mostrar time accuracy analysis, variance trends e suggestions para improvement.",
+        "test_specs": [
+          "should_include_accuracy_percentage_in_daily_summary",
+          "should_show_variance_trends_correctly",
+          "should_provide_improvement_suggestions"
+        ],
+        "acceptance_criteria": [
+          "Daily summary inclui seção 'Time Accuracy Analysis'",
+          "Variance trends mostrados com historical data",
+          "Suggestions baseadas em patterns de variance", 
+          "Testes da fase red passam"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/enhanced_daily_summary.py",
+          "tests/test_enhanced_daily_summary.py::test_should_include_time_accuracy_analysis_in_daily_summary"
+        ],
+        "dependencies": ["8.4b.1"],
+        "branch": "feature/time-monitoring",
+        "files_touched": [
+          "transform/warnings/cli/enhanced_daily_summary.py"
+        ],
+        "risk": "Summary ficar muito verboso ou confuso",
+        "mitigation": "Design clean com seções colapsáveis/optional"
+      },
+      {
+        "id": "8.4b.3",
+        "title": "REFACTOR: modularize summary plugins and add export formats",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10, 
+        "story_points": 2,
+        "description": "Refatorar daily summary para plugin architecture, adicionar export formats (JSON, CSV) e configurability de seções.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Plugin architecture para summary sections implementada",
+          "Export formats (JSON, CSV, Markdown) funcionais", 
+          "Configuração de seções ativas/inativas",
+          "Todos os testes continuam verdes"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/summary_plugins.py"
+        ],
+        "dependencies": ["8.4b.2"],
+        "branch": "feature/time-monitoring",
+        "files_touched": [
+          "transform/warnings/cli/summary_plugins.py"
+        ],
+        "risk": "Plugin architecture over-engineered para necessidades simples", 
+        "mitigation": "Start simple, adicionar complexity apenas quando needed"
+      },
+      {
+        "id": "8.5b.1",
+        "title": "TEST: should_provide_complete_cli_workflow_for_task_monitoring",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste end-to-end que verifica workflow completo: start timer com estimate → trabalhar → stop → ver analytics → achievements.",
+        "test_specs": [
+          "should_complete_full_workflow_start_to_analytics_under_30_seconds",
+          "should_handle_multiple_concurrent_tasks_without_conflicts",
+          "should_integrate_seamlessly_with_existing_tdah_tools"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se algum passo do workflow não funcionar",
+          "Teste falha se concurrent tasks causarem conflicts",
+          "Teste falha se integration com tools existentes quebrar"
+        ],
+        "deliverables": [
+          "tests/test_cli_workflow_integration.py::test_should_provide_complete_cli_workflow_for_task_monitoring"
+        ],
+        "dependencies": ["8.1b.3", "8.3b.3", "8.4b.3"],
+        "branch": "feature/time-monitoring",
+        "files_touched": ["tests/test_cli_workflow_integration.py"],
+        "risk": "End-to-end tests muito frágeis ou lentos",
+        "mitigation": "Usar test data isolated e mocks para external dependencies"
+      },
+      {
+        "id": "8.5b.2", 
+        "title": "IMPL: integrated cli commands for complete workflow",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar comandos CLI integrados e main CLI integration para workflow completo de task monitoring.",
+        "test_specs": [
+          "should_complete_full_workflow_successfully",
+          "should_handle_concurrent_tasks_correctly",
+          "should_integrate_with_existing_tools_seamlessly"
+        ],
+        "acceptance_criteria": [
+          "Comandos CLI integrados ao main CLI do projeto",
+          "Workflow completo funcional from start to analytics",
+          "Integration sem breaking changes com Epic 4 tools",
+          "Testes da fase red passam"
+        ],
+        "deliverables": [
+          "transform/warnings/cli/main_cli_enhanced.py",
+          "tests/test_cli_workflow_integration.py::test_should_provide_complete_cli_workflow_for_task_monitoring"
+        ],
+        "dependencies": ["8.5b.1"],
+        "branch": "feature/time-monitoring", 
+        "files_touched": [
+          "transform/warnings/cli/main_cli_enhanced.py"
+        ],
+        "risk": "CLI integration conflicts com existing commands",
+        "mitigation": "Use namespaces e backward compatibility checks"
+      },
+      {
+        "id": "8.5b.3",
+        "title": "REFACTOR: optimize cli performance and add help documentation",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2, 
+        "description": "Refatorar CLI para performance otimizada, adicionar comprehensive help e documentation para user adoption.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "CLI commands respondem em <200ms para operations comuns",
+          "Help documentation completa e user-friendly", 
+          "Examples e tutorials para common workflows",
+          "Todos os testes continuam verdes"
+        ],
+        "deliverables": [
+          "docs/cli_task_monitoring_guide.md"
+        ],
+        "dependencies": ["8.5b.2"],
+        "branch": "feature/time-monitoring",
+        "files_touched": [
+          "docs/cli_task_monitoring_guide.md"
+        ],
+        "risk": "Documentation desatualizar rapidamente",
+        "mitigation": "Automated doc generation from CLI help strings"
+      }
+    ],
+    "checklist_epic_level": [
+      "Task Timer enhanced com task-id e estimate parameters funcionais",
+      "Database schema para task_tracking criado e testado", 
+      "Accuracy metrics calculator implementado e integrado com achievements",
+      "Daily summary enhanced com time analytics e improvement suggestions",
+      "CLI workflow completo integrado e documentado",
+      "Cobertura de testes ≥ 90% em todos os novos módulos",
+      "≥ 60% das tasks executadas em paralelo (analyses, testes independentes)",
+      "Integration seamless com Epic 4 TDAH tools sem breaking changes",
+      "Performance constraints atendidos (CLI <200ms, analytics <5s)",
+      "Documentation completa para user adoption"
+    ],
+    "automation_hooks": {
+      "create_labels": ["tdd", "productivity", "analytics", "time-tracking"],
+      "project_board": {
+        "name": "TDD Development Board", 
+        "columns": ["Red (Failing Tests)", "Green (Implementation)", "Refactor", "Done"]
+      },
+      "default_branch": "refactor",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": ["pytest", "coverage", "black", "flake8"],
+      "issue_template_fields": [
+        "title", "description", "tdd_phase", "test_specs",
+        "acceptance_criteria", "deliverables", "dependencies", 
+        "estimate_minutes", "risk", "mitigation"
+      ],
+      "milestone": "EPIC 8 - Task Time Monitoring & Analytics"
+    },
+    "performance_constraints": {
+      "cli_responsiveness": {
+        "command_startup_max": "≤200ms",
+        "timer_operations_max": "≤100ms", 
+        "database_operations_max": "≤500ms",
+        "analytics_calculation_max": "≤5s"
+      },
+      "database_performance": {
+        "insert_task_record_max": "≤50ms",
+        "query_analytics_data_max": "≤2s",
+        "batch_operations_max": "≤10s per 1000 records",
+        "concurrent_access_support": true
+      },
+      "analytics_processing": {
+        "accuracy_calculation_max": "≤1s for 100 tasks",
+        "trend_analysis_max": "≤3s for 30 days",
+        "summary_generation_max": "≤2s",
+        "achievement_processing_max": "≤500ms"
+      },
+      "integration_overhead": {
+        "epic4_integration_latency": "≤50ms additional",
+        "existing_workflow_impact": "0% performance degradation", 
+        "memory_overhead_max": "≤5MB additional"
+      }
+    },
+    "quality_gates": {
+      "user_experience": {
+        "cli_responsiveness": "≤200ms for all common operations",
+        "workflow_simplicity": "≤3 commands for complete cycle",
+        "data_accuracy": "100% time tracking precision",
+        "error_handling": "graceful degradation with clear messages"
+      },
+      "integration_quality": {
+        "backward_compatibility": "100% with Epic 4 TDAH tools",
+        "database_consistency": "ACID compliance for all operations",
+        "concurrent_usage": "thread-safe multi-user support", 
+        "data_migration": "seamless upgrade path"
+      },
+      "analytics_reliability": {
+        "calculation_accuracy": "≤1% variance in statistical metrics",
+        "trend_detection": "accurate pattern recognition",
+        "achievement_fairness": "consistent threshold application",
+        "insight_actionability": "specific improvement suggestions"
+      },
+      "system_robustness": {
+        "error_recovery": "graceful handling of database/network failures",
+        "data_backup": "automatic backup of tracking data",
+        "performance_scaling": "linear performance up to 10K tasks",
+        "monitoring_observability": "comprehensive logging and metrics"
+      }
+    }
+  }
+}
