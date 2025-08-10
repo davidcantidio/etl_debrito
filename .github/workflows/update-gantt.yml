@@ -38,6 +38,11 @@ on:
         required: false
         default: 'docs'
         type: string
+      force_deploy:
+        description: 'Force GitHub Pages deployment even without changes'
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   update-gantt-charts:
@@ -238,13 +243,14 @@ jobs:
           branch: ${{ github.ref }}
       
       - name: 🚀 Deploy to GitHub Pages
-        if: steps.git-check.outputs.changes == 'true' || github.event_name == 'workflow_dispatch'
+        if: steps.git-check.outputs.changes == 'true' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_deploy == 'true'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs
           enable_jekyll: true
           commit_message: 'Deploy: ${{ github.event.head_commit.message }}'
+          force_orphan: true
       
       - name: 💬 Comment on Related Issues (if triggered by issue)
         if: github.event_name == 'issues' && steps.git-check.outputs.changes == 'true'
