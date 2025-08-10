@@ -154,10 +154,6 @@ class CommitTracker:
                     epic_data[epic_id]['commit_status'] = 'done'
                 elif epic_data[epic_id]['commit_status'] != 'done':
                     epic_data[epic_id]['commit_status'] = 'active'
-                    
-                except Exception as e:
-                    print(f"⚠️ Erro ao processar commit {commit_hash}: {e}")
-                    continue
         
         except Exception as e:
             print(f"❌ Erro ao buscar commits: {e}")
