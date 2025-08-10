@@ -60,9 +60,13 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           pip install --upgrade pip
-          # Dependências mínimas para o gerador
-          pip install argparse json5 pathlib
-          echo "✅ Dependencies installed"
+          # Dependências para o gerador de diagramas
+          pip install json5
+          echo "✅ Core dependencies installed"
+          
+          # Verificar disponibilidade dos epic files
+          echo "📋 Checking epic files availability..."
+          ls -la epico_*.json || echo "⚠️ Epic files not found in root"
       
       - name: 🔍 Validate Epic Files
         run: |
