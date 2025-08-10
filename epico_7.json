@@ -1,0 +1,356 @@
+{
+  "epic": {
+    "id": "7",
+    "name": "Missing Caches Integration",
+    "summary": "Integrar caches atualmente ausentes (por exemplo, geografia, conquistas ou outras caches criadas posteriormente) ao sistema de invalidação unificado e definir pontos de integração com a etapa de escrita consolidada, garantindo que nenhuma cache fique desatualizada.",
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "goals": [
+      "Identificar caches existentes que ainda não estão registradas no CacheController",
+      "Registrar caches ausentes e garantir que respondem a invalidação global",
+      "Conectar a etapa de write-back (dest_writer.flush_payloads) à invalidação de caches para prevenir inconsistências",
+      "Manter a contagem de chamadas de API dentro do limite (2 chamadas) mesmo após limpar caches"
+    ],
+    "definition_of_done": [
+      "Todas as caches identificadas registradas no CacheController",
+      "Método invalidate_all() limpa também caches antes omitidas",
+      "dest_writer chama invalidação de caches após flush de dados",
+      "Cobertura de testes ≥ 90% nos módulos modificados",
+      "≥ 60% das tarefas executáveis em paralelo (análises e testes isolados)",
+      "Nenhuma regressão no número de chamadas de API",
+      "Todas as micro‑tarefas seguem ciclo TDD red‑green‑refactor",
+      "Performance de invalidação ≤ 20ms para todas as caches registradas",
+      "Write-back integration thread‑safe com hook único por flush"
+    ],
+    "duration": "1 dia",
+    "labels": [
+      "tdd",
+      "caching",
+      "integration",
+      "write-back"
+    ],
+    "tasks": [
+      {
+        "id": "7.1a",
+        "title": "Analisar caches ausentes e pontos de registro",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Fazer inventário de caches criadas (geografia_cache, achievements_cache, etc.) e verificar quais não estão registradas no CacheController; documentar locais onde são usadas.",
+        "deliverables": [
+          "reports/analysis_missing_caches.md"
+        ],
+        "acceptance_criteria": [
+          "Lista de caches existentes e status de registro",
+          "Mapa de módulos que consomem cada cache"
+        ],
+        "dependencies": [],
+        "branch": "feature/missing-caches",
+        "files_touched": [],
+        "risk": "Esquecer caches definidas em futuras epics",
+        "mitigation": "Criar checklist para futuras caches e revisar epics posteriores"
+      },
+      {
+        "id": "7.1b.1",
+        "title": "TEST: should_register_and_invalidate_missing_caches",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que caches previamente ausentes (p.ex. geografia_cache, achievements_cache) podem ser registradas no CacheController e que invalidate_all() as invalida corretamente.",
+        "test_specs": [
+          "should_register_missing_cache_with_latency_under_5_milliseconds",
+          "should_invalidate_registered_cache_with_performance_under_10_milliseconds",
+          "should_handle_concurrent_registration_with_thread_safety_validation"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se cache não puder ser registrada",
+          "Falha se cache não for invalidada ou se dados persistirem após invalidate_all()"
+        ],
+        "deliverables": [
+          "tests/test_missing_caches.py::test_should_register_and_invalidate_missing_caches"
+        ],
+        "dependencies": [
+          "7.1a",
+          "5.3b.2"
+        ],
+        "branch": "feature/missing-caches",
+        "files_touched": [
+          "tests/test_missing_caches.py"
+        ],
+        "risk": "Mocks de caches não reproduzirem comportamento real",
+        "mitigation": "Implementar caches de exemplo mínimas ou usar caches reais no teste"
+      },
+      {
+        "id": "7.1b.2",
+        "title": "IMPL: register missing caches in CacheController",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar registro de caches ausentes no CacheController, adicionando chamadas register_cache() para geografia_cache e quaisquer outras caches identificadas, garantindo que invalidate_all() funcione.",
+        "test_specs": [
+          "should_register_missing_cache_in_cache_controller",
+          "should_invalidate_registered_missing_cache_when_called"
+        ],
+        "acceptance_criteria": [
+          "Caches ausentes registradas por padrão no inicializador do CacheController ou em configuração central",
+          "invalidate_all() limpa caches registradas",
+          "Testes vermelhos passam"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/cache_controller.py",
+          "tests/test_missing_caches.py::test_should_register_and_invalidate_missing_caches"
+        ],
+        "dependencies": [
+          "7.1b.1"
+        ],
+        "branch": "feature/missing-caches",
+        "files_touched": [
+          "transform/warnings/caches/cache_controller.py"
+        ],
+        "risk": "Adicionar caches sem necessidade e aumentar overhead",
+        "mitigation": "Permitir registro condicional via config e documentar"
+      },
+      {
+        "id": "7.1b.3",
+        "title": "REFACTOR: dynamic cache registration via configuration",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar CacheController para registrar caches ausentes de forma dinâmica usando uma configuração (ex.: arquivo YAML/JSON) em vez de código fixo, mantendo testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Caches definidas em config/cache_registry.yaml carregadas no init",
+          "CacheController oferece método para reconfigurar caches sem reiniciar aplicação",
+          "Nenhum teste quebra"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/cache_controller.py",
+          "config/cache_registry.yaml"
+        ],
+        "dependencies": [
+          "7.1b.2"
+        ],
+        "branch": "feature/missing-caches",
+        "files_touched": [
+          "transform/warnings/caches/cache_controller.py",
+          "config/cache_registry.yaml"
+        ],
+        "risk": "Configuração externa ficar desincronizada com código",
+        "mitigation": "Validar config em startup e documentar processo de atualização"
+      },
+      {
+        "id": "7.2a",
+        "title": "Analisar integração de invalidação com write-back",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Estudar dest_writer.flush_payloads e identificar o melhor ponto para chamar o CacheController.invalidate_all() após a escrita, sem aumentar o número de chamadas de API.",
+        "deliverables": [
+          "reports/analysis_writeback_integration.md"
+        ],
+        "acceptance_criteria": [
+          "Documento indicando a linha exata para inserir hook de invalidação",
+          "Avaliação de impacto no número de chamadas de API"
+        ],
+        "dependencies": [],
+        "branch": "feature/missing-caches",
+        "files_touched": [],
+        "risk": "Inserir hook no lugar errado causar invalidações desnecessárias",
+        "mitigation": "Revisar lógica de write-back e criar testes para validar"
+      },
+      {
+        "id": "7.2b.1",
+        "title": "TEST: should_invalidate_caches_after_write_back",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que, após a execução de flush_payloads(), todos os caches registrados no CacheController são invalidados, e que o número total de chamadas de API permanece igual ao baseline.",
+        "test_specs": [
+          "should_call_invalidate_all_after_flush_with_hook_latency_under_100_milliseconds",
+          "should_maintain_api_calls_limit_exactly_2_after_write_back_invalidation",
+          "should_prevent_invalidation_loops_with_single_hook_execution_per_flush"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se caches não forem limpas após write-back",
+          "Teste falha se chamadas de API excederem as 2 permitidas"
+        ],
+        "deliverables": [
+          "tests/test_writeback_integration.py::test_should_invalidate_caches_after_write_back"
+        ],
+        "dependencies": [
+          "7.1b.2"
+        ],
+        "branch": "feature/missing-caches",
+        "files_touched": [
+          "tests/test_writeback_integration.py"
+        ],
+        "risk": "Testar flush_payloads exigir setup complexo de planilhas",
+        "mitigation": "Mockar dest_writer e simular payload mínimo"
+      },
+      {
+        "id": "7.2b.2",
+        "title": "IMPL: hook cache invalidation into write-back",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Adicionar chamada ao CacheController.invalidate_all() no final de dest_writer.flush_payloads() (ou método equivalente) e garantir que a contagem de chamadas de API não aumenta.",
+        "test_specs": [
+          "should_call_invalidate_all_after_flush_payloads",
+          "should_not_increase_api_calls_after_write_back_invalidation"
+        ],
+        "acceptance_criteria": [
+          "Hook é acionado após write-back apenas uma vez por flush",
+          "Caches são limpas e recarregadas na próxima leitura",
+          "Testes da fase red passam"
+        ],
+        "deliverables": [
+          "transform/load/dest_writer.py",
+          "tests/test_writeback_integration.py::test_should_invalidate_caches_after_write_back"
+        ],
+        "dependencies": [
+          "7.2b.1"
+        ],
+        "branch": "feature/missing-caches",
+        "files_touched": [
+          "transform/load/dest_writer.py"
+        ],
+        "risk": "Hook causar loop de invalidação e recarga sem fim",
+        "mitigation": "Adicionar flag ou verificação para evitar invalidação repetida no mesmo ciclo"
+      },
+      {
+        "id": "7.2b.3",
+        "title": "REFACTOR: make write-back invalidation configurable",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar a integração de invalidação no write-back para torná-la opcional via configuração (env ou config file), mantendo todos os testes verdes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Chave config (ex.: ENABLE_WRITEBACK_INVALIDATION) controla a execução do hook",
+          "Default habilitado em DEV, desabilitado em PROD se necessário",
+          "Testes continuam verdes"
+        ],
+        "deliverables": [
+          "transform/load/dest_writer.py",
+          "transform/warnings/config.py"
+        ],
+        "dependencies": [
+          "7.2b.2"
+        ],
+        "branch": "feature/missing-caches",
+        "files_touched": [
+          "transform/load/dest_writer.py",
+          "transform/warnings/config.py"
+        ],
+        "risk": "Configuração incorreta causar inconsistências em PROD",
+        "mitigation": "Documentar a flag e validar em testes de integração"
+      }
+    ],
+    "checklist_epic_level": [
+      "Inventário de caches ausentes concluído e documentado",
+      "Caches ausentes registradas no CacheController",
+      "Invalidação global abrange caches recém-registradas",
+      "Hook de write-back chama invalidação de caches sem aumentar chamadas de API",
+      "Cobertura de testes ≥ 90% nos módulos modificados",
+      "≥ 60% das tarefas executadas em paralelo (análise e testes podem correr simultaneamente)",
+      "Configuração de integração de invalidação documentada e testada",
+      "Implementação follow red‑green‑refactor micro‑cycles (5‑15 min)",
+      "Cache integration performance: ≤ 20ms invalidation, ≤ 5ms registration, ≤ 100ms write-back hook",
+      "Thread safety validado para cache controller concurrent access"
+    ],
+    "automation_hooks": {
+      "create_labels": [
+        "tdd",
+        "caching",
+        "integration",
+        "write-back"
+      ],
+      "project_board": {
+        "name": "TDD Development Board",
+        "columns": [
+          "Red (Failing Tests)",
+          "Green (Implementation)",
+          "Refactor",
+          "Done"
+        ]
+      },
+      "default_branch": "refactor",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": [
+        "pytest",
+        "coverage",
+        "black",
+        "flake8"
+      ],
+      "issue_template_fields": [
+        "title",
+        "description",
+        "tdd_phase",
+        "test_specs",
+        "acceptance_criteria",
+        "deliverables",
+        "dependencies",
+        "estimate_minutes",
+        "risk",
+        "mitigation"
+      ],
+      "milestone": "EPIC 7 - Missing Caches Integration"
+    },
+    "performance_constraints": {
+      "cache_integration": {
+        "cache_registration_max_latency": "5ms",
+        "global_invalidation_max_latency": "20ms",
+        "write_back_hook_max_latency": "100ms",
+        "concurrent_registration_support": true
+      },
+      "write_back_integration": {
+        "api_calls_maintenance": "2 calls exactly",
+        "hook_execution_per_flush": "1 execution only",
+        "thread_safety": "mandatory",
+        "invalidation_loop_prevention": true
+      },
+      "configuration_management": {
+        "config_reload_max_time": "50ms",
+        "config_validation_max_time": "10ms",
+        "dynamic_reconfiguration": true,
+        "error_handling": "graceful degradation"
+      },
+      "cross_epic_integration": {
+        "cache_controller_dependency": "Epic 5 (5.3b.2)",
+        "api_limit_compliance": "maintain ETL 2-call limit",
+        "backward_compatibility": true
+      }
+    },
+    "quality_gates": {
+      "cache_integration_quality": {
+        "registration_accuracy": "100% missing caches identified and registered",
+        "performance_benchmark": "P99 ≤ 25ms for all cache operations",
+        "reliability": "Zero cache inconsistency tolerance",
+        "thread_safety_validation": "Concurrent access stress testing"
+      },
+      "write_back_integration_quality": {
+        "api_compliance": "Exactly 2 API calls maintained per pipeline",
+        "hook_reliability": "100% execution after successful flush",
+        "performance_overhead": "≤ 100ms write-back integration latency",
+        "loop_prevention": "100% prevention of invalidation loops"
+      },
+      "configuration_quality": {
+        "dynamic_reconfiguration": "100% uptime during cache registry updates",
+        "validation_accuracy": "100% config error detection on startup",
+        "documentation_completeness": "Complete cache integration guides",
+        "environment_flexibility": "DEV/PROD configuration support"
+      },
+      "cross_epic_quality": {
+        "dependency_management": "Clean Epic 5 integration without circular deps",
+        "api_limit_preservation": "Zero increase in ETL API calls",
+        "backward_compatibility": "100% compatibility with existing cache systems",
+        "integration_testing": "End-to-end cache invalidation validation"
+      }
+    }
+  }
+}
