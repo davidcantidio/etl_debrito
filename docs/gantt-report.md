@@ -2,8 +2,8 @@
 
 **Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
 **GitHub Repository:** davidcantidio/etl_debrito  
-**Commit:** bc674eff282222a81b56558ff4c15b286f71e522  
-**Branch:** refactor
+**Commit:** eed0b3243c887a57e4cecddbd98a81a89753c5df  
+**Branch:** main
 **TDD Pattern:** ${USING_ENHANCED_TDD:-false}
 
 ## 🎯 Generated Files
