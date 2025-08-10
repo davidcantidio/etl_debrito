@@ -144,3 +144,10 @@ Task: ID | Time: Xmin | Status: red/green/refactor
   <strong>🤖 Auto-updated via GitHub Actions</strong><br>
   <small>Last deployment: Real-time | Based on commits with [EPIC-X] pattern</small>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: true });
+  }
+</script>
