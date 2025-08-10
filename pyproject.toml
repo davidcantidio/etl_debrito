@@ -17,6 +17,7 @@ python  = "^3.12,<3.13"
 pandas  = "2.2.3"    # compatível com NumPy 2
 numpy   = "2.2.5"
 python-dotenv = "1.1.0"
+plotly = "^5.17.0"   # para gantt tracker visualização
 # --- adicione aqui outras libs runtime que seu código usa ---
 # google-auth, google-api-python-client, etc.
 aiosqlite = "0.21.0"
