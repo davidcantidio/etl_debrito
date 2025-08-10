@@ -1,0 +1,32 @@
+flowchart LR
+  classDef epic fill:#eef,stroke:#55f,stroke-width:2px,color:#000;
+  classDef task fill:#efe,stroke:#393,stroke-width:1px,color:#000;
+  classDef red fill:#fee,stroke:#f33,stroke-width:1px,color:#000;
+  classDef green fill:#efe,stroke:#3f3,stroke-width:1px,color:#000;
+  classDef refactor fill:#ffd,stroke:#fa0,stroke-width:1px,color:#000;
+
+  E0["Epic 0<br/>Environment & Production Safety<br/>(1d)"]:::epic
+  E0_5["Epic 0.5<br/>Integration Architecture Fixes<br/>(1d)"]:::epic
+  E2["Epic 2<br/>Discovery & Compatibility<br/>(1d)"]:::epic
+  E3["Epic 3<br/>Interactive Warning Resolution System<br/>(1d)"]:::epic
+  E5["Epic 5<br/>Cache Management Specifics<br/>(1d)"]:::epic
+  E6["Epic 6<br/>Data Migration & Issues Integration<br/>(1d)"]:::epic
+  E7["Epic 7<br/>Missing Caches Integration<br/>(1d)"]:::epic
+  E4["Epic 4<br/>TDAH Tooling Implementation<br/>(1d)"]:::epic
+  E8["Epic 8<br/>Task Time Monitoring & Analytics<br/>(1d)"]:::epic
+
+  E0 --> E0_5
+  E0_5 --> E2
+  E2 --> E3
+  E3 --> E5
+  E3 --> E4
+  E2 --> E6
+  E5 --> E7
+  E5 --> E8
+
+  T3_1["3.1a<br/>Analisar requisitos de ca...<br/>(10min)"]:::analysis
+  T3_2["3.1b.3<br/>REFACTOR: optimize and mo...<br/>(10min)"]:::refactor
+  T3_3["3.2a<br/>Analisar requisitos da in...<br/>(10min)"]:::analysis
+  E3 --> T3_1
+  T3_1 --> T3_2
+  T3_2 --> T3_3

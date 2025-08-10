@@ -1,0 +1,258 @@
+name: 🎯 Update Project Gantt Charts
+# Workflow para atualizar automaticamente os diagramas Gantt com integração GitHub
+
+on:
+  # Trigger automático em mudanças importantes
+  push:
+    branches: [ main, refactor ]
+    paths:
+      - 'epico_*.json'
+      - 'generate_all_diagrams.py'
+      - '.github/workflows/update-gantt.yml'
+  
+  # Trigger em Issues relacionadas aos épicos
+  issues:
+    types: [opened, closed, labeled, unlabeled, assigned, unassigned]
+    
+  # Trigger em Milestones
+  milestone:
+    types: [created, closed, opened, edited, deleted]
+  
+  # Trigger manual
+  workflow_dispatch:
+    inputs:
+      github_repo:
+        description: 'GitHub Repository (owner/repo)'
+        required: false
+        default: 'davidcantidio/etl_debrito'
+        type: string
+      output_dir:
+        description: 'Output directory for .mmd files'
+        required: false
+        default: 'docs'
+        type: string
+
+jobs:
+  update-gantt-charts:
+    name: 🧠 Generate Mermaid Diagrams
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write          # Para commit automático
+      issues: read            # Para ler Issues
+      repository-projects: read # Para ler Projects
+      pages: write            # Para GitHub Pages deploy
+      id-token: write         # Para GitHub Pages authentication
+      
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: 📦 Install Dependencies
+        run: |
+          pip install --upgrade pip
+          # Dependências mínimas para o gerador
+          pip install argparse json5 pathlib
+          echo "✅ Dependencies installed"
+      
+      - name: 🔍 Validate Epic Files
+        run: |
+          echo "📋 Checking epic files..."
+          epic_count=$(ls epico_*.json 2>/dev/null | wc -l)
+          if [ $epic_count -eq 0 ]; then
+            echo "❌ No epic files found!"
+            exit 1
+          fi
+          echo "✅ Found $epic_count epic files"
+          
+          # Validar JSON syntax
+          for file in epico_*.json; do
+            if python3 -m json.tool "$file" > /dev/null 2>&1; then
+              echo "  ✅ $file - valid JSON"
+            else
+              echo "  ❌ $file - invalid JSON"
+              exit 1
+            fi
+          done
+      
+      - name: 🎨 Generate Gantt Diagrams with GitHub Integration
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          echo "🧠 Starting Mermaid diagram generation..."
+          
+          # Usar input do workflow dispatch ou default
+          REPO="${{ github.event.inputs.github_repo || github.repository }}"
+          OUTPUT_DIR="${{ github.event.inputs.output_dir || 'docs' }}"
+          
+          echo "🔗 GitHub Repo: $REPO"
+          echo "📁 Output Dir: $OUTPUT_DIR"
+          
+          # Executar gerador com integração GitHub
+          python3 generate_all_diagrams.py \
+            --github-repo "$REPO" \
+            --output-dir "$OUTPUT_DIR"
+          
+          echo "✅ Diagrams generated successfully"
+      
+      - name: 📊 Generate Enhanced Gantt Progress Tracker
+        run: |
+          echo "🎯 Generating enhanced Gantt with commit tracking..."
+          
+          # Instalar dependências para o tracker
+          pip install plotly pandas
+          
+          # Gerar dashboard de progresso
+          python3 gantt_tracker.py --output docs/gantt_progress.html --no-open
+          
+          echo "✅ Enhanced Gantt progress tracker generated"
+      
+      - name: 📊 Generate Diagram Summary
+        run: |
+          echo "📊 Generating summary report..."
+          
+          cat > docs/gantt-report.md << 'EOF'
+          # 📊 ETL Debrito - Gantt Chart Report
+          
+          **Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
+          **GitHub Repository:** ${{ github.repository }}  
+          **Commit:** ${{ github.sha }}  
+          **Branch:** ${{ github.ref_name }}  
+          
+          ## 🎯 Generated Files
+          - [📋 Mindmap](./mindmap.mmd) - Hierarchical project structure
+          - [🔄 Flowchart](./flow_dependencies.mmd) - Epic dependencies  
+          - [📅 Gantt Chart](./gantt_schedule.mmd) - Professional timeline with GitHub integration
+          
+          ## 🔗 GitHub Integration Features
+          - ✅ Interactive links to Issues by Epic
+          - ✅ Professional status tags (done, active, crit, milestone)
+          - ✅ Milestone connections
+          - ✅ Weekend exclusions for realistic timeline
+          - ✅ Vertical markers for important dates
+          
+          ## 🌐 Visualization
+          Copy any .mmd file content to [Mermaid Live](https://mermaid.live/) for interactive visualization.
+          
+          ---
+          🤖 Auto-generated by GitHub Actions
+          EOF
+          
+          echo "✅ Summary report created"
+      
+      - name: 🔍 Check for Changes
+        id: git-check
+        run: |
+          if git diff --quiet HEAD -- docs/; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "🔵 No changes detected in diagrams"
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "🟢 Changes detected in diagrams"
+            git diff --stat HEAD -- docs/
+          fi
+      
+      - name: 💾 Commit Updated Diagrams
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Add arquivos gerados
+          git add docs/*.mmd docs/gantt-report.md docs/gantt_progress.html
+          
+          # Commit message detalhado
+          COMMIT_MSG="🎯 Auto-update Gantt charts with enhanced progress tracking
+          
+          - Updated Mindmap, Flowchart, and Professional Gantt
+          - Enhanced progress tracker with commit analysis
+          - Interactive links to Issues: ${{ github.repository }}
+          - Real-time metrics: planned vs actual progress
+          - TDD cycle tracking and time accuracy analytics
+          - Status tags: done, active, crit, milestone  
+          - Weekend exclusions and vertical markers
+          
+          🤖 Generated with Claude Code
+          
+          Co-authored-by: Claude <noreply@anthropic.com>"
+          
+          git commit -m "$COMMIT_MSG"
+          echo "✅ Changes committed"
+      
+      - name: 📤 Push Changes
+        if: steps.git-check.outputs.changes == 'true'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+      
+      - name: 🚀 Deploy to GitHub Pages
+        if: steps.git-check.outputs.changes == 'true' || github.event_name == 'workflow_dispatch'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          enable_jekyll: true
+          commit_message: 'Deploy: ${{ github.event.head_commit.message }}'
+      
+      - name: 💬 Comment on Related Issues (if triggered by issue)
+        if: github.event_name == 'issues' && steps.git-check.outputs.changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue_number = context.issue.number;
+            const comment = `🎯 **Gantt charts updated automatically!**
+            
+            The project timeline has been refreshed with the latest Epic status.
+            
+            **View updated dashboards:**
+            - 🏠 [**GitHub Pages Dashboard**](https://davidcantidio.github.io/etl_debrito/) - Live Gantt + Project Overview
+            - 🎯 [**Enhanced Progress Tracker**](https://davidcantidio.github.io/etl_debrito/gantt_progress.html) - Interactive Analytics
+            - 📋 [Mindmap](../blob/${{ github.ref_name }}/docs/mindmap.mmd)
+            - 🔄 [Dependencies](../blob/${{ github.ref_name }}/docs/flow_dependencies.mmd)  
+            
+            **Interactive visualization:** Copy diagram content to [mermaid.live](https://mermaid.live/)
+            
+            🤖 Auto-generated by GitHub Actions`;
+            
+            github.rest.issues.createComment({
+              issue_number: issue_number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+      
+      - name: 📈 Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gantt-diagrams-${{ github.run_number }}
+          path: |
+            docs/*.mmd
+            docs/gantt-report.md
+            docs/gantt_progress.html
+          retention-days: 30
+      
+      - name: 🎉 Success Summary
+        if: success()
+        run: |
+          echo "🎉 Workflow completed successfully!"
+          echo ""
+          echo "📊 Generated Files:"
+          find docs -name "*.mmd" -o -name "gantt-report.md" | while read file; do
+            echo "  📄 $file ($(wc -l < "$file") lines)"
+          done
+          echo ""
+          echo "🌐 View diagrams at: https://mermaid.live/"
+          echo "📱 Repository: https://github.com/${{ github.repository }}"

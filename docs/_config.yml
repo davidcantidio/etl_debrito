@@ -1,0 +1,99 @@
+# ETL Debrito - GitHub Pages Configuration
+title: "ETL Debrito - Project Dashboard"
+description: >-
+  Enhanced Gantt Progress Tracker with Real-time Commit Analysis.
+  Ultra-optimized ETL pipeline reducing API calls by 93%.
+
+# Build settings
+theme: minima
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Site settings
+url: "https://davidcantidio.github.io"
+baseurl: "/etl_debrito"
+lang: pt-BR
+
+# Author/Organization
+author:
+  name: "David Cantidio"
+  email: "david@example.com"
+
+# GitHub integration
+github:
+  repository_url: https://github.com/davidcantidio/etl_debrito
+  repository_name: davidcantidio/etl_debrito
+
+# Social media and contact
+social:
+  - name: GitHub
+    url: https://github.com/davidcantidio/etl_debrito
+    icon: github
+
+# Navigation menu
+header_pages:
+  - index.md
+
+# SEO and metadata
+seo:
+  type: Organization
+  name: ETL Debrito Project
+  links:
+    - https://github.com/davidcantidio/etl_debrito
+
+# Mermaid configuration (for GitHub Pages compatibility)
+mermaid:
+  enabled: true
+
+# Minima theme customization
+minima:
+  skin: auto
+  social_links:
+    github: davidcantidio
+    
+# Collections (if needed for future docs)
+collections:
+  docs:
+    output: true
+    permalink: /:collection/:name/
+
+# Exclude from processing
+exclude:
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
+  - Gemfile
+  - Gemfile.lock
+  - node_modules/
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+  - "*.pyc"
+  - "__pycache__"
+
+# Markdown settings
+markdown: kramdown
+highlighter: rouge
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+# Pagination
+paginate: 5
+paginate_path: "/page:num/"
+
+# Default front matter
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"

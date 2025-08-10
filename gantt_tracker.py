@@ -348,14 +348,14 @@ class GanttVisualizer:
             paper_bgcolor='#F8FAFC'
         )
         
-        # Linha "Today"
-        fig.add_vline(
-            x=datetime.now(),
-            line_dash="dash",
-            line_color="#EF4444",
-            annotation_text="TODAY",
-            annotation_position="top"
-        )
+        # Linha "Today" - remover temporariamente por compatibilidade plotly
+        # fig.add_vline(
+        #     x=datetime.now(),
+        #     line_dash="dash", 
+        #     line_color="#EF4444",
+        #     annotation_text="TODAY",
+        #     annotation_position="top"
+        # )
         
         return fig
     
@@ -595,6 +595,10 @@ class GanttTracker:
         """
         
         output_file = Path(output_path)
+        
+        # Criar diretório se não existir
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        
         output_file.write_text(html_content, encoding='utf-8')
         
         return output_file
@@ -647,8 +651,8 @@ Exemplos de uso:
     
     parser.add_argument(
         "--output", "-o",
-        default="gantt_progress.html",
-        help="Arquivo de saída (default: gantt_progress.html)"
+        default="docs/gantt_progress.html",
+        help="Arquivo de saída (default: docs/gantt_progress.html)"
     )
     
     parser.add_argument(
