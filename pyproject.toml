@@ -7,9 +7,9 @@ authors = ["Seu Nome <seu@email.com>"]
 # lista explícita dos diretórios-módulo que fazem parte do projeto
 packages = [
   { include = "ponto_de_controle" },
-  { include = "extract" },
-  { include = "load" },
-  { include = "treat" }
+  { include = "transform" },
+  { include = "tdah_tools" },
+  { include = "logs" }
 ]
 
 [tool.poetry.dependencies]
