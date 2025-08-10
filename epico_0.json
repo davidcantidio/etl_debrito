@@ -1,0 +1,822 @@
+{
+  "epic": {
+    "id": "0",
+    "name": "Environment & Production Safety",
+    "summary": "Garantir compatibilidade total com o ambiente de produção e os sistemas críticos (warning_suppressor, production_mode, caches, smart_reload), sem quebrar a arquitetura 2-API-calls e preparando base para o sistema interativo de warnings.",
+    "goals": [
+      "Manter 2 chamadas de API (batchGet/batchUpdate) sem regressões",
+      "Tornar comportamento de warnings previsível em produção e desenvolvimento",
+      "Isolar configuração por variáveis de ambiente (.env) com defaults seguros",
+      "Introduzir PerformanceGuard (limite de chamadas e trilha de auditoria)",
+      "Produzir matriz de compatibilidade entre módulos e modos de execução"
+    ],
+    "definition_of_done": [
+      "Flags de ambiente documentadas e testadas (INTERACTIVE_MODE, PRODUCTION_MODE, WARNINGS_DB_IMPL, WARNINGS_SQLITE_PRAGMAS, WARNINGS_DATABASE_URL)",
+      "PerformanceGuard integrado sem aumentar chamadas acima do baseline",
+      "Compatibilidade validada com warning_suppressor e production_mode",
+      "Matriz de compatibilidade publicada (sistemas × ambiente × comportamento)",
+      "Suíte de smoke tests executando OK em DEV/TEST/PROD (ou simulação)"
+    ],
+    "duration": "2 dias",
+    "labels": [
+      "infra",
+      "compatibility",
+      "performance",
+      "env",
+      "safety"
+    ],
+    "tasks": [
+      {
+        "id": "0.1",
+        "title": "Mapear comportamento atual do warning_suppressor",
+        "story_points": 15,
+        "estimate_minutes": 45,
+        "description": "Executar o pipeline (ou scripts de validação) com e sem o warning_suppressor para identificar exatamente quais padrões de log.warning() são suprimidos e em que condições.",
+        "acceptance_criteria": [
+          "Lista de padrões suprimidos com exemplos reais de logs",
+          "Diferenças de saída documentadas (antes/depois)",
+          "Impacto na detecção de warnings do projeto claramente descrito"
+        ],
+        "deliverables": [
+          "docs/compat/warning_suppressor_report.md",
+          "artefato de logs (logs/warning_suppressor_sample.log)"
+        ],
+        "dependencies": [],
+        "branch": "refactor",
+        "files_touched": [],
+        "test_plan": [
+          "Rodar pipeline em modo DEV com e sem supressor e comparar logs",
+          "Coletar amostras representativas (mín. 10 warnings de tipos distintos)"
+        ],
+        "risk": "Padrões implícitos não documentados mascararem problemas",
+        "mitigation": "Ampliar amostra e ativar logging detalhado temporário",
+        "tdd_skip_reason": "Analysis/documentation task"
+      },
+      {
+        "id": "0.2",
+        "title": "Analisar impacto do production_mode no logging",
+        "story_points": 18,
+        "estimate_minutes": 50,
+        "description": "Avaliar os níveis de log em production_mode e como eles afetam a visibilidade de warnings e erros. Produzir matriz de níveis (DEBUG/INFO/WARN/ERROR) × categorias de warning.",
+        "acceptance_criteria": [
+          "Matriz de compatibilidade nível×warning publicada",
+          "Recomendação de nível padrão para PROD e DEV"
+        ],
+        "deliverables": [
+          "docs/compat/production_mode_matrix.md"
+        ],
+        "dependencies": [],
+        "branch": "refactor",
+        "files_touched": [],
+        "test_plan": [
+          "Executar cenários com níveis diferentes e capturar contagem de warnings",
+          "Validar que WARN e ERROR não são silenciados inadvertidamente"
+        ],
+        "risk": "Silenciamento de warnings críticos em PROD",
+        "mitigation": "Forçar whitelist de mensagens críticas independente do nível",
+        "tdd_skip_reason": "Analysis/documentation task"
+      },
+      {
+        "id": "0.3.1",
+        "title": "TEST: test_module_0_3_should_arquivo_envexample_criado",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Arquivo .env.example criado",
+        "test_specs": [
+          "test_module_0_3_should_arquivo_envexample_criado"
+        ],
+        "deliverables": [
+          "tests/test_module_0_3.py::test_module_0_3_should_arquivo_envexample_criado"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.3.2",
+        "title": "IMPL: module_0_3 arquivo .env.example criado",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_3_should_arquivo_envexample_criado"
+        ],
+        "deliverables": [
+          "tests/test_module_0_3.py::test_module_0_3_should_arquivo_envexample_criado",
+          "transform/module_0_3.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.3.4",
+        "title": "TEST: test_module_0_3_should_defaults_seguros_para_prod_e_dev_definid",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Defaults seguros para PROD e DEV definidos e documentados",
+        "test_specs": [
+          "test_module_0_3_should_defaults_seguros_para_prod_e_dev_definid"
+        ],
+        "deliverables": [
+          "tests/test_module_0_3.py::test_module_0_3_should_defaults_seguros_para_prod_e_dev_definid"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.3.5",
+        "title": "IMPL: module_0_3 defaults seguros para prod e d",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_3_should_defaults_seguros_para_prod_e_dev_definid"
+        ],
+        "deliverables": [
+          "tests/test_module_0_3.py::test_module_0_3_should_defaults_seguros_para_prod_e_dev_definid",
+          "transform/module_0_3.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.4.1",
+        "title": "TEST: test_performance_should_beforeapicallop_incrementa_contador_e_re",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: before_api_call(\"op\") incrementa contador e registra operação",
+        "test_specs": [
+          "test_performance_should_beforeapicallop_incrementa_contador_e_re"
+        ],
+        "deliverables": [
+          "tests/test_performance.py::test_performance_should_beforeapicallop_incrementa_contador_e_re"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.4.2",
+        "title": "IMPL: performance before_api_call(\"op\") incremen",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_performance_should_beforeapicallop_incrementa_contador_e_re"
+        ],
+        "deliverables": [
+          "tests/test_performance.py::test_performance_should_beforeapicallop_incrementa_contador_e_re",
+          "transform/performance.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.4.4",
+        "title": "TEST: test_performance_should_exceo_emitida_ao_exceder_maxcalls",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Exceção emitida ao exceder max_calls",
+        "test_specs": [
+          "test_performance_should_exceo_emitida_ao_exceder_maxcalls"
+        ],
+        "deliverables": [
+          "tests/test_performance.py::test_performance_should_exceo_emitida_ao_exceder_maxcalls"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.4.5",
+        "title": "IMPL: performance exceção emitida ao exceder max",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_performance_should_exceo_emitida_ao_exceder_maxcalls"
+        ],
+        "deliverables": [
+          "tests/test_performance.py::test_performance_should_exceo_emitida_ao_exceder_maxcalls",
+          "transform/performance.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.4.7",
+        "title": "TEST: test_performance_should_logs_incluem_as_operaes_registradas",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Logs incluem as operações registradas",
+        "test_specs": [
+          "test_performance_should_logs_incluem_as_operaes_registradas"
+        ],
+        "deliverables": [
+          "tests/test_performance.py::test_performance_should_logs_incluem_as_operaes_registradas"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.4.8",
+        "title": "IMPL: performance logs incluem as operações regi",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_performance_should_logs_incluem_as_operaes_registradas"
+        ],
+        "deliverables": [
+          "tests/test_performance.py::test_performance_should_logs_incluem_as_operaes_registradas",
+          "transform/performance.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.4.9",
+        "title": "REFACTOR: performance",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.5.1",
+        "title": "TEST: test_module_0_5_should_contagem_de_chamadas_idntica_ao_baseline",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Contagem de chamadas idêntica ao baseline",
+        "test_specs": [
+          "test_module_0_5_should_contagem_de_chamadas_idntica_ao_baseline"
+        ],
+        "deliverables": [
+          "tests/test_module_0_5.py::test_module_0_5_should_contagem_de_chamadas_idntica_ao_baseline"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.5.2",
+        "title": "IMPL: module_0_5 contagem de chamadas idêntica ",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_5_should_contagem_de_chamadas_idntica_ao_baseline"
+        ],
+        "deliverables": [
+          "tests/test_module_0_5.py::test_module_0_5_should_contagem_de_chamadas_idntica_ao_baseline",
+          "transform/module_0_5.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.5.4",
+        "title": "TEST: test_module_0_5_should_calllog_apresenta_as_duas_operaes_espera",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: call_log apresenta as duas operações esperadas",
+        "test_specs": [
+          "test_module_0_5_should_calllog_apresenta_as_duas_operaes_espera"
+        ],
+        "deliverables": [
+          "tests/test_module_0_5.py::test_module_0_5_should_calllog_apresenta_as_duas_operaes_espera"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.5.5",
+        "title": "IMPL: module_0_5 call_log apresenta as duas ope",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_5_should_calllog_apresenta_as_duas_operaes_espera"
+        ],
+        "deliverables": [
+          "tests/test_module_0_5.py::test_module_0_5_should_calllog_apresenta_as_duas_operaes_espera",
+          "transform/module_0_5.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.6.1",
+        "title": "TEST: test_config_should_loader_l_env_e_valida_combinaes_invlidas",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Loader lê .env e valida combinações inválidas",
+        "test_specs": [
+          "test_config_should_loader_l_env_e_valida_combinaes_invlidas"
+        ],
+        "deliverables": [
+          "tests/test_config.py::test_config_should_loader_l_env_e_valida_combinaes_invlidas"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.6.2",
+        "title": "IMPL: config loader lê .env e valida combin",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_config_should_loader_l_env_e_valida_combinaes_invlidas"
+        ],
+        "deliverables": [
+          "tests/test_config.py::test_config_should_loader_l_env_e_valida_combinaes_invlidas",
+          "transform/config.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.6.4",
+        "title": "TEST: test_config_should_objeto_de_configurao_acessvel_por_mdulos",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Objeto de configuração acessível por módulos consumidores",
+        "test_specs": [
+          "test_config_should_objeto_de_configurao_acessvel_por_mdulos"
+        ],
+        "deliverables": [
+          "tests/test_config.py::test_config_should_objeto_de_configurao_acessvel_por_mdulos"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.6.5",
+        "title": "IMPL: config objeto de configuração acessív",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_config_should_objeto_de_configurao_acessvel_por_mdulos"
+        ],
+        "deliverables": [
+          "tests/test_config.py::test_config_should_objeto_de_configurao_acessvel_por_mdulos",
+          "transform/config.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.7",
+        "title": "Verificar existência e papel de early_exit_checker.py",
+        "story_points": 10,
+        "estimate_minutes": 30,
+        "description": "Checar se o módulo existe; se não existir, especificar stub e pontos de engate no pipeline.",
+        "acceptance_criteria": [
+          "Status do módulo (existente/ausente) documentado",
+          "Proposta de engate definida"
+        ],
+        "deliverables": [
+          "docs/compat/early_exit_checker_status.md"
+        ],
+        "dependencies": [],
+        "branch": "refactor",
+        "files_touched": [],
+        "test_plan": [
+          "Se existir, executar função principal em cenário simples",
+          "Se ausente, validar stub com teste unitário"
+        ],
+        "risk": "Suposições equivocadas sobre comportamento de saída",
+        "mitigation": "Confirmar com cenários controlados e logs",
+        "tdd_skip_reason": "Analysis/documentation task"
+      },
+      {
+        "id": "0.8",
+        "title": "Verificar existência e papel de schema_validator.py",
+        "story_points": 10,
+        "estimate_minutes": 30,
+        "description": "Checar presença do validador de schema e como interage com warnings; se ausente, propor contrato mínimo.",
+        "acceptance_criteria": [
+          "Status do módulo documentado",
+          "Contrato de interface proposto (inputs/outputs/erros)"
+        ],
+        "deliverables": [
+          "docs/compat/schema_validator_status.md"
+        ],
+        "dependencies": [],
+        "branch": "refactor",
+        "files_touched": [],
+        "test_plan": [
+          "Se existir, rodar validação em dataset pequeno",
+          "Se ausente, criar stub com testes unitários"
+        ],
+        "risk": "Validações conflitarem com resolução interativa",
+        "mitigation": "Modo 'advisory' até mapear conflitos",
+        "tdd_skip_reason": "Analysis/documentation task"
+      },
+      {
+        "id": "0.9.1",
+        "title": "TEST: test_module_0_9_should_reload_no_duplica_hooks_nem_eventos",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Reload não duplica hooks nem eventos",
+        "test_specs": [
+          "test_module_0_9_should_reload_no_duplica_hooks_nem_eventos"
+        ],
+        "deliverables": [
+          "tests/test_module_0_9.py::test_module_0_9_should_reload_no_duplica_hooks_nem_eventos"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.9.2",
+        "title": "IMPL: module_0_9 reload não duplica hooks nem e",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_9_should_reload_no_duplica_hooks_nem_eventos"
+        ],
+        "deliverables": [
+          "tests/test_module_0_9.py::test_module_0_9_should_reload_no_duplica_hooks_nem_eventos",
+          "transform/module_0_9.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.9.4",
+        "title": "TEST: test_module_0_9_should_caches_permanecem_consistentes_aps_reloa",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Caches permanecem consistentes após reload",
+        "test_specs": [
+          "test_module_0_9_should_caches_permanecem_consistentes_aps_reloa"
+        ],
+        "deliverables": [
+          "tests/test_module_0_9.py::test_module_0_9_should_caches_permanecem_consistentes_aps_reloa"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.9.5",
+        "title": "IMPL: module_0_9 caches permanecem consistentes",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_9_should_caches_permanecem_consistentes_aps_reloa"
+        ],
+        "deliverables": [
+          "tests/test_module_0_9.py::test_module_0_9_should_caches_permanecem_consistentes_aps_reloa",
+          "transform/module_0_9.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.10.1",
+        "title": "TEST: test_environment_should_api_simples_isproduction",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: API simples: is_production()",
+        "test_specs": [
+          "test_environment_should_api_simples_isproduction"
+        ],
+        "deliverables": [
+          "tests/test_environment.py::test_environment_should_api_simples_isproduction"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.10.2",
+        "title": "IMPL: environment api simples: is_production()",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_environment_should_api_simples_isproduction"
+        ],
+        "deliverables": [
+          "tests/test_environment.py::test_environment_should_api_simples_isproduction",
+          "transform/environment.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.10.4",
+        "title": "TEST: test_environment_should_override_via_env_documentado_e_testado",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Override via env documentado e testado",
+        "test_specs": [
+          "test_environment_should_override_via_env_documentado_e_testado"
+        ],
+        "deliverables": [
+          "tests/test_environment.py::test_environment_should_override_via_env_documentado_e_testado"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.10.5",
+        "title": "IMPL: environment override via env documentado e",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_environment_should_override_via_env_documentado_e_testado"
+        ],
+        "deliverables": [
+          "tests/test_environment.py::test_environment_should_override_via_env_documentado_e_testado",
+          "transform/environment.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.11.1",
+        "title": "TEST: test_module_0_11_should_matriz_com_entradas_para_cada_sistema_cr",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Matriz com entradas para cada sistema crítico",
+        "test_specs": [
+          "test_module_0_11_should_matriz_com_entradas_para_cada_sistema_cr"
+        ],
+        "deliverables": [
+          "tests/test_module_0_11.py::test_module_0_11_should_matriz_com_entradas_para_cada_sistema_cr"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.11.2",
+        "title": "IMPL: module_0_11 matriz com entradas para cada ",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_11_should_matriz_com_entradas_para_cada_sistema_cr"
+        ],
+        "deliverables": [
+          "tests/test_module_0_11.py::test_module_0_11_should_matriz_com_entradas_para_cada_sistema_cr",
+          "transform/module_0_11.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.11.4",
+        "title": "TEST: test_module_0_11_should_recomendaes_claras_para_devtestprod",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Recomendações claras para DEV/TEST/PROD",
+        "test_specs": [
+          "test_module_0_11_should_recomendaes_claras_para_devtestprod"
+        ],
+        "deliverables": [
+          "tests/test_module_0_11.py::test_module_0_11_should_recomendaes_claras_para_devtestprod"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.11.5",
+        "title": "IMPL: module_0_11 recomendações claras para dev/",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_11_should_recomendaes_claras_para_devtestprod"
+        ],
+        "deliverables": [
+          "tests/test_module_0_11.py::test_module_0_11_should_recomendaes_claras_para_devtestprod",
+          "transform/module_0_11.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.12.1",
+        "title": "TEST: test_module_0_12_should_nenhuma_regresso_de_chamadas_externas",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Nenhuma regressão de chamadas externas",
+        "test_specs": [
+          "test_module_0_12_should_nenhuma_regresso_de_chamadas_externas"
+        ],
+        "deliverables": [
+          "tests/test_module_0_12.py::test_module_0_12_should_nenhuma_regresso_de_chamadas_externas"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.12.2",
+        "title": "IMPL: module_0_12 nenhuma regressão de chamadas ",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_12_should_nenhuma_regresso_de_chamadas_externas"
+        ],
+        "deliverables": [
+          "tests/test_module_0_12.py::test_module_0_12_should_nenhuma_regresso_de_chamadas_externas",
+          "transform/module_0_12.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.12.4",
+        "title": "TEST: test_module_0_12_should_zero_crashes_e_warnings_crticos_visveis",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Zero crashes e warnings críticos visíveis",
+        "test_specs": [
+          "test_module_0_12_should_zero_crashes_e_warnings_crticos_visveis"
+        ],
+        "deliverables": [
+          "tests/test_module_0_12.py::test_module_0_12_should_zero_crashes_e_warnings_crticos_visveis"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.12.5",
+        "title": "IMPL: module_0_12 zero crashes e warnings crític",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_12_should_zero_crashes_e_warnings_crticos_visveis"
+        ],
+        "deliverables": [
+          "tests/test_module_0_12.py::test_module_0_12_should_zero_crashes_e_warnings_crticos_visveis",
+          "transform/module_0_12.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      }
+    ],
+    "checklist_epic_level": [
+      "Todos os testes escritos antes da implementação",
+      "100% de cobertura de testes nos novos módulos",
+      "Ciclo red-green-refactor seguido consistentemente",
+      "Criar e validar .env.example",
+      "Integrar PerformanceGuard sem regressão de chamadas",
+      "Publicar matriz de compatibilidade",
+      "Executar smoke tests em DEV/TEST/PROD",
+      "Aprovação em peer review"
+    ],
+    "automation_hooks": {
+      "create_labels": [
+        "infra",
+        "compatibility",
+        "performance",
+        "env",
+        "safety"
+      ],
+      "project_board": {
+        "name": "Warnings Interactive System",
+        "columns": [
+          "Backlog",
+          "Doing",
+          "Review",
+          "Done"
+        ]
+      },
+      "default_branch": "refactor",
+      "issue_template_fields": [
+        "title",
+        "description",
+        "acceptance_criteria",
+        "deliverables",
+        "dependencies",
+        "estimate_minutes",
+        "test_plan",
+        "risk",
+        "mitigation"
+      ],
+      "milestone": "EPIC 0 - Environment & Safety",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": [
+        "pytest",
+        "coverage"
+      ]
+    },
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "performance_constraints": {
+      "environment_management": {
+        "config_loading_max_time": "100ms",
+        "environment_detection_max_time": "50ms",
+        "performance_guard_overhead": "≤2ms per API call",
+        "matrix_generation_max_time": "200ms"
+      },
+      "production_safety": {
+        "warning_suppression_latency": "≤1ms",
+        "production_mode_switch_time": "≤10ms",
+        "compatibility_validation_max_time": "500ms",
+        "smoke_test_execution_max_time": "30s"
+      },
+      "api_constraints": {
+        "max_api_calls_maintenance": 2,
+        "performance_guard_call_tracking": "real-time",
+        "baseline_preservation": "mandatory"
+      }
+    },
+    "quality_gates": {
+      "environment_reliability": {
+        "config_validation_accuracy": "100%",
+        "default_safety_compliance": "mandatory",
+        "cross_environment_compatibility": "DEV/TEST/PROD validated"
+      },
+      "performance_benchmarks": {
+        "no_regression_tolerance": "0% API increase",
+        "compatibility_matrix_coverage": "100% system coverage",
+        "production_safety_validation": "zero critical warnings silenced"
+      }
+    }
+  }
+}

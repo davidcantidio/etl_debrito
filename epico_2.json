@@ -1,6 +1,6 @@
 {
   "epic": {
-    "id": "1",
+    "id": "2",
     "name": "Discovery & Compatibility",
     "summary": "Entender completamente os sistemas de logging e supressão existentes (warning_suppressor, production_mode, early_exit_checker) e validar via testes que os comportamentos de supressão e modos de execução estão corretos, preparando o terreno para integração segura com o sistema interativo de warnings.",
     "tdd_enabled": true,
@@ -340,7 +340,40 @@
         "acceptance_criteria", "deliverables", "dependencies",
         "estimate_minutes", "risk", "mitigation"
       ],
-      "milestone": "EPIC 1 - Discovery & Compatibility"
+      "milestone": "EPIC 2 - Discovery & Compatibility"
+    },
+    "performance_constraints": {
+      "compatibility_analysis": {
+        "warning_suppressor_analysis_max": "30s",
+        "production_mode_validation_max": "15s", 
+        "early_exit_detection_max": "10ms",
+        "system_integration_overhead": "≤5ms"
+      },
+      "logging_performance": {
+        "warning_suppression_latency": "≤1ms",
+        "logging_level_switch_time": "≤5ms",
+        "early_exit_check_overhead": "≤2ms per validation",
+        "schema_validation_max": "≤50ms"
+      },
+      "api_constraints": {
+        "max_api_calls_maintained": 2,
+        "compatibility_validation_overhead": "0 additional calls",
+        "early_exit_api_savings": "potential reduction"
+      }
+    },
+    "quality_gates": {
+      "compatibility_validation": {
+        "warning_suppressor_accuracy": "100% pattern identification",
+        "production_mode_consistency": "100% level validation",
+        "early_exit_reliability": "100% detection accuracy",
+        "integration_safety": "zero breaking changes"
+      },
+      "system_reliability": {
+        "backward_compatibility": "100% maintained",
+        "logging_consistency": "cross-mode validation",
+        "thread_safety_validation": "concurrent suppression tested",
+        "performance_regression": "0% overhead increase"
+      }
     }
   }
 }

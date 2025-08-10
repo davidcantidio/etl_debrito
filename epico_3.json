@@ -522,6 +522,45 @@
         "estimate_minutes", "risk", "mitigation"
       ],
       "milestone": "EPIC 3 - Interactive Warning Resolution"
+    },
+    "performance_constraints": {
+      "warning_capture": {
+        "capture_latency_max": "10ms per warning",
+        "pipeline_overhead_max": "5% of baseline execution time",
+        "interceptor_processing_max": "≤5ms",
+        "memory_overhead_max": "≤10MB per session"
+      },
+      "interactive_decisions": {
+        "user_prompt_response_max": "30s timeout",
+        "decision_persistence_max": "≤100ms",
+        "rule_lookup_max": "≤5ms",
+        "decision_cache_hit_ratio": "≥90%"
+      },
+      "database_operations": {
+        "sqlite_write_max": "≤50ms",
+        "sqlite_read_max": "≤10ms",
+        "transaction_commit_max": "≤100ms",
+        "acid_compliance": "mandatory"
+      },
+      "api_constraints": {
+        "max_api_calls_preserved": 2,
+        "warning_system_overhead": "0 additional calls",
+        "database_operations_isolated": "no API impact"
+      }
+    },
+    "quality_gates": {
+      "system_reliability": {
+        "warning_capture_accuracy": "100% capture rate",
+        "decision_persistence_reliability": "100% ACID compliance",
+        "user_experience": "≤30s resolution time",
+        "thread_safety_validation": "concurrent warning handling"
+      },
+      "performance_benchmarks": {
+        "pipeline_impact": "≤5% performance degradation",
+        "real_time_processing": "≤10ms warning handling",
+        "database_efficiency": "≥1000 ops/s SQLite throughput",
+        "memory_efficiency": "≤10MB session overhead"
+      }
     }
   }
 }

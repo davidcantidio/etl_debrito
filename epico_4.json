@@ -757,6 +757,45 @@
         "estimate_minutes", "risk", "mitigation"
       ],
       "milestone": "EPIC 4 - TDAH Tooling Implementation"
+    },
+    "performance_constraints": {
+      "cli_responsiveness": {
+        "command_startup_max": "≤200ms",
+        "timer_accuracy": "≤100ms deviation",
+        "progress_bar_update_max": "≤50ms",
+        "cli_integration_overhead": "≤100ms"
+      },
+      "tdah_tooling": {
+        "task_timer_precision": "≤1s accuracy",
+        "focus_session_management_max": "≤1s transition time",
+        "achievement_tracking_latency": "≤10ms",
+        "daily_summary_generation_max": "≤2s"
+      },
+      "git_integration": {
+        "commit_hook_overhead": "≤500ms",
+        "task_id_validation_max": "≤100ms",
+        "git_operation_timeout": "30s",
+        "commit_message_processing_max": "≤50ms"
+      },
+      "api_constraints": {
+        "max_api_calls_preserved": 2,
+        "cli_tooling_isolation": "no API impact",
+        "background_operations": "independent of pipeline"
+      }
+    },
+    "quality_gates": {
+      "user_experience": {
+        "cli_responsiveness": "≤200ms startup time",
+        "tdah_workflow_efficiency": "seamless task switching",
+        "achievement_motivation": "positive reinforcement system",
+        "accessibility_compliance": "screen reader compatible"
+      },
+      "integration_quality": {
+        "main_cli_integration": "100% backward compatibility",
+        "git_workflow_enhancement": "non-intrusive operation",
+        "concurrent_tool_usage": "thread-safe operations",
+        "configuration_flexibility": "customizable defaults"
+      }
     }
   }
 }

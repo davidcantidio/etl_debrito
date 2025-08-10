@@ -1,0 +1,1606 @@
+{
+  "epic": {
+    "id": "0.5",
+    "name": "Integration Architecture Fixes",
+    "summary": "Resolver inconsistências arquiteturais críticas identificadas na auditoria: eliminar uso de builtins globais, criar inventário completo de todos os log.warning(), mapear funções de validação específicas para hooks e projetar interfaces de invalidação de cache, garantindo compatibilidade com a arquitetura otimizada (2 API calls).",
+    "goals": [
+      "Definir um padrão consistente de injeção de dependência, evitando o uso de builtins globais",
+      "Criar inventário completo de todos os log.warning() no código, para mapear pontos de hook",
+      "Mapear funções de validação críticas (validate_columns, check_required_columns, validate_taxonomy_consistency) para pontos de hook",
+      "Projetar interfaces de invalidação de cache para BIParamLookup.invalidate() e SheetsFetcher.clear_cache()",
+      "Definir estratégia de integração com relatórios de pipeline e provas de conceito sem builtins globais",
+      "Garantir preservação do contexto de warnings entre validação, decisão e aplicação",
+      "Estabelecer checklist de consistência arquitetural para as próximas fases"
+    ],
+    "definition_of_done": [
+      "Padrão de injeção de dependência definido e documentado",
+      "Inventário de todos os log.warning() calls completo e validado",
+      "Todas as funções de validação mapeadas com pontos de hook específicos",
+      "Interfaces de invalidação de cache especificadas para BIParamLookup e SheetsFetcher",
+      "Estratégia de integração com relatórios do pipeline definida e testada",
+      "Proof‑of‑concept que elimina builtins sem vazar estado global implementada",
+      "Especificação de preservação de contexto de warnings publicada",
+      "Checklist de consistência arquitetural criada e revisada"
+    ],
+    "duration": "1 dia",
+    "labels": [
+      "architecture",
+      "refactoring",
+      "dependency-injection",
+      "cache-invalidation"
+    ],
+    "tasks": [
+      {
+        "id": "0.13a",
+        "title": "Analisar uso atual de builtins no codebase",
+        "story_points": 7,
+        "estimate_minutes": 20,
+        "description": "Fazer levantamento de todos os locais onde builtins são usados atualmente para compartilhar estado global, documentando padrões e problemas encontrados.",
+        "acceptance_criteria": [
+          "Lista completa de uso de builtins no código",
+          "Identificação de padrões recorrentes",
+          "Análise de riscos de cada uso"
+        ],
+        "deliverables": [
+          "reports/builtins_usage_analysis.md"
+        ],
+        "dependencies": [],
+        "branch": "refactor",
+        "files_touched": [],
+        "test_plan": [
+          "Grep recursivo por 'builtins' no codebase",
+          "Verificar imports e usos diretos"
+        ],
+        "risk": "Usos não óbvios de builtins passarem despercebidos",
+        "mitigation": "Usar múltiplas estratégias de busca e revisão manual",
+        "tdd_skip_reason": "Analysis/documentation task"
+      },
+      {
+        "id": "0.13b.1",
+        "title": "TEST: test_module_0_13b_should_documento_com_proposta_de_padro_di",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Documento com proposta de padrão DI",
+        "test_specs": [
+          "test_module_0_13b_should_documento_com_proposta_de_padro_di"
+        ],
+        "deliverables": [
+          "tests/test_module_0_13b.py::test_module_0_13b_should_documento_com_proposta_de_padro_di"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.13b.2",
+        "title": "IMPL: module_0_13b documento com proposta de padr",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_13b_should_documento_com_proposta_de_padro_di"
+        ],
+        "deliverables": [
+          "tests/test_module_0_13b.py::test_module_0_13b_should_documento_com_proposta_de_padro_di",
+          "transform/module_0_13b.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.13b.4",
+        "title": "TEST: test_module_0_13b_should_comparao_com_abordagem_atual",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Comparação com abordagem atual",
+        "test_specs": [
+          "test_module_0_13b_should_comparao_com_abordagem_atual"
+        ],
+        "deliverables": [
+          "tests/test_module_0_13b.py::test_module_0_13b_should_comparao_com_abordagem_atual"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.13b.5",
+        "title": "IMPL: module_0_13b comparação com abordagem atual",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_13b_should_comparao_com_abordagem_atual"
+        ],
+        "deliverables": [
+          "tests/test_module_0_13b.py::test_module_0_13b_should_comparao_com_abordagem_atual",
+          "transform/module_0_13b.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.13b.7",
+        "title": "TEST: test_module_0_13b_should_prs_e_contras_documentados",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Prós e contras documentados",
+        "test_specs": [
+          "test_module_0_13b_should_prs_e_contras_documentados"
+        ],
+        "deliverables": [
+          "tests/test_module_0_13b.py::test_module_0_13b_should_prs_e_contras_documentados"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.13b.8",
+        "title": "IMPL: module_0_13b prós e contras documentados",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_13b_should_prs_e_contras_documentados"
+        ],
+        "deliverables": [
+          "tests/test_module_0_13b.py::test_module_0_13b_should_prs_e_contras_documentados",
+          "transform/module_0_13b.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.13b.9",
+        "title": "REFACTOR: module_0_13b",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.13c.1",
+        "title": "TEST: test_di_pattern_demo_should_cdigo_de_exemplo_funcionando",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Código de exemplo funcionando",
+        "test_specs": [
+          "test_di_pattern_demo_should_cdigo_de_exemplo_funcionando"
+        ],
+        "deliverables": [
+          "tests/test_di_pattern_demo.py::test_di_pattern_demo_should_cdigo_de_exemplo_funcionando"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.13c.2",
+        "title": "IMPL: di_pattern_demo código de exemplo funcionando",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_di_pattern_demo_should_cdigo_de_exemplo_funcionando"
+        ],
+        "deliverables": [
+          "tests/test_di_pattern_demo.py::test_di_pattern_demo_should_cdigo_de_exemplo_funcionando",
+          "transform/di_pattern_demo.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.13c.4",
+        "title": "TEST: test_di_pattern_demo_should_testes_unitrios_passando",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Testes unitários passando",
+        "test_specs": [
+          "test_di_pattern_demo_should_testes_unitrios_passando"
+        ],
+        "deliverables": [
+          "tests/test_di_pattern_demo.py::test_di_pattern_demo_should_testes_unitrios_passando"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.13c.5",
+        "title": "IMPL: di_pattern_demo testes unitários passando",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_di_pattern_demo_should_testes_unitrios_passando"
+        ],
+        "deliverables": [
+          "tests/test_di_pattern_demo.py::test_di_pattern_demo_should_testes_unitrios_passando",
+          "transform/di_pattern_demo.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.13c.7",
+        "title": "TEST: test_di_pattern_demo_should_documentao_inline_clara",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Documentação inline clara",
+        "test_specs": [
+          "test_di_pattern_demo_should_documentao_inline_clara"
+        ],
+        "deliverables": [
+          "tests/test_di_pattern_demo.py::test_di_pattern_demo_should_documentao_inline_clara"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.13c.8",
+        "title": "IMPL: di_pattern_demo documentação inline clara",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_di_pattern_demo_should_documentao_inline_clara"
+        ],
+        "deliverables": [
+          "tests/test_di_pattern_demo.py::test_di_pattern_demo_should_documentao_inline_clara",
+          "transform/di_pattern_demo.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.13c.9",
+        "title": "REFACTOR: di_pattern_demo",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.14.1",
+        "title": "TEST: test_module_0_14_should_lista_de_todos_os_warnings_com_caminholi",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Lista de todos os warnings com caminho/linha e trecho do código",
+        "test_specs": [
+          "test_module_0_14_should_lista_de_todos_os_warnings_com_caminholi"
+        ],
+        "deliverables": [
+          "tests/test_module_0_14.py::test_module_0_14_should_lista_de_todos_os_warnings_com_caminholi"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.14.2",
+        "title": "IMPL: module_0_14 lista de todos os warnings com",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_14_should_lista_de_todos_os_warnings_com_caminholi"
+        ],
+        "deliverables": [
+          "tests/test_module_0_14.py::test_module_0_14_should_lista_de_todos_os_warnings_com_caminholi",
+          "transform/module_0_14.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.14.4",
+        "title": "TEST: test_module_0_14_should_classificao_por_mdulofuno",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Classificação por módulo/função",
+        "test_specs": [
+          "test_module_0_14_should_classificao_por_mdulofuno"
+        ],
+        "deliverables": [
+          "tests/test_module_0_14.py::test_module_0_14_should_classificao_por_mdulofuno"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.14.5",
+        "title": "IMPL: module_0_14 classificação por módulo/funçã",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_14_should_classificao_por_mdulofuno"
+        ],
+        "deliverables": [
+          "tests/test_module_0_14.py::test_module_0_14_should_classificao_por_mdulofuno",
+          "transform/module_0_14.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.14.7",
+        "title": "TEST: test_module_0_14_should_documento_compartilhado_com_equipe_para_",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Documento compartilhado com equipe para validação",
+        "test_specs": [
+          "test_module_0_14_should_documento_compartilhado_com_equipe_para_"
+        ],
+        "deliverables": [
+          "tests/test_module_0_14.py::test_module_0_14_should_documento_compartilhado_com_equipe_para_"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.14.8",
+        "title": "IMPL: module_0_14 documento compartilhado com eq",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_14_should_documento_compartilhado_com_equipe_para_"
+        ],
+        "deliverables": [
+          "tests/test_module_0_14.py::test_module_0_14_should_documento_compartilhado_com_equipe_para_",
+          "transform/module_0_14.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.14.9",
+        "title": "REFACTOR: module_0_14",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.15a",
+        "title": "Mapear validate_columns para hooks",
+        "story_points": 6,
+        "estimate_minutes": 18,
+        "description": "Analisar função validate_columns e identificar pontos exatos onde inserir hooks de interceptação de warnings.",
+        "acceptance_criteria": [
+          "Função validate_columns mapeada completamente",
+          "Pontos de hook identificados com arquivo:linha",
+          "Documentação de impacto e riscos"
+        ],
+        "deliverables": [
+          "docs/architecture/hooks/validate_columns_hooks.md"
+        ],
+        "dependencies": [
+          "0.14"
+        ],
+        "branch": "refactor",
+        "files_touched": [],
+        "test_plan": [
+          "Adicionar print temporário nos pontos identificados",
+          "Executar validação e confirmar interceptação"
+        ],
+        "risk": "Hook afetar performance da validação",
+        "mitigation": "Medir tempo de execução antes/depois",
+        "tdd_skip_reason": "Analysis/documentation task"
+      },
+      {
+        "id": "0.15b",
+        "title": "Mapear check_required_columns para hooks",
+        "story_points": 6,
+        "estimate_minutes": 18,
+        "description": "Analisar função check_required_columns e mapear pontos de inserção de hooks para warnings de colunas faltantes.",
+        "acceptance_criteria": [
+          "Função check_required_columns mapeada",
+          "Identificação de todos os log.warning() na função",
+          "Proposta de hook não-intrusivo"
+        ],
+        "deliverables": [
+          "docs/architecture/hooks/check_required_columns_hooks.md"
+        ],
+        "dependencies": [
+          "0.14"
+        ],
+        "branch": "refactor",
+        "files_touched": [],
+        "test_plan": [
+          "Testar com DataFrame faltando colunas",
+          "Verificar que warnings são interceptáveis"
+        ],
+        "risk": "Múltiplos warnings em loop causar spam",
+        "mitigation": "Considerar batching de warnings similares",
+        "tdd_skip_reason": "Analysis/documentation task"
+      },
+      {
+        "id": "0.15c",
+        "title": "Mapear validate_taxonomy_consistency e consolidar",
+        "story_points": 6,
+        "estimate_minutes": 19,
+        "description": "Mapear validate_taxonomy_consistency e criar documento consolidado com todos os pontos de hook de validação.",
+        "acceptance_criteria": [
+          "validate_taxonomy_consistency mapeada",
+          "Documento consolidado com todos os hooks",
+          "Checklist de verificação completo"
+        ],
+        "deliverables": [
+          "docs/architecture/validation_hook_points.md"
+        ],
+        "dependencies": [
+          "0.15a",
+          "0.15b"
+        ],
+        "branch": "refactor",
+        "files_touched": [],
+        "test_plan": [
+          "Revisar todos os pontos mapeados",
+          "Executar suite de validação completa"
+        ],
+        "risk": "Pontos críticos esquecidos",
+        "mitigation": "Cross-check com inventário da task 0.14",
+        "tdd_skip_reason": "Analysis/documentation task"
+      },
+      {
+        "id": "0.16a.1",
+        "title": "TEST: test_module_0_16a_should_interface_documentada_com_assinatura_com",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Interface documentada com assinatura completa",
+        "test_specs": [
+          "test_module_0_16a_should_interface_documentada_com_assinatura_com"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16a.py::test_module_0_16a_should_interface_documentada_com_assinatura_com"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.16a.2",
+        "title": "IMPL: module_0_16a interface documentada com assi",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_16a_should_interface_documentada_com_assinatura_com"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16a.py::test_module_0_16a_should_interface_documentada_com_assinatura_com",
+          "transform/module_0_16a.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.16a.4",
+        "title": "TEST: test_module_0_16a_should_cenrios_de_uso_definidos",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Cenários de uso definidos",
+        "test_specs": [
+          "test_module_0_16a_should_cenrios_de_uso_definidos"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16a.py::test_module_0_16a_should_cenrios_de_uso_definidos"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.16a.5",
+        "title": "IMPL: module_0_16a cenários de uso definidos",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_16a_should_cenrios_de_uso_definidos"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16a.py::test_module_0_16a_should_cenrios_de_uso_definidos",
+          "transform/module_0_16a.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.16a.7",
+        "title": "TEST: test_module_0_16a_should_estratgia_de_invalidao_parcial_vs_total",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Estratégia de invalidação parcial vs total",
+        "test_specs": [
+          "test_module_0_16a_should_estratgia_de_invalidao_parcial_vs_total"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16a.py::test_module_0_16a_should_estratgia_de_invalidao_parcial_vs_total"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.16a.8",
+        "title": "IMPL: module_0_16a estratégia de invalidação parc",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_16a_should_estratgia_de_invalidao_parcial_vs_total"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16a.py::test_module_0_16a_should_estratgia_de_invalidao_parcial_vs_total",
+          "transform/module_0_16a.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.16a.9",
+        "title": "REFACTOR: module_0_16a",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.16b.1",
+        "title": "TEST: test_module_0_16b_should_interface_clearcache_especificada",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Interface clear_cache() especificada",
+        "test_specs": [
+          "test_module_0_16b_should_interface_clearcache_especificada"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16b.py::test_module_0_16b_should_interface_clearcache_especificada"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.16b.2",
+        "title": "IMPL: module_0_16b interface clear_cache() especi",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_16b_should_interface_clearcache_especificada"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16b.py::test_module_0_16b_should_interface_clearcache_especificada",
+          "transform/module_0_16b.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.16b.4",
+        "title": "TEST: test_module_0_16b_should_granularidade_por_sheetrange_definida",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Granularidade por sheet/range definida",
+        "test_specs": [
+          "test_module_0_16b_should_granularidade_por_sheetrange_definida"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16b.py::test_module_0_16b_should_granularidade_por_sheetrange_definida"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.16b.5",
+        "title": "IMPL: module_0_16b granularidade por sheet/range ",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_16b_should_granularidade_por_sheetrange_definida"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16b.py::test_module_0_16b_should_granularidade_por_sheetrange_definida",
+          "transform/module_0_16b.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.16b.7",
+        "title": "TEST: test_module_0_16b_should_impacto_em_api_calls_documentado",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Impacto em API calls documentado",
+        "test_specs": [
+          "test_module_0_16b_should_impacto_em_api_calls_documentado"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16b.py::test_module_0_16b_should_impacto_em_api_calls_documentado"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.16b.8",
+        "title": "IMPL: module_0_16b impacto em api calls documenta",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_16b_should_impacto_em_api_calls_documentado"
+        ],
+        "deliverables": [
+          "tests/test_module_0_16b.py::test_module_0_16b_should_impacto_em_api_calls_documentado",
+          "transform/module_0_16b.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.16b.9",
+        "title": "REFACTOR: module_0_16b",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.16c.1",
+        "title": "TEST: test_cache_invalidation_should_prottipo_funcional_em_python",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Protótipo funcional em Python",
+        "test_specs": [
+          "test_cache_invalidation_should_prottipo_funcional_em_python"
+        ],
+        "deliverables": [
+          "tests/test_cache_invalidation.py::test_cache_invalidation_should_prottipo_funcional_em_python"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.16c.2",
+        "title": "IMPL: cache_invalidation protótipo funcional em python",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_cache_invalidation_should_prottipo_funcional_em_python"
+        ],
+        "deliverables": [
+          "tests/test_cache_invalidation.py::test_cache_invalidation_should_prottipo_funcional_em_python",
+          "transform/cache_invalidation.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.16c.4",
+        "title": "TEST: test_cache_invalidation_should_coordenao_entre_diferentes_caches",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Coordenação entre diferentes caches",
+        "test_specs": [
+          "test_cache_invalidation_should_coordenao_entre_diferentes_caches"
+        ],
+        "deliverables": [
+          "tests/test_cache_invalidation.py::test_cache_invalidation_should_coordenao_entre_diferentes_caches"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.16c.5",
+        "title": "IMPL: cache_invalidation coordenação entre diferentes c",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_cache_invalidation_should_coordenao_entre_diferentes_caches"
+        ],
+        "deliverables": [
+          "tests/test_cache_invalidation.py::test_cache_invalidation_should_coordenao_entre_diferentes_caches",
+          "transform/cache_invalidation.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.16c.7",
+        "title": "TEST: test_cache_invalidation_should_logging_de_operaes_de_invalidao",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Logging de operações de invalidação",
+        "test_specs": [
+          "test_cache_invalidation_should_logging_de_operaes_de_invalidao"
+        ],
+        "deliverables": [
+          "tests/test_cache_invalidation.py::test_cache_invalidation_should_logging_de_operaes_de_invalidao"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.16c.8",
+        "title": "IMPL: cache_invalidation logging de operações de invali",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_cache_invalidation_should_logging_de_operaes_de_invalidao"
+        ],
+        "deliverables": [
+          "tests/test_cache_invalidation.py::test_cache_invalidation_should_logging_de_operaes_de_invalidao",
+          "transform/cache_invalidation.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.16c.9",
+        "title": "REFACTOR: cache_invalidation",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.17a",
+        "title": "Analisar estrutura atual dos relatórios",
+        "story_points": 6,
+        "estimate_minutes": 18,
+        "description": "Estudar estrutura de `_last_taxo_report` e `_last_impressions_report` para entender como decisões podem ser incorporadas.",
+        "acceptance_criteria": [
+          "Documentação da estrutura atual dos relatórios",
+          "Identificação de pontos de extensão",
+          "Análise de impacto em consumidores"
+        ],
+        "deliverables": [
+          "docs/architecture/reports/current_report_structure.md"
+        ],
+        "dependencies": [
+          "0.14"
+        ],
+        "branch": "refactor",
+        "files_touched": [],
+        "test_plan": [
+          "Extrair sample de relatórios atuais",
+          "Documentar schema e uso"
+        ],
+        "risk": "Estrutura não documentada ou variável",
+        "mitigation": "Analisar múltiplos exemplos reais",
+        "tdd_skip_reason": "Analysis/documentation task"
+      },
+      {
+        "id": "0.17b.1",
+        "title": "TEST: test_module_0_17b_should_schema_de_campos_de_deciso_definido",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Schema de campos de decisão definido",
+        "test_specs": [
+          "test_module_0_17b_should_schema_de_campos_de_deciso_definido"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17b.py::test_module_0_17b_should_schema_de_campos_de_deciso_definido"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.17b.2",
+        "title": "IMPL: module_0_17b schema de campos de decisão de",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_17b_should_schema_de_campos_de_deciso_definido"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17b.py::test_module_0_17b_should_schema_de_campos_de_deciso_definido",
+          "transform/module_0_17b.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.17b.4",
+        "title": "TEST: test_module_0_17b_should_estratgia_de_versionamento",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Estratégia de versionamento",
+        "test_specs": [
+          "test_module_0_17b_should_estratgia_de_versionamento"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17b.py::test_module_0_17b_should_estratgia_de_versionamento"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.17b.5",
+        "title": "IMPL: module_0_17b estratégia de versionamento",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_17b_should_estratgia_de_versionamento"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17b.py::test_module_0_17b_should_estratgia_de_versionamento",
+          "transform/module_0_17b.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.17b.7",
+        "title": "TEST: test_module_0_17b_should_garantia_de_retrocompatibilidade",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Garantia de retrocompatibilidade",
+        "test_specs": [
+          "test_module_0_17b_should_garantia_de_retrocompatibilidade"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17b.py::test_module_0_17b_should_garantia_de_retrocompatibilidade"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.17b.8",
+        "title": "IMPL: module_0_17b garantia de retrocompatibilida",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_17b_should_garantia_de_retrocompatibilidade"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17b.py::test_module_0_17b_should_garantia_de_retrocompatibilidade",
+          "transform/module_0_17b.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.17b.9",
+        "title": "REFACTOR: module_0_17b",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.17c.1",
+        "title": "TEST: test_module_0_17c_should_mock_de_relatrio_funcional",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Mock de relatório funcional",
+        "test_specs": [
+          "test_module_0_17c_should_mock_de_relatrio_funcional"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17c.py::test_module_0_17c_should_mock_de_relatrio_funcional"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.17c.2",
+        "title": "IMPL: module_0_17c mock de relatório funcional",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_17c_should_mock_de_relatrio_funcional"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17c.py::test_module_0_17c_should_mock_de_relatrio_funcional",
+          "transform/module_0_17c.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.17c.4",
+        "title": "TEST: test_module_0_17c_should_exemplo_de_deciso_aplicada_visvel",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Exemplo de decisão aplicada visível",
+        "test_specs": [
+          "test_module_0_17c_should_exemplo_de_deciso_aplicada_visvel"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17c.py::test_module_0_17c_should_exemplo_de_deciso_aplicada_visvel"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.17c.5",
+        "title": "IMPL: module_0_17c exemplo de decisão aplicada vi",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_17c_should_exemplo_de_deciso_aplicada_visvel"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17c.py::test_module_0_17c_should_exemplo_de_deciso_aplicada_visvel",
+          "transform/module_0_17c.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.17c.7",
+        "title": "TEST: test_module_0_17c_should_documentao_de_integrao_completa",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Documentação de integração completa",
+        "test_specs": [
+          "test_module_0_17c_should_documentao_de_integrao_completa"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17c.py::test_module_0_17c_should_documentao_de_integrao_completa"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.17c.8",
+        "title": "IMPL: module_0_17c documentação de integração com",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_17c_should_documentao_de_integrao_completa"
+        ],
+        "deliverables": [
+          "tests/test_module_0_17c.py::test_module_0_17c_should_documentao_de_integrao_completa",
+          "transform/module_0_17c.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.17c.9",
+        "title": "REFACTOR: module_0_17c",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.18.1",
+        "title": "TEST: test_builtins_elimination_demo_should_prova_de_conceito_executvel_que_utiliza_",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Prova de conceito executável que utiliza injeção em vez de builtins",
+        "test_specs": [
+          "test_builtins_elimination_demo_should_prova_de_conceito_executvel_que_utiliza_"
+        ],
+        "deliverables": [
+          "tests/test_builtins_elimination_demo.py::test_builtins_elimination_demo_should_prova_de_conceito_executvel_que_utiliza_"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.18.2",
+        "title": "IMPL: builtins_elimination_demo prova de conceito executável q",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_builtins_elimination_demo_should_prova_de_conceito_executvel_que_utiliza_"
+        ],
+        "deliverables": [
+          "tests/test_builtins_elimination_demo.py::test_builtins_elimination_demo_should_prova_de_conceito_executvel_que_utiliza_",
+          "transform/builtins_elimination_demo.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.18.4",
+        "title": "TEST: test_builtins_elimination_demo_should_teste_unitrio_demonstrando_ausncia_de_si",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Teste unitário demonstrando ausência de side effects",
+        "test_specs": [
+          "test_builtins_elimination_demo_should_teste_unitrio_demonstrando_ausncia_de_si"
+        ],
+        "deliverables": [
+          "tests/test_builtins_elimination_demo.py::test_builtins_elimination_demo_should_teste_unitrio_demonstrando_ausncia_de_si"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.18.5",
+        "title": "IMPL: builtins_elimination_demo teste unitário demonstrando au",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_builtins_elimination_demo_should_teste_unitrio_demonstrando_ausncia_de_si"
+        ],
+        "deliverables": [
+          "tests/test_builtins_elimination_demo.py::test_builtins_elimination_demo_should_teste_unitrio_demonstrando_ausncia_de_si",
+          "transform/builtins_elimination_demo.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.18.7",
+        "title": "TEST: test_builtins_elimination_demo_should_documentao_de_diferenas_observadas_em_re",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Documentação de diferenças observadas em relação ao padrão atual",
+        "test_specs": [
+          "test_builtins_elimination_demo_should_documentao_de_diferenas_observadas_em_re"
+        ],
+        "deliverables": [
+          "tests/test_builtins_elimination_demo.py::test_builtins_elimination_demo_should_documentao_de_diferenas_observadas_em_re"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.18.8",
+        "title": "IMPL: builtins_elimination_demo documentação de diferenças obs",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_builtins_elimination_demo_should_documentao_de_diferenas_observadas_em_re"
+        ],
+        "deliverables": [
+          "tests/test_builtins_elimination_demo.py::test_builtins_elimination_demo_should_documentao_de_diferenas_observadas_em_re",
+          "transform/builtins_elimination_demo.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.18.9",
+        "title": "REFACTOR: builtins_elimination_demo",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.19.1",
+        "title": "TEST: test_module_0_19_should_especificao_de_campos_de_contexto_a_sere",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Especificação de campos de contexto a serem capturados",
+        "test_specs": [
+          "test_module_0_19_should_especificao_de_campos_de_contexto_a_sere"
+        ],
+        "deliverables": [
+          "tests/test_module_0_19.py::test_module_0_19_should_especificao_de_campos_de_contexto_a_sere"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.19.2",
+        "title": "IMPL: module_0_19 especificação de campos de con",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_19_should_especificao_de_campos_de_contexto_a_sere"
+        ],
+        "deliverables": [
+          "tests/test_module_0_19.py::test_module_0_19_should_especificao_de_campos_de_contexto_a_sere",
+          "transform/module_0_19.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.19.4",
+        "title": "TEST: test_module_0_19_should_proposta_de_estrutura_de_dados_imutvel_o",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Proposta de estrutura de dados imutável ou serializável",
+        "test_specs": [
+          "test_module_0_19_should_proposta_de_estrutura_de_dados_imutvel_o"
+        ],
+        "deliverables": [
+          "tests/test_module_0_19.py::test_module_0_19_should_proposta_de_estrutura_de_dados_imutvel_o"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.19.5",
+        "title": "IMPL: module_0_19 proposta de estrutura de dados",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_19_should_proposta_de_estrutura_de_dados_imutvel_o"
+        ],
+        "deliverables": [
+          "tests/test_module_0_19.py::test_module_0_19_should_proposta_de_estrutura_de_dados_imutvel_o",
+          "transform/module_0_19.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.19.7",
+        "title": "TEST: test_module_0_19_should_demonstrao_de_fluxo_onde_contexto__recup",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Demonstração de fluxo onde contexto é recuperado na decisão",
+        "test_specs": [
+          "test_module_0_19_should_demonstrao_de_fluxo_onde_contexto__recup"
+        ],
+        "deliverables": [
+          "tests/test_module_0_19.py::test_module_0_19_should_demonstrao_de_fluxo_onde_contexto__recup"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.19.8",
+        "title": "IMPL: module_0_19 demonstração de fluxo onde con",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_19_should_demonstrao_de_fluxo_onde_contexto__recup"
+        ],
+        "deliverables": [
+          "tests/test_module_0_19.py::test_module_0_19_should_demonstrao_de_fluxo_onde_contexto__recup",
+          "transform/module_0_19.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.19.9",
+        "title": "REFACTOR: module_0_19",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      },
+      {
+        "id": "0.20.1",
+        "title": "TEST: test_module_0_20_should_checklist_cobrindo_todos_os_tpicos_crtic",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Checklist cobrindo todos os tópicos críticos da auditoria",
+        "test_specs": [
+          "test_module_0_20_should_checklist_cobrindo_todos_os_tpicos_crtic"
+        ],
+        "deliverables": [
+          "tests/test_module_0_20.py::test_module_0_20_should_checklist_cobrindo_todos_os_tpicos_crtic"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.20.2",
+        "title": "IMPL: module_0_20 checklist cobrindo todos os tó",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_20_should_checklist_cobrindo_todos_os_tpicos_crtic"
+        ],
+        "deliverables": [
+          "tests/test_module_0_20.py::test_module_0_20_should_checklist_cobrindo_todos_os_tpicos_crtic",
+          "transform/module_0_20.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.20.4",
+        "title": "TEST: test_module_0_20_should_aprovado_em_reviso_cruzada_pela_equipe_t",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Aprovado em revisão cruzada pela equipe técnica",
+        "test_specs": [
+          "test_module_0_20_should_aprovado_em_reviso_cruzada_pela_equipe_t"
+        ],
+        "deliverables": [
+          "tests/test_module_0_20.py::test_module_0_20_should_aprovado_em_reviso_cruzada_pela_equipe_t"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.20.5",
+        "title": "IMPL: module_0_20 aprovado em revisão cruzada pe",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_20_should_aprovado_em_reviso_cruzada_pela_equipe_t"
+        ],
+        "deliverables": [
+          "tests/test_module_0_20.py::test_module_0_20_should_aprovado_em_reviso_cruzada_pela_equipe_t",
+          "transform/module_0_20.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.20.7",
+        "title": "TEST: test_module_0_20_should_aplicado_a_pelo_menos_um_epic_subsequent",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "description": "Escrever teste que verifica: Aplicado a pelo menos um epic subsequente como validação piloto",
+        "test_specs": [
+          "test_module_0_20_should_aplicado_a_pelo_menos_um_epic_subsequent"
+        ],
+        "deliverables": [
+          "tests/test_module_0_20.py::test_module_0_20_should_aplicado_a_pelo_menos_um_epic_subsequent"
+        ],
+        "acceptance_criteria": [
+          "Teste falha com assertion correta",
+          "Mensagem de erro é clara e específica"
+        ]
+      },
+      {
+        "id": "0.20.8",
+        "title": "IMPL: module_0_20 aplicado a pelo menos um epic ",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "description": "Implementar código mínimo para passar o teste",
+        "test_specs": [
+          "test_module_0_20_should_aplicado_a_pelo_menos_um_epic_subsequent"
+        ],
+        "deliverables": [
+          "tests/test_module_0_20.py::test_module_0_20_should_aplicado_a_pelo_menos_um_epic_subsequent",
+          "transform/module_0_20.py"
+        ],
+        "acceptance_criteria": [
+          "Teste passa com implementação mínima",
+          "Nenhum teste anterior quebra"
+        ]
+      },
+      {
+        "id": "0.20.9",
+        "title": "REFACTOR: module_0_20",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "description": "Melhorar design mantendo todos os testes verdes",
+        "test_specs": [
+          "all_tests_still_pass"
+        ],
+        "deliverables": [
+          "refactored code with green tests"
+        ],
+        "acceptance_criteria": [
+          "Código mais limpo e maintível",
+          "Todos os testes continuam verdes",
+          "Complexidade ciclomática reduzida"
+        ]
+      }
+    ],
+    "checklist_epic_level": [
+      "Todos os testes escritos antes da implementação",
+      "100% de cobertura de testes nos novos módulos",
+      "Ciclo red-green-refactor seguido consistentemente",
+      "Definição do padrão de injeção de dependência aprovada",
+      "Inventário de warnings entregue e validado",
+      "Hooks definidos para todas as funções de validação críticas",
+      "Interfaces de invalidação documentadas",
+      "Prova de conceito sem builtins executada com sucesso",
+      "Especificação de preservação de contexto aprovada",
+      "Checklist de consistência arquitetural validado",
+      "Todos os deliverables revisados e commitados na branch refactor"
+    ],
+    "automation_hooks": {
+      "create_labels": [
+        "architecture",
+        "refactoring",
+        "dependency-injection",
+        "cache-invalidation"
+      ],
+      "project_board": {
+        "name": "Warnings Interactive System",
+        "columns": [
+          "Backlog",
+          "Doing",
+          "Review",
+          "Done"
+        ]
+      },
+      "default_branch": "refactor",
+      "issue_template_fields": [
+        "title",
+        "description",
+        "acceptance_criteria",
+        "deliverables",
+        "dependencies",
+        "estimate_minutes",
+        "test_plan",
+        "risk",
+        "mitigation"
+      ],
+      "milestone": "EPIC 0.5 - Integration Architecture Fixes",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": [
+        "pytest",
+        "coverage"
+      ]
+    },
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "performance_constraints": {
+      "dependency_injection": {
+        "injection_overhead_max": "≤1ms per component",
+        "circular_dependency_detection": "≤50ms",
+        "component_initialization_max": "≤100ms",
+        "factory_resolution_max": "≤5ms"
+      },
+      "cache_invalidation": {
+        "coordinated_invalidation_max": "≤20ms",
+        "cache_chain_invalidation_max": "≤15ms", 
+        "invalidation_hook_latency": "≤2ms",
+        "cache_rebuild_max": "≤100ms"
+      },
+      "api_constraints": {
+        "max_api_calls_preserved": 2,
+        "injection_api_overhead": "0 additional calls",
+        "cache_invalidation_api_impact": "0 additional calls"
+      }
+    },
+    "quality_gates": {
+      "architecture_quality": {
+        "circular_dependency_elimination": "100%",
+        "global_state_reduction": "≥80%", 
+        "dependency_injection_coverage": "≥90%",
+        "cache_consistency_validation": "100%"
+      },
+      "integration_reliability": {
+        "backward_compatibility": "100% maintained",
+        "cache_invalidation_accuracy": "100%",
+        "component_isolation": "full dependency injection",
+        "thread_safety_validation": "concurrent access tested"
+      }
+    }
+  }
+}
