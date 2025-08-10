@@ -1,0 +1,627 @@
+{
+  "epic": {
+    "id": "5",
+    "name": "Cache Management Specifics",
+    "summary": "Implementar mecanismos de invalidação e coordenação de caches (BIParamLookup e SheetsFetcher) e estatísticas de uso, garantindo que todas as caches possam ser limpas de forma independente ou em cadeia sem violar o limite de 2 chamadas de API.",
+    "tdd_enabled": true,
+    "methodology": "Test-Driven Development",
+    "goals": [
+      "Permitir invalidação manual e programática do cache de BIParamLookup e SheetsFetcher",
+      "Garantir coordenação entre caches para evitar dados inconsistentes",
+      "Implementar teste de cadeia de invalidação para verificar que todas as caches são limpas em ordem correta",
+      "Adicionar contadores de hits, misses e invalidações para monitoramento de performance"
+    ],
+    "definition_of_done": [
+      "Funções clear_cache() e invalidate() implementadas e testadas em módulos BIParamLookup e SheetsFetcher",
+      "Coordenação entre caches configurável sem aumentar chamadas de API",
+      "Chain invalidation test passa em menos de 50 ms por cache",
+      "Estatísticas de uso e invalidação disponíveis via função pública",
+      "Cobertura de testes ≥ 90% nos novos módulos",
+      "Pelo menos 60% das micro‑tarefas executáveis em paralelo",
+      "Todas as micro‑tarefas seguem ciclo TDD red‑green‑refactor",
+      "Performance de cache mantém hit ratio ≥ 85% após invalidações",
+      "Sistema de cache thread‑safe com locks adequados"
+    ],
+    "duration": "1.5 dias",
+    "labels": [
+      "tdd",
+      "caching",
+      "performance",
+      "refactor"
+    ],
+    "tasks": [
+      {
+        "id": "5.1a",
+        "title": "Analisar BIParamLookup.invalidate() existente e comportamento de cache",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Revisar implementação atual (se existente) de invalidação no BIParamLookup, mapear onde os dados são armazenados em cache e quais chamadas à API são feitas ao recarregar os parâmetros.",
+        "deliverables": [
+          "reports/analysis_biparam_invalidation.md"
+        ],
+        "acceptance_criteria": [
+          "Documento descrevendo estrutura de cache e pontos de invalidação",
+          "Identificação de possíveis efeitos colaterais ao limpar cache"
+        ],
+        "dependencies": [],
+        "branch": "feature/cache-management",
+        "files_touched": [],
+        "risk": "Não identificar todos os locais de cache",
+        "mitigation": "Buscar por todas as referências a BIParamLookup nos módulos"
+      },
+      {
+        "id": "5.1b.1",
+        "title": "TEST: should_invalidate_biparam_cache_and_reload_on_next_call",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que, ao invocar invalidate(), o cache de BIParamLookup é limpo e uma nova chamada de API (ou acesso à planilha) ocorre na próxima consulta.",
+        "test_specs": [
+          "should_clear_biparam_cache_in_under_5ms",
+          "should_reload_data_with_latency_under_10ms_after_invalidation",
+          "should_maintain_hit_ratio_above_85_percent_post_invalidation"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se cache não for limpo ou se dados antigos forem retornados",
+          "Verificar contagem de chamadas de API antes e depois"
+        ],
+        "deliverables": [
+          "tests/test_biparam_cache.py::test_should_invalidate_biparam_cache_and_reload_on_next_call"
+        ],
+        "dependencies": [
+          "5.1a"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "tests/test_biparam_cache.py"
+        ],
+        "risk": "Dificuldade em simular planilha e chamada de API",
+        "mitigation": "Mockar camada de dados e contador de chamadas"
+      },
+      {
+        "id": "5.1b.2",
+        "title": "IMPL: minimal invalidate() for BIParamLookup",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar a função invalidate() em transform/warnings/caches/biparam_lookup.py (ou módulo existente) que limpa o dicionário ou objeto de cache e garante recarga na próxima chamada, passando os testes.",
+        "test_specs": [
+          "should_clear_biparam_cache",
+          "should_reload_data_on_next_lookup_after_invalidation"
+        ],
+        "acceptance_criteria": [
+          "Cache interno zerado após invalidate()",
+          "Próxima chamada repopula o cache e retorna novos dados",
+          "Testes da fase red passam sem regressão"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/biparam_lookup.py",
+          "tests/test_biparam_cache.py::test_should_invalidate_biparam_cache_and_reload_on_next_call"
+        ],
+        "dependencies": [
+          "5.1b.1"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/warnings/caches/biparam_lookup.py"
+        ],
+        "risk": "Perder dados carregados se cache for necessário em outras partes",
+        "mitigation": "Documentar claramente o efeito de invalidate() e avisar usuários do método"
+      },
+      {
+        "id": "5.1b.3",
+        "title": "REFACTOR: isolate cache and add timestamp to BIParamLookup",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar para encapsular a lógica de cache em classe própria (CacheStore) e adicionar timestamp de última invalidação, permitindo monitoramento e extensões futuras.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Cache encapsulado em classe com métodos clear() e stats()",
+          "Invalidate atualiza timestamp",
+          "Nenhum teste quebra"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/biparam_lookup.py",
+          "transform/warnings/caches/cache_store.py"
+        ],
+        "dependencies": [
+          "5.1b.2"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/warnings/caches/biparam_lookup.py",
+          "transform/warnings/caches/cache_store.py"
+        ],
+        "risk": "Refatoração introduzir regressão de performance",
+        "mitigation": "Medir tempo antes e depois; usar classe leve"
+      },
+      {
+        "id": "5.2a",
+        "title": "Analisar mecanismo de clear_cache() em SheetsFetcher",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Investigar como o SheetsFetcher gerencia seu cache de abas e ranges, identificando quais estruturas (dicts, TTL) precisam ser limpas ao chamar clear_cache().",
+        "deliverables": [
+          "reports/analysis_sheets_cache.md"
+        ],
+        "acceptance_criteria": [
+          "Mapa das estruturas de cache e seus nomes de variáveis",
+          "Lista de funções que consomem o cache"
+        ],
+        "dependencies": [],
+        "branch": "feature/cache-management",
+        "files_touched": [],
+        "risk": "Estruturas de cache estarem distribuídas em múltiplos módulos",
+        "mitigation": "Fazer busca global por atributos _cache ou similares"
+      },
+      {
+        "id": "5.2b.1",
+        "title": "TEST: should_clear_sheetsfetcher_cache_and_not_exceed_api_calls",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que clear_cache() esvazia todos os caches do SheetsFetcher e que a próxima chamada a get() recarrega os dados sem exceder o limite de 2 chamadas de API.",
+        "test_specs": [
+          "should_clear_all_sheetsfetcher_caches_in_under_3ms",
+          "should_not_exceed_2_api_calls_baseline_after_clearing_cache",
+          "should_restore_cache_performance_within_50ms"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se qualquer cache interno permanecer após clear_cache()",
+          "Teste falha se chamadas de API ultrapassarem o baseline"
+        ],
+        "deliverables": [
+          "tests/test_sheets_cache.py::test_should_clear_sheetsfetcher_cache_and_not_exceed_api_calls"
+        ],
+        "dependencies": [
+          "5.2a"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "tests/test_sheets_cache.py"
+        ],
+        "risk": "Difícil simular limitações de API em teste isolado",
+        "mitigation": "Mockar camada de rede e contador de chamadas no teste"
+      },
+      {
+        "id": "5.2b.2",
+        "title": "IMPL: minimal clear_cache() for SheetsFetcher",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar método clear_cache() em transform/extract/sheets_fetcher.py que limpa caches de headers, values e TTL, e garantir que a próxima chamada recarregue corretamente, mantendo contagem de chamadas sob controle.",
+        "test_specs": [
+          "should_clear_all_caches_in_sheetsfetcher",
+          "should_not_exceed_api_calls_after_clearing_cache"
+        ],
+        "acceptance_criteria": [
+          "Cache é limpo (len = 0) após clear_cache()",
+          "Próxima chamada repopula cache e não excede chamadas de API",
+          "Testes passam sem regressão"
+        ],
+        "deliverables": [
+          "transform/extract/sheets_fetcher.py",
+          "tests/test_sheets_cache.py::test_should_clear_sheetsfetcher_cache_and_not_exceed_api_calls"
+        ],
+        "dependencies": [
+          "5.2b.1"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/extract/sheets_fetcher.py"
+        ],
+        "risk": "Limpar cache enquanto operação em curso",
+        "mitigation": "Documentar que clear_cache() deve ser chamado em ponto seguro e usar lock se necessário"
+      },
+      {
+        "id": "5.2b.3",
+        "title": "REFACTOR: extract cache logic in SheetsFetcher to CacheStore",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar SheetsFetcher para utilizar a classe CacheStore (introduzida em BIParamLookup) para gerenciar caches de headers e values de forma homogênea e fornecer estatísticas uniformes.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "SheetsFetcher delega armazenamento em cache à CacheStore",
+          "Funções clear(), stats() disponíveis",
+          "Todos os testes passam"
+        ],
+        "deliverables": [
+          "transform/extract/sheets_fetcher.py",
+          "transform/warnings/caches/cache_store.py"
+        ],
+        "dependencies": [
+          "5.2b.2",
+          "5.1b.3"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/extract/sheets_fetcher.py",
+          "transform/warnings/caches/cache_store.py"
+        ],
+        "risk": "Refatoração quebrar atualizações de TTL e ranges",
+        "mitigation": "Manter interface de CacheStore simples e adaptar TTL logic separadamente"
+      },
+      {
+        "id": "5.3a",
+        "title": "Analisar coordenação entre caches (multi-class invalidation)",
+        "tdd_skip_reason": "analysis/documentation",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Planejar como coordenar invalidação entre BIParamLookup e SheetsFetcher e quaisquer caches futuras, definindo gatilhos e ordem de execução para evitar inconsistência de dados.",
+        "deliverables": [
+          "reports/analysis_cache_coordination.md"
+        ],
+        "acceptance_criteria": [
+          "Documento definindo cenário de coordenação: quem dispara quem",
+          "Diagramas de sequência para chain invalidation"
+        ],
+        "dependencies": [],
+        "branch": "feature/cache-management",
+        "files_touched": [],
+        "risk": "Ordem de invalidação provocar múltiplos reloads desnecessários",
+        "mitigation": "Planejar ordem otimizada (ex.: invalidar BIParam, depois Sheets somente se necessário)"
+      },
+      {
+        "id": "5.3b.1",
+        "title": "TEST: should_invalidate_all_caches_when_triggered_by_controller",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que o controlador de caches (CacheController) invoca invalidate() em todas as caches registradas na ordem correta quando solicitado.",
+        "test_specs": [
+          "should_call_invalidate_on_biparam_and_sheetsfetcher_in_under_20ms",
+          "should_follow_defined_order_with_max_5ms_between_invalidations"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se algum cache não for invalidado ou ordem incorreta",
+          "Asserção do número de chamadas de API após coordenação"
+        ],
+        "deliverables": [
+          "tests/test_cache_controller.py::test_should_invalidate_all_caches_when_triggered_by_controller"
+        ],
+        "dependencies": [
+          "5.1b.2",
+          "5.2b.2"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "tests/test_cache_controller.py"
+        ],
+        "risk": "Dificuldade em simular múltiplas caches em teste isolado",
+        "mitigation": "Registrar caches mockadas no controlador"
+      },
+      {
+        "id": "5.3b.2",
+        "title": "IMPL: minimal CacheController for coordinated invalidation",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar classe CacheController em transform/warnings/caches/cache_controller.py que registra diferentes caches (BIParam, Sheets, etc.) e executa invalidate() em todas na ordem definida.",
+        "test_specs": [
+          "should_call_invalidate_on_biparam_and_sheetsfetcher",
+          "should_follow_defined_order_of_invalidation"
+        ],
+        "acceptance_criteria": [
+          "Controller possui métodos register_cache() e invalidate_all()",
+          "Invalidate_all chama invalidate() de cada cache na ordem registrada",
+          "Testes passam sem regressão"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/cache_controller.py",
+          "tests/test_cache_controller.py::test_should_invalidate_all_caches_when_triggered_by_controller"
+        ],
+        "dependencies": [
+          "5.3b.1"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/warnings/caches/cache_controller.py"
+        ],
+        "risk": "Design rígido dificultar adição de caches futuras",
+        "mitigation": "Usar lista dinâmica e priorização configurável"
+      },
+      {
+        "id": "5.3b.3",
+        "title": "REFACTOR: add plugin architecture to CacheController",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar CacheController para suportar priorização por peso ou tags e permitir que caches se registrem automaticamente via decorators, mantendo testes intactos.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Caches podem ser registradas com prioridade",
+          "invalidate_all() respeita prioridade",
+          "Nenhum teste quebra"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/cache_controller.py"
+        ],
+        "dependencies": [
+          "5.3b.2"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/warnings/caches/cache_controller.py"
+        ],
+        "risk": "Aumento de complexidade sem necessidade imediata",
+        "mitigation": "Implementar apenas suportes simples e documentar casos futuros"
+      },
+      {
+        "id": "5.4b.1",
+        "title": "TEST: should_propagate_chain_invalidation_across_caches",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que simula chain invalidation em que uma cache dispara automaticamente a invalidação da próxima (ex.: ao invalidar BIParam, deve invalidar Sheets) e verifica que todos os caches são limpos corretamente.",
+        "test_specs": [
+          "should_trigger_second_cache_invalidation_within_2ms_after_first",
+          "should_clear_data_in_all_caches_with_total_latency_under_15ms"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se chain não ocorrer ou se algum cache não for limpo",
+          "Valida contagem de chamadas de API após chain"
+        ],
+        "deliverables": [
+          "tests/test_chain_invalidation.py::test_should_propagate_chain_invalidation_across_caches"
+        ],
+        "dependencies": [
+          "5.3b.2"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "tests/test_chain_invalidation.py"
+        ],
+        "risk": "Chain invalidation causar múltiplas recargas desnecessárias",
+        "mitigation": "Implementar verificação de flag para evitar loops"
+      },
+      {
+        "id": "5.4b.2",
+        "title": "IMPL: implement chain invalidation triggers",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Adicionar gatilhos no CacheController ou nas caches para que a invalidação de uma cache dispare automaticamente a invalidação de outra (se configurado), atendendo aos testes.",
+        "test_specs": [
+          "should_trigger_second_cache_invalidation_after_first",
+          "should_clear_data_in_all_caches_after_chain"
+        ],
+        "acceptance_criteria": [
+          "Chain ocorre na ordem correta sem loops infinitos",
+          "Caches limpam dados e recarregam conforme necessário",
+          "Testes passam sem regressão"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/cache_controller.py",
+          "tests/test_chain_invalidation.py::test_should_propagate_chain_invalidation_across_caches"
+        ],
+        "dependencies": [
+          "5.4b.1"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/warnings/caches/cache_controller.py"
+        ],
+        "risk": "Erro na detecção de cadeia gerar recursão infinita",
+        "mitigation": "Manter lista de caches já invalidada no ciclo"
+      },
+      {
+        "id": "5.4b.3",
+        "title": "REFACTOR: provide event-based invalidation hooks",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar chain invalidation para utilizar hooks de eventos (observer pattern) em vez de chamada direta, permitindo extensões futuras sem acoplamento forte.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Caches expõem evento on_invalidate ao qual outras caches podem se inscrever",
+          "Chain de invalidação implementada via subscription",
+          "Todos os testes passam"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/cache_controller.py",
+          "transform/warnings/caches/cache_store.py"
+        ],
+        "dependencies": [
+          "5.4b.2"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/warnings/caches/cache_controller.py",
+          "transform/warnings/caches/cache_store.py"
+        ],
+        "risk": "Excesso de abstração aumentar dificuldade de manutenção",
+        "mitigation": "Documentar o fluxo de eventos e manter código simples"
+      },
+      {
+        "id": "5.5b.1",
+        "title": "TEST: should_report_cache_statistics_correctly",
+        "tdd_phase": "red",
+        "estimate_minutes": 5,
+        "story_points": 1,
+        "description": "Escrever teste que verifica que as caches retornam estatísticas de hits, misses e invalidações corretas após diversas operações de leitura e limpeza.",
+        "test_specs": [
+          "should_increment_hits_counter_with_latency_under_1ms",
+          "should_track_miss_and_invalidation_counts_with_accuracy_100_percent",
+          "should_report_statistics_with_response_time_under_5ms"
+        ],
+        "acceptance_criteria": [
+          "Teste falha se contadores não batem com operações realizadas",
+          "Cobertura de pelo menos dois tipos de cache"
+        ],
+        "deliverables": [
+          "tests/test_cache_stats.py::test_should_report_cache_statistics_correctly"
+        ],
+        "dependencies": [
+          "5.1b.3",
+          "5.2b.3"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "tests/test_cache_stats.py"
+        ],
+        "risk": "Dificuldade em controlar contagem de hits/misses em teste",
+        "mitigation": "Utilizar mocks de fonte de dados e contar manualmente"
+      },
+      {
+        "id": "5.5b.2",
+        "title": "IMPL: add stats tracking to caches",
+        "tdd_phase": "green",
+        "estimate_minutes": 8,
+        "story_points": 2,
+        "description": "Implementar contadores em CacheStore e caches existentes para registrar hits, misses e invalidações, e fornecer método get_stats() retornando essas métricas.",
+        "test_specs": [
+          "should_increment_hits_when_data_served_from_cache",
+          "should_increment_misses_and_invalidation_counts_appropriately"
+        ],
+        "acceptance_criteria": [
+          "get_stats() retorna hits, misses, invalidations e timestamp",
+          "Contadores incrementam corretamente em cada operação",
+          "Testes da fase red passam sem regressão"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/cache_store.py",
+          "tests/test_cache_stats.py::test_should_report_cache_statistics_correctly"
+        ],
+        "dependencies": [
+          "5.5b.1"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/warnings/caches/cache_store.py"
+        ],
+        "risk": "Incremento de contador prejudicar performance",
+        "mitigation": "Usar tipos nativos e evitar locks pesados; documentar overhead"
+      },
+      {
+        "id": "5.5b.3",
+        "title": "REFACTOR: centralize metrics and expose monitoring endpoint",
+        "tdd_phase": "refactor",
+        "estimate_minutes": 10,
+        "story_points": 2,
+        "description": "Refatorar para consolidar estatísticas de todas as caches em um agregador central e expor endpoint (função ou API interna) para monitoramento via logs ou dashboards.",
+        "test_specs": [
+          "all_existing_tests_still_pass"
+        ],
+        "acceptance_criteria": [
+          "Classe CacheMetricsAggregator coleta stats de cada cache registrada",
+          "Função export_metrics() retorna dict ou JSON com métricas agregadas",
+          "Todos os testes passam e cobertura ≥ 90%"
+        ],
+        "deliverables": [
+          "transform/warnings/caches/cache_metrics.py"
+        ],
+        "dependencies": [
+          "5.5b.2",
+          "5.3b.2"
+        ],
+        "branch": "feature/cache-management",
+        "files_touched": [
+          "transform/warnings/caches/cache_metrics.py"
+        ],
+        "risk": "Expor métricas sensíveis inadvertidamente",
+        "mitigation": "Restringir acesso a export_metrics() e mascarar dados sensíveis"
+      }
+    ],
+    "checklist_epic_level": [
+      "Análises completas de caches concluídas e documentadas",
+      "Testes RED escritos antes de cada implementação",
+      "Métodos invalidate() e clear_cache() implementados e funcionando",
+      "Coordenação e chain invalidation testados e integrados",
+      "Estatísticas de uso e invalidação disponíveis e validadas",
+      "≥ 60% das tasks executáveis em paralelo (análises, testes independentes, implementações isoladas)",
+      "Cobertura de testes ≥ 90% nos novos módulos e sem regressão nas chamadas de API",
+      "Implementação follow red‑green‑refactor micro‑cycles (5‑15 min)",
+      "Cache performance metrics: latência ≤ 10ms, throughput ≥ 1000 ops/s",
+      "Thread safety validado com testes de concorrência"
+    ],
+    "automation_hooks": {
+      "create_labels": [
+        "tdd",
+        "caching",
+        "performance",
+        "refactor"
+      ],
+      "project_board": {
+        "name": "TDD Development Board",
+        "columns": [
+          "Red (Failing Tests)",
+          "Green (Implementation)",
+          "Refactor",
+          "Done"
+        ]
+      },
+      "default_branch": "refactor",
+      "test_runner": "pytest",
+      "coverage_threshold": 90,
+      "pre_commit_hooks": [
+        "pytest",
+        "coverage",
+        "black",
+        "flake8"
+      ],
+      "issue_template_fields": [
+        "title",
+        "description",
+        "tdd_phase",
+        "test_specs",
+        "acceptance_criteria",
+        "deliverables",
+        "dependencies",
+        "estimate_minutes",
+        "risk",
+        "mitigation"
+      ],
+      "milestone": "EPIC 5 - Cache Management Specifics"
+    },
+    "performance_constraints": {
+      "cache_invalidation": {
+        "single_cache_clear_max_latency": "5ms",
+        "coordinated_invalidation_max_latency": "20ms",
+        "chain_invalidation_total_max_latency": "15ms"
+      },
+      "cache_operations": {
+        "hit_ratio_minimum": "85%",
+        "cache_reload_max_latency": "10ms",
+        "stats_reporting_max_latency": "5ms"
+      },
+      "api_constraints": {
+        "max_api_calls_after_cache_clear": 2,
+        "cache_restoration_max_time": "50ms"
+      },
+      "threading_requirements": {
+        "thread_safety": "mandatory",
+        "concurrent_access_support": true,
+        "lock_acquisition_max_time": "1ms"
+      }
+    },
+    "quality_gates": {
+      "performance_benchmarks": {
+        "cache_latency_p99": "≤ 10ms",
+        "throughput_minimum": "≥ 1000 ops/s",
+        "memory_overhead_maximum": "≤ 5% of original data size"
+      },
+      "reliability_requirements": {
+        "cache_consistency_after_invalidation": "100%",
+        "zero_data_corruption_tolerance": true,
+        "graceful_degradation_on_cache_failure": true
+      },
+      "concurrency_validation": {
+        "thread_safety_test_duration": "60s",
+        "concurrent_users_simulation": 50,
+        "race_condition_tolerance": 0
+      }
+    }
+  }
+}
