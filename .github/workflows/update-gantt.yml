@@ -50,6 +50,9 @@ jobs:
   update-gantt-charts:
     name: 🧠 Generate Mermaid Diagrams
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
     permissions:
       contents: write          # Para commit automático
@@ -261,15 +264,20 @@ jobs:
           echo "✅ Jekyll site built successfully"
           ls -la _site/
 
+      - name: 📄 Setup Pages
+        if: steps.git-check.outputs.changes == 'true' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_deploy == 'true'
+        uses: actions/configure-pages@v4
+        
+      - name: 📦 Upload Pages Artifact
+        if: steps.git-check.outputs.changes == 'true' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_deploy == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs/_site
+          
       - name: 🚀 Deploy to GitHub Pages
         if: steps.git-check.outputs.changes == 'true' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_deploy == 'true'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/_site
-          enable_jekyll: false
-          commit_message: 'Deploy: ${{ github.event.head_commit.message }}'
-          force_orphan: true
+        id: deployment
+        uses: actions/deploy-pages@v4
       
       - name: 💬 Comment on Related Issues (if triggered by issue)
         if: github.event_name == 'issues' && steps.git-check.outputs.changes == 'true'
