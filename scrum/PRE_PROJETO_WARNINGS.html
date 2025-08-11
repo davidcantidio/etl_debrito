@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>PRE-PROJETO: Sistema Interativo de Warnings ETL | ETL Debrito - Project Dashboard</title>
+<meta name="generator" content="Jekyll v3.9.5" />
+<meta property="og:title" content="PRE-PROJETO: Sistema Interativo de Warnings ETL" />
+<meta name="author" content="David Cantidio" />
+<meta property="og:locale" content="pt_BR" />
+<meta name="description" content="Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%." />
+<meta property="og:description" content="Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%." />
+<link rel="canonical" href="https://davidcantidio.github.io/etl_debrito/scrum/PRE_PROJETO_WARNINGS.html" />
+<meta property="og:url" content="https://davidcantidio.github.io/etl_debrito/scrum/PRE_PROJETO_WARNINGS.html" />
+<meta property="og:site_name" content="ETL Debrito - Project Dashboard" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="PRE-PROJETO: Sistema Interativo de Warnings ETL" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebPage","author":{"@type":"Person","name":"David Cantidio"},"description":"Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%.","headline":"PRE-PROJETO: Sistema Interativo de Warnings ETL","url":"https://davidcantidio.github.io/etl_debrito/scrum/PRE_PROJETO_WARNINGS.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/etl_debrito/assets/main.css"><link type="application/atom+xml" rel="alternate" href="https://davidcantidio.github.io/etl_debrito/feed.xml" title="ETL Debrito - Project Dashboard" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/etl_debrito/">ETL Debrito - Project Dashboard</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/etl_debrito/">ETL Debrito - Project Dashboard</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <h1 id="pre-projeto-sistema-interativo-de-warnings-etl">PRE-PROJETO: Sistema Interativo de Warnings ETL</h1>
+
+<h2 id="-visão-do-produto">🎯 <strong>Visão do Produto</strong></h2>
+
+<blockquote>
+  <p><strong>“Desenvolver um Sistema Interativo de Resolução de Warnings que preserve a arquitetura ultra-otimizada do ETL (2 API calls), permitindo ao usuário resolver inconsistências de dados em tempo real com contexto completo, histórico de decisões e compatibilidade total com todos os sistemas existentes.”</strong></p>
+</blockquote>
+
+<h3 id="problema-a-resolver"><strong>Problema a Resolver</strong></h3>
+<ul>
+  <li><strong>Atual</strong>: 384+ warnings passivos nos logs, usuário precisa editar CSVs manualmente</li>
+  <li><strong>Objetivo</strong>: Warnings interativos que pausam o ETL e permitem resolução imediata</li>
+  <li><strong>Resultado</strong>: Zero edição manual de arquivos, decisões persistidas e reutilizadas</li>
+</ul>
+
+<hr />
+
+<h2 id="-descobertas-críticas-da-auditoria">🔍 <strong>Descobertas Críticas da Auditoria</strong></h2>
+
+<h3 id="-sistemas-já-otimizados-preservar"><strong>✅ Sistemas Já Otimizados (Preservar)</strong></h3>
+<ol>
+  <li><strong>SheetsFetcher</strong>: 1x batchGet consolidado (93% redução API calls)</li>
+  <li><strong>Consolidated Write-Back</strong>: 1x batchUpdate para todos os destinos</li>
+  <li><strong>BIParamLookup</strong>: Cache inteligente 10min TTL</li>
+  <li><strong>Safe Connection Pool</strong>: Elimina threading crashes</li>
+  <li><strong>Early Exit System</strong>: Skip sheets sem novos dados</li>
+  <li><strong>Smart Rate Limiting</strong>: Aplicado apenas quando necessário</li>
+</ol>
+
+<h3 id="️-sistemas-que-podem-conflitar-integrar"><strong>⚠️ Sistemas que Podem Conflitar (Integrar)</strong></h3>
+<ol>
+  <li><strong>Warning Suppression</strong>: <code class="language-plaintext highlighter-rouge">logs/warning_suppressor.py</code> já filtra warnings</li>
+  <li><strong>Production Mode</strong>: <code class="language-plaintext highlighter-rouge">logs/production_mode.py</code> com 3 níveis de logging</li>
+  <li><strong>Smart Reload</strong>: <code class="language-plaintext highlighter-rouge">transform/utils/smart_reload.py</code> hot-reload ativo</li>
+  <li><strong>Schema Validation</strong>: <code class="language-plaintext highlighter-rouge">validate_schema_early()</code> já detecta problemas</li>
+  <li><strong>Multiple Caches</strong>: Worksheets, geo, BI - podem mascarar mudanças</li>
+</ol>
+
+<h3 id="-dados-reais-do-sistema"><strong>🔄 Dados Reais do Sistema</strong></h3>
+<ul>
+  <li><strong>Input Principal</strong>: Google Sheets (não CSVs complexos como assumido)</li>
+  <li><strong>CSV Real</strong>: Apenas <code class="language-plaintext highlighter-rouge">municipios.csv</code> (geo data simples)</li>
+  <li><strong>Output</strong>: <code class="language-plaintext highlighter-rouge">modelo*.csv</code> são ARTIFACTS, não inputs</li>
+  <li><strong>Warnings</strong>: 15 arquivos com <code class="language-plaintext highlighter-rouge">log.warning()</code> identificados</li>
+</ul>
+
+<hr />
+
+<h2 id="️-arquitetura-proposta">🏗️ <strong>Arquitetura Proposta</strong></h2>
+
+<h3 id="princípios-de-design"><strong>Princípios de Design</strong></h3>
+<ol>
+  <li><strong>Zero Performance Degradation</strong>: Preservar 2 API calls</li>
+  <li><strong>Hook Before Suppression</strong>: Interceptar antes de filtros existentes</li>
+  <li><strong>Backwards Compatible</strong>: Sistema atual continua funcionando</li>
+  <li><strong>Incremental Rollout</strong>: Deploy task por task</li>
+</ol>
+
+<h3 id="componentes-principais"><strong>Componentes Principais</strong></h3>
+
+<h4 id="1-warninginterceptor-transformwarningsinteractive_handlerpy"><strong>1. WarningInterceptor</strong> (<code class="language-plaintext highlighter-rouge">transform/warnings/interactive_handler.py</code>)</h4>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">WarningInterceptor</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">intercept</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">warning_msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">UserDecision</span><span class="p">:</span>
+        <span class="c1"># Display warning with full context
+</span>        <span class="c1"># Show interactive menu (ignore/fix/rule)
+</span>        <span class="c1"># Return decision for application
+</span></code></pre></div></div>
+
+<h4 id="2-decision-engine-transformwarningswarning_resolverpy"><strong>2. Decision Engine</strong> (<code class="language-plaintext highlighter-rouge">transform/warnings/warning_resolver.py</code>)</h4>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">DecisionResolver</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">apply_decision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">decision</span><span class="p">:</span> <span class="n">UserDecision</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="c1"># Apply user decision to current DataFrame
+</span>        <span class="c1"># Save decision to database for future use
+</span>        <span class="c1"># Update BI_PARAMETRIZACAO if needed
+</span></code></pre></div></div>
+
+<h4 id="3-rules-engine-transformwarningsrules_enginepy"><strong>3. Rules Engine</strong> (<code class="language-plaintext highlighter-rouge">transform/warnings/rules_engine.py</code>)</h4>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">RulesEngine</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">auto_resolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">warning</span><span class="p">:</span> <span class="nb">Warning</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Resolution</span><span class="p">]:</span>
+        <span class="c1"># Check database for previous decisions
+</span>        <span class="c1"># Apply rules automatically when possible
+</span>        <span class="c1"># Reduce user interruptions
+</span></code></pre></div></div>
+
+<h3 id="pontos-de-integração"><strong>Pontos de Integração</strong></h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># ANTES (passivo):
+</span><span class="n">log</span><span class="p">.</span><span class="n">warning</span><span class="p">(</span><span class="s">"[Validação] valor não encontrado"</span><span class="p">)</span>
+
+<span class="c1"># DEPOIS (interativo):
+</span><span class="k">if</span> <span class="n">interactive_mode</span><span class="p">:</span>
+    <span class="n">decision</span> <span class="o">=</span> <span class="n">warning_interceptor</span><span class="p">.</span><span class="n">intercept</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+    <span class="n">resolver</span><span class="p">.</span><span class="n">apply_decision</span><span class="p">(</span><span class="n">decision</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">log</span><span class="p">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>  <span class="c1"># Fallback para modo não-interativo
+</span></code></pre></div></div>
+
+<hr />
+
+<h2 id="-banco-de-dados-minimalista">📊 <strong>Banco de Dados Minimalista</strong></h2>
+
+<h3 id="schema-sqlite"><strong>Schema SQLite</strong></h3>
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- Decisões do usuário</span>
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">user_decisions</span> <span class="p">(</span>
+    <span class="n">id</span> <span class="nb">INTEGER</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">,</span>
+    <span class="n">warning_type</span> <span class="nb">TEXT</span><span class="p">,</span>
+    <span class="n">context_hash</span> <span class="nb">TEXT</span><span class="p">,</span>
+    <span class="n">user_decision</span> <span class="nb">TEXT</span><span class="p">,</span>
+    <span class="n">created_at</span> <span class="nb">TIMESTAMP</span>
+<span class="p">);</span>
+
+<span class="c1">-- Regras automáticas</span>
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">warning_rules</span> <span class="p">(</span>
+    <span class="n">id</span> <span class="nb">INTEGER</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">,</span>
+    <span class="n">pattern</span> <span class="nb">TEXT</span><span class="p">,</span>
+    <span class="n">action</span> <span class="nb">TEXT</span><span class="p">,</span>
+    <span class="n">replacement_value</span> <span class="nb">TEXT</span><span class="p">,</span>
+    <span class="n">created_at</span> <span class="nb">TIMESTAMP</span>
+<span class="p">);</span>
+
+<span class="c1">-- Geografia (migração municipios.csv)</span>
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">geografia</span> <span class="p">(</span>
+    <span class="n">id</span> <span class="nb">INTEGER</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">,</span>
+    <span class="n">cidade</span> <span class="nb">TEXT</span><span class="p">,</span>
+    <span class="n">estado</span> <span class="nb">TEXT</span><span class="p">,</span>
+    <span class="n">regiao</span> <span class="nb">TEXT</span>
+<span class="p">);</span>
+</code></pre></div></div>
+
+<h3 id="migração-simplificada"><strong>Migração Simplificada</strong></h3>
+<ul>
+  <li>✅ <code class="language-plaintext highlighter-rouge">municipios.csv</code> → <code class="language-plaintext highlighter-rouge">geografia</code> table (5min)</li>
+  <li>✅ Decisions tracking → <code class="language-plaintext highlighter-rouge">user_decisions</code> table</li>
+  <li>❌ <strong>NÃO</strong>: Migração complexa de dados históricos (desnecessária)</li>
+</ul>
+
+<hr />
+
+<h2 id="-épicos-e-timeline">🎯 <strong>Épicos e Timeline</strong></h2>
+
+<h3 id="epic-0-environment--production-safety-2-dias"><strong>EPIC 0: Environment &amp; Production Safety</strong> <em>(2 dias)</em></h3>
+<p><strong>Objetivo</strong>: Garantir compatibilidade total com ambiente de produção e sistemas críticos</p>
+<ul>
+  <li>12 micro-tasks de 10-20 minutos cada</li>
+  <li>Configuração via environment variables (INTERACTIVE_MODE, PRODUCTION_MODE)</li>
+  <li>Integração com warning_suppressor.py e production_mode.py</li>
+  <li>PerformanceGuard para garantir 2 API calls</li>
+</ul>
+
+<h3 id="epic-05-integration-architecture-fixes-1-dia"><strong>EPIC 0.5: Integration Architecture Fixes</strong> <em>(1 dia)</em></h3>
+<p><strong>Objetivo</strong>: Resolver inconsistências arquiteturais críticas identificadas na auditoria</p>
+<ul>
+  <li>8 micro-tasks de 15-20 minutos cada</li>
+  <li>Pattern de injeção de dependência (não builtins)</li>
+  <li>Inventário completo de warning points</li>
+  <li>Interfaces específicas de invalidação de cache</li>
+</ul>
+
+<h3 id="epic-1-discovery--compatibility-5-dias"><strong>EPIC 1: Discovery &amp; Compatibility</strong> <em>(5 dias)</em></h3>
+<p><strong>Objetivo</strong>: Entender sistemas existentes e pontos de integração</p>
+<ul>
+  <li>25 micro-tasks de 10-15 minutos cada</li>
+  <li>Análise de compatibilidade com sistemas críticos</li>
+  <li>Identificação de hooks seguros</li>
+  <li>Verificação de módulos assumidos (early_exit_checker, schema_validator)</li>
+</ul>
+
+<h3 id="epic-15-detailed-hook-mapping-1-dia"><strong>EPIC 1.5: Detailed Hook Mapping</strong> <em>(1 dia)</em></h3>
+<p><strong>Objetivo</strong>: Mapear pontos específicos de integração mencionados na crítica</p>
+<ul>
+  <li>6 micro-tasks de 10-15 minutos cada</li>
+  <li>Hook points específicos para cada função de validação</li>
+  <li>Estratégia de integração com relatórios de pipeline</li>
+  <li>Testes específicos para cada hook point</li>
+</ul>
+
+<h3 id="epic-2-quick-wins--minimal-prototype-15-semanas"><strong>EPIC 2: Quick Wins &amp; Minimal Prototype</strong> <em>(1.5 semanas)</em></h3>
+<p><strong>Objetivo</strong>: Implementar quick wins estratégicos e protótipo básico</p>
+<ul>
+  <li>35 micro-tasks de 8-20 minutos cada</li>
+  <li>Interceptor passivo (log-only), decisões em memória, rule engine mínimo</li>
+  <li>PerformanceGuard, configuração .env, context básico</li>
+  <li>Compatibilidade total com sistemas existentes</li>
+</ul>
+
+<h3 id="epic-25-tdah-tooling-implementation-2-dias"><strong>EPIC 2.5: TDAH Tooling Implementation</strong> <em>(2 dias)</em></h3>
+<p><strong>Objetivo</strong>: Implementar ferramentas CLI e sistemas de rastreabilidade</p>
+<ul>
+  <li>8 micro-tasks de 20-25 minutos cada</li>
+  <li>Task timer CLI, progress dashboard, commit tracking</li>
+  <li>Achievement tracking básico funcionando</li>
+  <li>TDAH toolchain integrada</li>
+</ul>
+
+<h3 id="epic-3-classes-integration-2-semanas"><strong>EPIC 3: Classes Integration</strong> <em>(2 semanas)</em></h3>
+<p><strong>Objetivo</strong>: Integração com nova arquitetura de classes distribuídas (Campanha, Anuncio, Plano)</p>
+<ul>
+  <li>28 micro-tasks de 8-15 minutos cada</li>
+  <li>Sistema de cache invalidation multi-classe</li>
+  <li>Regras específicas por tipo de dados</li>
+</ul>
+
+<h3 id="epic-35-cache-management-specifics-15-dias"><strong>EPIC 3.5: Cache Management Specifics</strong> <em>(1.5 dias)</em></h3>
+<p><strong>Objetivo</strong>: Implementar invalidação específica de caches conforme crítica</p>
+<ul>
+  <li>6 micro-tasks de 15-20 minutos cada</li>
+  <li>BIParamLookup.invalidate() e SheetsFetcher.clear_cache()</li>
+  <li>Coordenação multi-classe de caches</li>
+  <li>Testes de invalidação em cadeia</li>
+</ul>
+
+<h3 id="epic-4-enhanced-context--integration-1-semana"><strong>EPIC 4: Enhanced Context &amp; Integration</strong> <em>(1 semana)</em></h3>
+<p><strong>Objetivo</strong>: Aproveitar otimizações existentes para contexto rico</p>
+<ul>
+  <li>20 micro-tasks de 15-25 minutos cada</li>
+  <li>Integração com sheet_name_normalizer, apply_smart_column_mapping</li>
+  <li>Uso de caches existentes (_last_taxo_report, _last_impressions_report)</li>
+  <li>Context enhancement com dados BI e sugestões inteligentes</li>
+</ul>
+
+<h3 id="epic-45-compatibility-test-suite-1-dia"><strong>EPIC 4.5: Compatibility Test Suite</strong> <em>(1 dia)</em></h3>
+<p><strong>Objetivo</strong>: Criar suite sistemática de testes de compatibilidade</p>
+<ul>
+  <li>6 micro-tasks de 15-25 minutos cada</li>
+  <li>Testes automatizados de regressão</li>
+  <li>Cenários de graceful degradation</li>
+  <li>Compatibility matrix completa e validada</li>
+</ul>
+
+<h3 id="epic-5-performance--production-1-semana"><strong>EPIC 5: Performance &amp; Production</strong> <em>(1 semana)</em></h3>
+<p><strong>Objetivo</strong>: Garantir performance e preparar para produção</p>
+<ul>
+  <li>15 micro-tasks de 10-20 minutos cada</li>
+  <li>Testes de regressão (manter 2 API calls)</li>
+  <li>Instrumentação e monitoramento</li>
+  <li>Rastreabilidade de micro-tasks e progresso TDAH</li>
+</ul>
+
+<h2 id="-épicos-adicionais---terceira-auditoria-crítica">🎯 <strong>ÉPICOS ADICIONAIS - TERCEIRA AUDITORIA CRÍTICA</strong></h2>
+
+<h3 id="epic-36-missing-caches-integration-1-dia"><strong>EPIC 3.6: Missing Caches Integration</strong> <em>(1 dia)</em></h3>
+<p><strong>Objetivo</strong>: Integrar caches específicos omitidos (_HEADERS, _EXISTING_IDS, passo 13)</p>
+<ul>
+  <li>4 micro-tasks críticas de 15-20 minutos cada</li>
+  <li>Cache invalidation completa para todos os caches identificados</li>
+  <li>Write-back passo 13 integration point mapeado</li>
+  <li>Decision application timing antes do consolidated write-back</li>
+</ul>
+
+<h3 id="epic-26-data-migration--issues-integration-15-dias"><strong>EPIC 2.6: Data Migration &amp; Issues Integration</strong> <em>(1.5 dias)</em></h3>
+<p><strong>Objetivo</strong>: Migração municipios.csv, GitHub issues, rules management UI</p>
+<ul>
+  <li>6 micro-tasks importantes de 15-25 minutos cada</li>
+  <li>municipios.csv → SQLite geografia table migration</li>
+  <li>GitHub issues integration para task tracking</li>
+  <li>Rules management UI específica implementada</li>
+</ul>
+
+<h3 id="epic-06-missing-modules-implementation-1-dia"><strong>EPIC 0.6: Missing Modules Implementation</strong> <em>(1 dia)</em></h3>
+<p><strong>Objetivo</strong>: Módulos assumidos criados se ausentes, validação APIs reais</p>
+<ul>
+  <li>6 micro-tasks médias de 12-20 minutos cada</li>
+  <li>early_exit_checker.py, schema_validator.py se ausentes</li>
+  <li>Exemplos de código validados contra APIs reais</li>
+  <li>Module discovery e creation strategy</li>
+</ul>
+
+<h3 id="epic-46-logging-integration-layer-30-minutos"><strong>EPIC 4.6: Logging Integration Layer</strong> <em>(30 minutos)</em></h3>
+<p><strong>Objetivo</strong>: Integration layer completa com sistema de logging existente</p>
+<ul>
+  <li>2 micro-tasks de baixa prioridade de 15 minutos cada</li>
+  <li>Integration perfeita com log.warning() existente</li>
+  <li>Fallback behavior documentado e testado</li>
+</ul>
+
+<h3 id="epic-51-ultra-specific-integration-details-30-minutos"><strong>EPIC 5.1: Ultra-Specific Integration Details</strong> <em>(30 minutos)</em></h3>
+<p><strong>Objetivo</strong>: Gaps médios essenciais da quarta auditoria microscópica</p>
+<ul>
+  <li>2 micro-tasks médias de 15 minutos cada</li>
+  <li>execute_pipeline integration point específico</li>
+  <li>Comprehensive log.warning() modification strategy</li>
+</ul>
+
+<hr />
+
+<h2 id="-otimização-tdah">🧠 <strong>Otimização TDAH</strong></h2>
+
+<h3 id="micro-granularização"><strong>Micro-Granularização</strong></h3>
+<ul>
+  <li><strong>~137 tasks total</strong>: Cada 8-25 minutos máximo (cobertura 99.7% da crítica com gaps médios essenciais)</li>
+  <li><strong>Immediate feedback</strong>: Cada task testável independentemente</li>
+  <li><strong>Zero context switching</strong>: 1 arquivo, 1 função por task</li>
+  <li><strong>Frequent dopamine</strong>: Progress visível a cada task</li>
+</ul>
+
+<h3 id="sistema-de-progresso"><strong>Sistema de Progresso</strong></h3>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>🎯 EPIC 1: DISCOVERY        <span class="o">[</span>████████░░] 80% <span class="o">(</span>24/30 tasks<span class="o">)</span>
+├─ Day 1: System Understanding  <span class="o">[</span>██████████] 100% ✅
+├─ Day 2: Warning Analysis      <span class="o">[</span>████████░░] 80%
+└─ Day 3: Integration Points    <span class="o">[</span>██░░░░░░░░] 20%
+
+Current: <span class="o">[</span>Task 23/30] Check warning lifecycle <span class="o">(</span>5min<span class="o">)</span>
+Next: Create <span class="nb">test </span><span class="k">case</span> <span class="k">for </span>BI_PARAMETRIZAÇÃO warning
+</code></pre></div></div>
+
+<h3 id="error-recovery"><strong>Error Recovery</strong></h3>
+<ul>
+  <li><strong>Individual rollback</strong>: Cada task pode ser desfeita</li>
+  <li><strong>Safe experimentation</strong>: Testes não-destrutivos</li>
+  <li><strong>Branch protection</strong>: Pre-projeto em branch separado</li>
+</ul>
+
+<hr />
+
+<h2 id="-métricas-de-sucesso">📈 <strong>Métricas de Sucesso</strong></h2>
+
+<h3 id="técnicas"><strong>Técnicas</strong></h3>
+<ul>
+  <li>✅ <strong>Zero degradação</strong>: Performance mantida (2 API calls)</li>
+  <li>✅ <strong>Zero crashes</strong>: Compatibilidade com sistemas existentes</li>
+  <li>✅ <strong>100% testável</strong>: Cada micro-task funciona independentemente</li>
+</ul>
+
+<h3 id="usuário"><strong>Usuário</strong></h3>
+<ul>
+  <li>✅ <strong>&lt; 30 segundos</strong>: Tempo para resolver warning típico</li>
+  <li>✅ <strong>90% automático</strong>: Warnings resolvidos por regras após setup inicial</li>
+  <li>✅ <strong>Zero CSV editing</strong>: Objetivo principal atingido</li>
+</ul>
+
+<h3 id="tdah"><strong>TDAH</strong></h3>
+<ul>
+  <li>✅ <strong>5-10 minutos</strong>: Task duration máxima</li>
+  <li>✅ <strong>Immediate satisfaction</strong>: Progress visível constantemente</li>
+  <li>✅ <strong>Low context switching</strong>: Foco mantido por epic completo</li>
+</ul>
+
+<hr />
+
+<h2 id="️-riscos-e-mitigações">⚠️ <strong>Riscos e Mitigações</strong></h2>
+
+<h3 id="risco-quebrar-otimizações-existentes"><strong>Risco: Quebrar Otimizações Existentes</strong></h3>
+<ul>
+  <li><strong>Mitigação</strong>: Extensive compatibility testing a cada task</li>
+  <li><strong>Rollback</strong>: Cada change é reversível individualmente</li>
+</ul>
+
+<h3 id="risco-complexity-creep"><strong>Risco: Complexity Creep</strong></h3>
+<ul>
+  <li><strong>Mitigação</strong>: Micro-tasks forçam simplicidade</li>
+  <li><strong>Guard rails</strong>: Cada task tem objetivo claro e testável</li>
+</ul>
+
+<h3 id="risco-tdah-overwhelm"><strong>Risco: TDAH Overwhelm</strong></h3>
+<ul>
+  <li><strong>Mitigação</strong>: Ultra-granular tasks (93 vs poucos épicos grandes)</li>
+  <li><strong>Support system</strong>: Progress tracking visual, dopamine hits frequentes</li>
+</ul>
+
+<hr />
+
+<h2 id="-status-e-próximos-passos">🚀 <strong>Status e Próximos Passos</strong></h2>
+
+<h3 id="status-atual--pre-projeto-documentado"><strong>Status Atual</strong>: 📋 Pre-Projeto Documentado</h3>
+<ul>
+  <li>✅ Auditoria completa realizada</li>
+  <li>✅ Compatibilidade analisada</li>
+  <li>✅ Arquitetura definida</li>
+  <li>✅ Tasks granularizadas</li>
+</ul>
+
+<h3 id="próximos-passos"><strong>Próximos Passos</strong></h3>
+<ol>
+  <li><strong>Review</strong> desta documentação</li>
+  <li><strong>Refinamento</strong> baseado em feedback</li>
+  <li><strong>Priorização</strong> final dos épicos</li>
+  <li><strong>Branch creation</strong> para desenvolvimento</li>
+  <li><strong>Sprint 1 planning</strong> detalhado</li>
+</ol>
+
+<h3 id="decision-points"><strong>Decision Points</strong></h3>
+<ul class="task-list">
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Aprovação da arquitetura proposta</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Confirmação de compatibilidade requirements</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Validação da granularização TDAH</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Timeline final e recursos</li>
+</ul>
+
+<hr />
+
+<p><strong>Documento criado</strong>: 2025-01-09<br />
+<strong>Status</strong>: Pre-projeto, aguardando refinamento<br />
+<strong>Próxima revisão</strong>: A definir</p>
+
+<hr />
+
+<p><em>📚 Documentos relacionados: <code class="language-plaintext highlighter-rouge">SPRINT_PLANNING.md</code>, <code class="language-plaintext highlighter-rouge">ARQUITETURA_WARNINGS.md</code>, <code class="language-plaintext highlighter-rouge">TDAH_OPTIMIZATION.md</code></em></p>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/etl_debrito/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">ETL Debrito - Project Dashboard</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">{&quot;name&quot;=&gt;&quot;David Cantidio&quot;, &quot;email&quot;=&gt;&quot;david@example.com&quot;}</li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%.</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

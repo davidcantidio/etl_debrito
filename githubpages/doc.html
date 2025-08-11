@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>ETL Debrito - Project Dashboard | Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%.</title>
+<meta name="generator" content="Jekyll v3.9.5" />
+<meta property="og:title" content="ETL Debrito - Project Dashboard" />
+<meta name="author" content="David Cantidio" />
+<meta property="og:locale" content="pt_BR" />
+<meta name="description" content="Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%." />
+<meta property="og:description" content="Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%." />
+<link rel="canonical" href="https://davidcantidio.github.io/etl_debrito/githubpages/doc.html" />
+<meta property="og:url" content="https://davidcantidio.github.io/etl_debrito/githubpages/doc.html" />
+<meta property="og:site_name" content="ETL Debrito - Project Dashboard" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="ETL Debrito - Project Dashboard" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebPage","author":{"@type":"Person","name":"David Cantidio"},"description":"Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%.","headline":"ETL Debrito - Project Dashboard","url":"https://davidcantidio.github.io/etl_debrito/githubpages/doc.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/etl_debrito/assets/main.css"><link type="application/atom+xml" rel="alternate" href="https://davidcantidio.github.io/etl_debrito/feed.xml" title="ETL Debrito - Project Dashboard" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/etl_debrito/">ETL Debrito - Project Dashboard</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/etl_debrito/">ETL Debrito - Project Dashboard</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <p>Guia para o Claude Code: publicar um Gantt no GitHub Pages (a partir da documentação oficial)
+Objetivo: criar (ou usar) um repositório, habilitar o GitHub Pages e publicar uma página que renderize um Gantt em Mermaid com a evolução do projeto.</p>
+
+<p>1) Premissas e limites
+GitHub Pages hospeda sites estáticos diretamente de um repositório. Está disponível em repositórios públicos (Free) e também em privados conforme o plano. 
+GitHub Docs</p>
+
+<p>O site publica a partir de uma fonte de publicação (branch/pasta) ou via GitHub Actions. 
+GitHub Docs
++1</p>
+
+<p>Respeite limites (tamanho/tempo de build e renderização). 
+GitHub Docs
++1</p>
+
+<p>Mermaid é suportado nativamente no GitHub em arquivos Markdown — inclusive gantt — via bloco de código mermaid. 
+GitHub Docs
++1</p>
+
+<p>2) Estrutura mínima do repositório
+Crie/garanta estes arquivos na raiz (ou na pasta de publicação, ex. /docs):</p>
+
+<p>bash
+Copiar
+Editar
+/.github/workflows/pages.yml   # (opcional) deploy via Actions
+/_config.yml                   # (opcional) configurações Jekyll/tema
+index.md                       # página inicial com o gráfico Mermaid
+README.md                      # (opcional) instruções do projeto
+O GitHub Pages procura por index.html, index.md ou README.md como entrada. 
+GitHub Docs</p>
+
+<p>3) Habilitar o GitHub Pages
+Opção A — Publicação por Branch/Pasta
+No repositório, abra Configurações → Pages.</p>
+
+<p>Em Source, selecione o branch (ex.: main) e, se quiser, a pasta (ex.: /docs). Salve. 
+GitHub Docs</p>
+
+<p>Opção B — Publicação por GitHub Actions
+Use um workflow de deploy (recomendado quando usa Jekyll/geradores). O Pages hoje usa Actions por padrão nos builds Jekyll. 
+GitHub Docs
++1</p>
+
+<p>4) (Opcional) Jekyll e Tema
+O Pages tem suporte integrado ao Jekyll (Markdown + Liquid) e facilita aplicar temas. 
+GitHub Docs
++1</p>
+
+<p>Guia rápido e “Início Rápido” para subir um site de usuário/organização: 
+GitHub Docs</p>
+
+<p>Conteúdo em Jekyll (páginas e posts): 
+GitHub Docs</p>
+
+<p>Teste localmente com Jekyll quando precisar: 
+GitHub Docs</p>
+
+<p>Exemplo mínimo de _config.yml (usando o tema minima):</p>
+
+<p>yml
+Copiar
+Editar
+title: “Roadmap do Projeto”
+description: “Gantt da evolução”
+theme: minima
+5) Página inicial com Gantt (Mermaid)
+Crie index.md (na raiz ou em /docs, conforme a fonte de publicação):</p>
+
+<p>markdown
+Copiar
+Editar
+—
+layout: default
+title: Roadmap (Gantt)
+—</p>
+
+<h1 id="roadmap-do-projeto-gantt">Roadmap do Projeto (Gantt)</h1>
+
+<blockquote>
+  <p>Este gráfico é renderizado diretamente no GitHub Pages usando Mermaid.</p>
+</blockquote>
+
+<p>```mermaid
+gantt
+    dateFormat  YYYY-MM-DD
+    title       Evolução do Projeto
+    excludes    weekends</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>section Planejamento
+Definir visão &amp; escopo        :done,    t1, 2025-07-20, 2025-07-25
+Backlog inicial               :active,  t2, 2025-07-26, 2025-07-31
+
+section Sprint 1
+Setup repositório &amp; Pages     :done,    s1a, 2025-08-01, 2025-08-02
+Pipeline ETL base             :active,  s1b, 2025-08-03, 2025-08-10
+Dashboard MVP                 :         s1c, 2025-08-08, 2025-08-15
+
+section Sprint 2
+Warnings &amp; validações         :         s2a, 2025-08-16, 2025-08-25
+Relatórios &amp; SEO              :         s2b, 2025-08-18, 2025-08-28
+
+section Release
+Apresentação cliente          :milestone, rel, 2025-08-30, 1d yaml Copiar Editar
+</code></pre></div></div>
+
+<blockquote>
+  <p>Como o GitHub <strong>renderiza Mermaid em Markdown</strong>, basta usar o fence <code class="language-plaintext highlighter-rouge">mermaid</code>. Evite rodar plugins Mermaid de terceiros. :contentReference[oaicite:11]{index=11}</p>
+</blockquote>
+
+<hr />
+
+<h2 id="6-publicação-via-github-actions-opcional-recomendado">6) Publicação via GitHub Actions (opcional, recomendado)</h2>
+
+<p>Crie <code class="language-plaintext highlighter-rouge">.github/workflows/pages.yml</code>:</p>
+
+<p>```yaml
+name: Deploy GitHub Pages</p>
+
+<p>on:
+  push:
+    branches: [ “main” ]
+  workflow_dispatch:</p>
+
+<p>permissions:
+  contents: read
+  pages: write
+  id-token: write</p>
+
+<p>concurrency:
+  group: “pages”
+  cancel-in-progress: false</p>
+
+<p>jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  # (Opcional) Se usar Jekyll, configure Ruby e build
+  - name: Setup Ruby
+    uses: ruby/setup-ruby@v1
+    with:
+      ruby-version: '3.3'
+  - name: Install Jekyll
+    run: |
+      gem install jekyll bundler
+      bundle init
+      bundle add jekyll
+  - name: Build site
+    run: |
+      jekyll build -s . -d ./_site
+
+  - name: Setup Pages
+    uses: actions/configure-pages@v5
+  - name: Upload artifact
+    uses: actions/upload-pages-artifact@v3
+    with:
+      path: _site   deploy:
+environment:
+  name: github-pages
+  url: $
+needs: build
+runs-on: ubuntu-latest
+steps:
+  - name: Deploy to GitHub Pages
+    id: deployment
+    uses: actions/deploy-pages@v4 O Pages usa Actions para compilar Jekyll; verifique logs caso haja erros de build.  GitHub Docs
+</code></pre></div></div>
+
+<p>7) (Opcional) Domínio personalizado
+Se quiser usar um domínio próprio, defina o CNAME nas configurações (ou via DNS se publicar com Actions). 
+GitHub Docs
++1</p>
+
+<p>8) Variantes de fonte de publicação
+Branch + pasta /docs: coloque index.md em /docs e configure Pages para main + /docs. 
+GitHub Docs</p>
+
+<p>Branch raiz: mantenha index.md na raiz (/). 
+GitHub Docs</p>
+
+<p>Actions: publique o conteúdo estático gerado em _site. 
+GitHub Docs</p>
+
+<p>9) Boas práticas para renderização Mermaid
+Prefira blocos pequenos (renderização de arquivos grandes pode falhar ou exibir como texto). 
+GitHub Docs</p>
+
+<p>Evite plugins Mermaid adicionais quando usar Mermaid nativo do GitHub. 
+GitHub Docs</p>
+
+<p>Para Jekyll, não é obrigatório script extra para Mermaid — a renderização é do próprio GitHub na página final. 
+GitHub Docs</p>
+
+<p>10) Modelo de PR para atualizar o Gantt (opcional)
+Crie .github/PULL_REQUEST_TEMPLATE.md:</p>
+
+<p>markdown
+Copiar
+Editar</p>
+<h2 id="atualização-do-gantt">Atualização do Gantt</h2>
+<ul class="task-list">
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Ajustei datas/seções no <code class="language-plaintext highlighter-rouge">index.md</code> (Mermaid)</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Mantive <code class="language-plaintext highlighter-rouge">dateFormat</code> e marcos consistentes</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Verifiquei preview do Pages após o merge</li>
+</ul>
+
+<blockquote>
+  <p>Dica: mantenha as seções por sprint e marcos (<code class="language-plaintext highlighter-rouge">milestone</code>) para acompanhar releases.
+11) Checklist para o Claude Code
+Criar (ou detectar) repositório do site.</p>
+</blockquote>
+
+<p>Adicionar index.md com o bloco Mermaid (modelo acima).</p>
+
+<p>(Opcional) Adicionar _config.yml com tema Jekyll.</p>
+
+<p>Configurar GitHub Pages:</p>
+
+<p>Branch/pasta ou Actions (criar pages.yml). 
+GitHub Docs
++1</p>
+
+<p>Commit &amp; push → verificar a URL do Pages.</p>
+
+<p>(Opcional) Domínio personalizado (CNAME/DNS). 
+GitHub Docs
++1</p>
+
+<p>12) Referências oficiais usadas
+O que é GitHub Pages / Início Rápido / Criar site / Fonte de publicação / Limites / Despublicar. 
+GitHub Docs
++5
+GitHub Docs
++5
+GitHub Docs
++5</p>
+
+<p>Jekyll no GitHub Pages (sobre, criar, testar, conteúdo, temas). 
+GitHub Docs
++5
+GitHub Docs
++5
+GitHub Docs
++5</p>
+
+<p>Mermaid no GitHub (diagramas e blocos de código). 
+GitHub Docs
++1</p>
+
+<p>Observações finais
+O Gantt do Mermaid é simples de manter via Markdown e funciona muito bem no fluxo de PRs. (Mermaid é suportado no GitHub e foi pensado para esse tipo de uso.) 
+GitHub Docs</p>
+
+<p>Se o Gantt crescer demais, considere dividir por sprints e linkar páginas internas do Jekyll para manter a renderização estável. 
+GitHub Docs</p>
+
+<p>Pronto. Cole este arquivo como GUIDE_PAGES_GANTT.md no repositório e siga a checklist.</p>
+
+<p>Você gosta desta personalidade?</p>
+
+<p>Perguntar ao ChatGPT</p>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/etl_debrito/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">ETL Debrito - Project Dashboard</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">{&quot;name&quot;=&gt;&quot;David Cantidio&quot;, &quot;email&quot;=&gt;&quot;david@example.com&quot;}</li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%.</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

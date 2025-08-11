@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Guia de Boas Práticas TDD - ETL Debrito Project | ETL Debrito - Project Dashboard</title>
+<meta name="generator" content="Jekyll v3.9.5" />
+<meta property="og:title" content="Guia de Boas Práticas TDD - ETL Debrito Project" />
+<meta name="author" content="David Cantidio" />
+<meta property="og:locale" content="pt_BR" />
+<meta name="description" content="Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%." />
+<meta property="og:description" content="Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%." />
+<link rel="canonical" href="https://davidcantidio.github.io/etl_debrito/tdd_guidelines.html" />
+<meta property="og:url" content="https://davidcantidio.github.io/etl_debrito/tdd_guidelines.html" />
+<meta property="og:site_name" content="ETL Debrito - Project Dashboard" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Guia de Boas Práticas TDD - ETL Debrito Project" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebPage","author":{"@type":"Person","name":"David Cantidio"},"description":"Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%.","headline":"Guia de Boas Práticas TDD - ETL Debrito Project","url":"https://davidcantidio.github.io/etl_debrito/tdd_guidelines.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/etl_debrito/assets/main.css"><link type="application/atom+xml" rel="alternate" href="https://davidcantidio.github.io/etl_debrito/feed.xml" title="ETL Debrito - Project Dashboard" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/etl_debrito/">ETL Debrito - Project Dashboard</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/etl_debrito/">ETL Debrito - Project Dashboard</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <h1 id="guia-de-boas-práticas-tdd---etl-debrito-project">Guia de Boas Práticas TDD - ETL Debrito Project</h1>
+
+<h2 id="-visão-geral">🎯 Visão Geral</h2>
+
+<p>Este guia estabelece padrões e práticas para desenvolvimento orientado por testes (TDD) no projeto ETL Debrito, garantindo qualidade, manutenibilidade e confiabilidade do pipeline de dados.</p>
+
+<h2 id="-ciclo-tdd-fundamental">🔄 Ciclo TDD Fundamental</h2>
+
+<h3 id="-fase-red---teste-que-falha">🔴 FASE RED - Teste que Falha</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">test_should_extract_campaign_data_when_valid_sheet_id</span><span class="p">():</span>
+    <span class="c1"># Arrange
+</span>    <span class="n">sheets_fetcher</span> <span class="o">=</span> <span class="n">SheetsFetcher</span><span class="p">(</span><span class="n">mock_credentials</span><span class="p">)</span>
+    <span class="n">valid_sheet_id</span> <span class="o">=</span> <span class="s">"1jPFLqg7HIDZoxCwQacMpCS_bCKfRsnisvEniiHLljiE"</span>
+    
+    <span class="c1"># Act &amp; Assert
+</span>    <span class="k">with</span> <span class="n">pytest</span><span class="p">.</span><span class="n">raises</span><span class="p">(</span><span class="nb">NotImplementedError</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">sheets_fetcher</span><span class="p">.</span><span class="n">extract_campaign_data</span><span class="p">(</span><span class="n">valid_sheet_id</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><strong>✅ Regras da Fase RED:</strong></p>
+<ul>
+  <li>Escreva o teste mais simples possível que falhe</li>
+  <li>Teste deve expressar claramente o comportamento desejado</li>
+  <li>Use nomes descritivos: <code class="language-plaintext highlighter-rouge">test_should_[behavior]_when_[condition]</code></li>
+  <li>Execute o teste para confirmar que falha pelo motivo correto</li>
+</ul>
+
+<h3 id="-fase-green---código-mínimo">🟢 FASE GREEN - Código Mínimo</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">SheetsFetcher</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">extract_campaign_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sheet_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="c1"># Implementação mínima para passar o teste
+</span>        <span class="k">if</span> <span class="n">sheet_id</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s">"campaigns"</span><span class="p">:</span> <span class="p">[]}</span>
+        <span class="k">raise</span> <span class="nb">NotImplementedError</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p><strong>✅ Regras da Fase GREEN:</strong></p>
+<ul>
+  <li>Escreva apenas o código necessário para passar o teste</li>
+  <li>Não se preocupe com elegância - foque em funcionalidade</li>
+  <li>Não implemente funcionalidades não testadas</li>
+  <li>Execute TODOS os testes para garantir não-regressão</li>
+</ul>
+
+<h3 id="-fase-refactor---melhoria-de-design">🔵 FASE REFACTOR - Melhoria de Design</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">SheetsFetcher</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">extract_campaign_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sheet_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">]:</span>
+        <span class="s">"""Extrai dados de campanhas de uma planilha Google Sheets."""</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">_validate_sheet_id</span><span class="p">(</span><span class="n">sheet_id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">.</span><span class="n">_fetch_campaign_data</span><span class="p">(</span><span class="n">sheet_id</span><span class="p">)</span>
+    
+    <span class="k">def</span> <span class="nf">_validate_sheet_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sheet_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">sheet_id</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sheet_id</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="nb">ValueError</span><span class="p">(</span><span class="s">"Sheet ID deve ser uma string não vazia"</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><strong>✅ Regras da Fase REFACTOR:</strong></p>
+<ul>
+  <li>Melhore design mantendo funcionalidade</li>
+  <li>Elimine duplicação de código</li>
+  <li>Torne código mais legível e maintível</li>
+  <li>Execute testes constantemente durante refatoração</li>
+</ul>
+
+<h2 id="-estrutura-de-tasks-tdd">📋 Estrutura de Tasks TDD</h2>
+
+<h3 id="micro-tasks-por-funcionalidade">Micro-Tasks por Funcionalidade</h3>
+<p>Cada funcionalidade deve ser quebrada em micro-tasks de 5-15 minutos:</p>
+
+<ol>
+  <li><strong>RED</strong>: <code class="language-plaintext highlighter-rouge">test_should_[behavior]_when_[condition]</code> (5 min)</li>
+  <li><strong>GREEN</strong>: <code class="language-plaintext highlighter-rouge">implement_[minimal_feature]</code> (8 min)</li>
+  <li><strong>REFACTOR</strong>: <code class="language-plaintext highlighter-rouge">improve_[design_aspect]</code> (10 min)</li>
+</ol>
+
+<h3 id="exemplo-prático-performanceguard">Exemplo Prático: PerformanceGuard</h3>
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.1"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TEST: should_raise_exception_when_max_calls_exceeded"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"tdd_phase"</span><span class="p">:</span><span class="w"> </span><span class="s2">"red"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"estimate_minutes"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="w">
+</span><span class="p">}</span><span class="err">,</span><span class="w">
+</span><span class="p">{</span><span class="w">
+  </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.2"</span><span class="p">,</span><span class="w"> 
+  </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"IMPL: basic_call_counter_with_limit"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"tdd_phase"</span><span class="p">:</span><span class="w"> </span><span class="s2">"green"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"estimate_minutes"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="w">
+</span><span class="p">}</span><span class="err">,</span><span class="w">
+</span><span class="p">{</span><span class="w">
+  </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.3"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"REFACTOR: extract_configuration_class"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"tdd_phase"</span><span class="p">:</span><span class="w"> </span><span class="s2">"refactor"</span><span class="p">,</span><span class="w"> 
+  </span><span class="nl">"estimate_minutes"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="-padrões-de-teste">🧪 Padrões de Teste</h2>
+
+<h3 id="nomenclatura-de-testes">Nomenclatura de Testes</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># ✅ Bom: Descreve comportamento esperado
+</span><span class="k">def</span> <span class="nf">test_should_invalidate_cache_when_new_data_arrives</span><span class="p">():</span>
+<span class="k">def</span> <span class="nf">test_should_raise_ValueError_when_sheet_id_is_empty</span><span class="p">():</span>
+<span class="k">def</span> <span class="nf">test_should_return_cached_data_when_within_ttl</span><span class="p">():</span>
+
+<span class="c1"># ❌ Ruim: Focado em implementação, não comportamento  
+</span><span class="k">def</span> <span class="nf">test_get_sheets_data</span><span class="p">():</span>
+<span class="k">def</span> <span class="nf">test_cache_method</span><span class="p">():</span>
+<span class="k">def</span> <span class="nf">test_error_handling</span><span class="p">():</span>
+</code></pre></div></div>
+
+<h3 id="estrutura-aaa-arrange-act-assert">Estrutura AAA (Arrange-Act-Assert)</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">test_should_consolidate_api_calls_when_multiple_sheets</span><span class="p">():</span>
+    <span class="c1"># Arrange
+</span>    <span class="n">fetcher</span> <span class="o">=</span> <span class="n">SheetsFetcher</span><span class="p">(</span><span class="n">mock_credentials</span><span class="p">)</span>
+    <span class="n">sheet_ids</span> <span class="o">=</span> <span class="p">[</span><span class="s">"sheet1"</span><span class="p">,</span> <span class="s">"sheet2"</span><span class="p">,</span> <span class="s">"sheet3"</span><span class="p">]</span>
+    <span class="n">expected_call_count</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># Consolidado em batchGet
+</span>    
+    <span class="c1"># Act
+</span>    <span class="k">with</span> <span class="n">patch</span><span class="p">(</span><span class="s">'sheets_client.batchGet'</span><span class="p">)</span> <span class="k">as</span> <span class="n">mock_batch</span><span class="p">:</span>
+        <span class="n">fetcher</span><span class="p">.</span><span class="n">fetch_multiple_sheets</span><span class="p">(</span><span class="n">sheet_ids</span><span class="p">)</span>
+    
+    <span class="c1"># Assert
+</span>    <span class="k">assert</span> <span class="n">mock_batch</span><span class="p">.</span><span class="n">call_count</span> <span class="o">==</span> <span class="n">expected_call_count</span>
+</code></pre></div></div>
+
+<h3 id="mocks-e-fixtures">Mocks e Fixtures</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># fixtures/sheets_fixtures.py
+</span><span class="o">@</span><span class="n">pytest</span><span class="p">.</span><span class="n">fixture</span>
+<span class="k">def</span> <span class="nf">mock_sheets_service</span><span class="p">():</span>
+    <span class="s">"""Mock do Google Sheets API service."""</span>
+    <span class="k">with</span> <span class="n">patch</span><span class="p">(</span><span class="s">'googleapiclient.discovery.build'</span><span class="p">)</span> <span class="k">as</span> <span class="n">mock_service</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">mock_service</span>
+
+<span class="o">@</span><span class="n">pytest</span><span class="p">.</span><span class="n">fixture</span>  
+<span class="k">def</span> <span class="nf">sample_campaign_data</span><span class="p">():</span>
+    <span class="s">"""Dados de amostra para testes de campanhas."""</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s">"metaGeral"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s">"campaign_id"</span><span class="p">:</span> <span class="s">"123"</span><span class="p">,</span> <span class="s">"impressions"</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s">"clicks"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}</span>
+        <span class="p">]</span>
+    <span class="p">}</span>
+</code></pre></div></div>
+
+<h2 id="️-arquitetura-tdd-para-etl">🏗️ Arquitetura TDD para ETL</h2>
+
+<h3 id="testando-extract-layer">Testando Extract Layer</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">test_should_extract_all_required_sheets_in_single_batchget</span><span class="p">():</span>
+    <span class="c1"># Testa otimização de 2 API calls
+</span>    <span class="n">fetcher</span> <span class="o">=</span> <span class="n">SheetsFetcher</span><span class="p">(</span><span class="n">credentials</span><span class="p">)</span>
+    <span class="n">required_sheets</span> <span class="o">=</span> <span class="p">[</span><span class="s">"metaGeral"</span><span class="p">,</span> <span class="s">"linkedinGeral"</span><span class="p">,</span> <span class="s">"tiktokGeral"</span><span class="p">]</span>
+    
+    <span class="k">with</span> <span class="n">patch</span><span class="p">(</span><span class="s">'sheets_service.spreadsheets.values.batchGet'</span><span class="p">)</span> <span class="k">as</span> <span class="n">mock_batch</span><span class="p">:</span>
+        <span class="n">fetcher</span><span class="p">.</span><span class="n">extract_all_data</span><span class="p">(</span><span class="n">SPREADSHEET_ID</span><span class="p">)</span>
+        
+    <span class="k">assert</span> <span class="n">mock_batch</span><span class="p">.</span><span class="n">call_count</span> <span class="o">==</span> <span class="mi">1</span>
+    <span class="n">batch_request</span> <span class="o">=</span> <span class="n">mock_batch</span><span class="p">.</span><span class="n">call_args</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s">'body'</span><span class="p">]</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">batch_request</span><span class="p">[</span><span class="s">'ranges'</span><span class="p">])</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">required_sheets</span><span class="p">)</span>
+</code></pre></div></div>
+
+<h3 id="testando-transform-layer">Testando Transform Layer</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">test_should_validate_required_columns_and_collect_warnings</span><span class="p">():</span>
+    <span class="c1"># Testa pipeline de validação com captura de warnings
+</span>    <span class="n">transformer</span> <span class="o">=</span> <span class="n">TreatPipeline</span><span class="p">()</span>
+    <span class="n">invalid_data</span> <span class="o">=</span> <span class="n">pd</span><span class="p">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s">"wrong_column"</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]})</span>
+    
+    <span class="k">with</span> <span class="n">warnings</span><span class="p">.</span><span class="n">catch_warnings</span><span class="p">(</span><span class="n">record</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">w</span><span class="p">:</span>
+        <span class="n">transformer</span><span class="p">.</span><span class="n">validate_columns</span><span class="p">(</span><span class="n">invalid_data</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="p">[</span><span class="s">"campaign_id"</span><span class="p">])</span>
+        
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+    <span class="k">assert</span> <span class="s">"missing required columns"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">message</span><span class="p">).</span><span class="n">lower</span><span class="p">()</span>
+</code></pre></div></div>
+
+<h3 id="testando-load-layer">Testando Load Layer</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">test_should_write_all_changes_in_single_batchupdate</span><span class="p">():</span>
+    <span class="c1"># Testa consolidação de escritas
+</span>    <span class="n">writer</span> <span class="o">=</span> <span class="n">DestWriter</span><span class="p">(</span><span class="n">credentials</span><span class="p">)</span>  
+    <span class="n">changes</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s">"sheet1"</span><span class="p">:</span> <span class="p">{</span><span class="s">"range"</span><span class="p">:</span> <span class="s">"A1:C10"</span><span class="p">,</span> <span class="s">"values"</span><span class="p">:</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]]},</span>
+        <span class="s">"sheet2"</span><span class="p">:</span> <span class="p">{</span><span class="s">"range"</span><span class="p">:</span> <span class="s">"A1:B5"</span><span class="p">,</span> <span class="s">"values"</span><span class="p">:</span> <span class="p">[[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">]]}</span>
+    <span class="p">}</span>
+    
+    <span class="k">with</span> <span class="n">patch</span><span class="p">(</span><span class="s">'sheets_service.spreadsheets.values.batchUpdate'</span><span class="p">)</span> <span class="k">as</span> <span class="n">mock_batch</span><span class="p">:</span>
+        <span class="n">writer</span><span class="p">.</span><span class="n">write_all_changes</span><span class="p">(</span><span class="n">SPREADSHEET_ID</span><span class="p">,</span> <span class="n">changes</span><span class="p">)</span>
+        
+    <span class="k">assert</span> <span class="n">mock_batch</span><span class="p">.</span><span class="n">call_count</span> <span class="o">==</span> <span class="mi">1</span>
+</code></pre></div></div>
+
+<h2 id="-métricas-e-qualidade">📊 Métricas e Qualidade</h2>
+
+<h3 id="coverage-requirements">Coverage Requirements</h3>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Configuração pytest-cov</span>
+pytest <span class="nt">--cov</span><span class="o">=</span>transform <span class="nt">--cov-report</span><span class="o">=</span>html <span class="nt">--cov-fail-under</span><span class="o">=</span>90
+</code></pre></div></div>
+
+<h3 id="performance-testing">Performance Testing</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">test_should_complete_etl_pipeline_within_time_limit</span><span class="p">():</span>
+    <span class="s">"""Pipeline completo deve rodar em menos de 60 segundos."""</span>
+    <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="p">.</span><span class="n">time</span><span class="p">()</span>
+    
+    <span class="n">pipeline</span> <span class="o">=</span> <span class="n">TreatPipeline</span><span class="p">()</span>
+    <span class="n">pipeline</span><span class="p">.</span><span class="n">run_complete_etl</span><span class="p">()</span>
+    
+    <span class="n">execution_time</span> <span class="o">=</span> <span class="n">time</span><span class="p">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+    <span class="k">assert</span> <span class="n">execution_time</span> <span class="o">&lt;</span> <span class="mi">60</span><span class="p">,</span> <span class="sa">f</span><span class="s">"Pipeline took </span><span class="si">{</span><span class="n">execution_time</span><span class="si">}</span><span class="s">s, expected &lt; 60s"</span>
+</code></pre></div></div>
+
+<h3 id="integration-tests">Integration Tests</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">@</span><span class="n">pytest</span><span class="p">.</span><span class="n">mark</span><span class="p">.</span><span class="n">integration</span>
+<span class="k">def</span> <span class="nf">test_should_maintain_2_api_calls_architecture</span><span class="p">():</span>
+    <span class="s">"""Teste de regressão para arquitetura otimizada."""</span>
+    <span class="k">with</span> <span class="n">patch</span><span class="p">(</span><span class="s">'google.oauth2.service_account'</span><span class="p">)</span> <span class="k">as</span> <span class="n">mock_auth</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">patch</span><span class="p">(</span><span class="s">'googleapiclient.discovery.build'</span><span class="p">)</span> <span class="k">as</span> <span class="n">mock_service</span><span class="p">:</span>
+            <span class="c1"># Setup mocks
+</span>            <span class="n">mock_service</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">spreadsheets</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">values</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">batchGet</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">execute</span><span class="p">.</span><span class="n">return_value</span> <span class="o">=</span> <span class="n">MOCK_BATCH_GET_RESPONSE</span>
+            <span class="n">mock_service</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">spreadsheets</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">values</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">batchUpdate</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">execute</span><span class="p">.</span><span class="n">return_value</span> <span class="o">=</span> <span class="p">{}</span>
+            
+            <span class="c1"># Execute pipeline
+</span>            <span class="n">pipeline</span> <span class="o">=</span> <span class="n">TreatPipeline</span><span class="p">()</span>
+            <span class="n">pipeline</span><span class="p">.</span><span class="n">run_complete_etl</span><span class="p">()</span>
+            
+            <span class="c1"># Verify API call count
+</span>            <span class="n">batch_get_calls</span> <span class="o">=</span> <span class="n">mock_service</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">spreadsheets</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">values</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">batchGet</span><span class="p">.</span><span class="n">call_count</span>
+            <span class="n">batch_update_calls</span> <span class="o">=</span> <span class="n">mock_service</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">spreadsheets</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">values</span><span class="p">.</span><span class="n">return_value</span><span class="p">.</span><span class="n">batchUpdate</span><span class="p">.</span><span class="n">call_count</span>
+            
+            <span class="k">assert</span> <span class="n">batch_get_calls</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s">"Should use exactly 1 batchGet call"</span>
+            <span class="k">assert</span> <span class="n">batch_update_calls</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s">"Should use exactly 1 batchUpdate call"</span>
+</code></pre></div></div>
+
+<h2 id="-ferramentas-e-setup">🔧 Ferramentas e Setup</h2>
+
+<h3 id="pytestini">pytest.ini</h3>
+<div class="language-ini highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">[tool:pytest]</span>
+<span class="py">testpaths</span> <span class="p">=</span> <span class="s">tests</span>
+<span class="py">python_files</span> <span class="p">=</span> <span class="s">test_*.py</span>
+<span class="py">python_classes</span> <span class="p">=</span> <span class="s">Test*</span>
+<span class="py">python_functions</span> <span class="p">=</span> <span class="s">test_*</span>
+<span class="py">addopts</span> <span class="p">=</span> 
+    <span class="s">--strict-markers</span>
+    <span class="err">--strict-config</span>
+    <span class="err">--verbose</span>
+    <span class="py">--cov</span><span class="p">=</span><span class="s">transform</span>
+    <span class="err">--cov-branch</span>
+    <span class="py">--cov-report</span><span class="p">=</span><span class="s">term-missing</span>
+    <span class="py">--cov-report</span><span class="p">=</span><span class="s">html</span>
+<span class="py">markers</span> <span class="p">=</span>
+    <span class="err">unit:</span> <span class="err">Unit</span> <span class="err">tests</span>
+    <span class="err">integration:</span> <span class="err">Integration</span> <span class="err">tests</span>  
+    <span class="err">slow:</span> <span class="err">Tests</span> <span class="err">that</span> <span class="err">take</span> <span class="err">more</span> <span class="err">than</span> <span class="err">1</span> <span class="err">second</span>
+    <span class="err">api:</span> <span class="err">Tests</span> <span class="err">that</span> <span class="err">make</span> <span class="err">real</span> <span class="err">API</span> <span class="err">calls</span>
+</code></pre></div></div>
+
+<h3 id="pre-commit-hooks">Pre-commit Hooks</h3>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># .pre-commit-config.yaml</span>
+<span class="na">repos</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">repo</span><span class="pi">:</span> <span class="s">local</span>
+    <span class="na">hooks</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">id</span><span class="pi">:</span> <span class="s">tests</span>
+        <span class="na">name</span><span class="pi">:</span> <span class="s">Run tests</span>
+        <span class="na">entry</span><span class="pi">:</span> <span class="s">pytest -x --ff</span>
+        <span class="na">language</span><span class="pi">:</span> <span class="s">system</span>
+        <span class="na">pass_filenames</span><span class="pi">:</span> <span class="no">false</span>
+        <span class="na">always_run</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="pi">-</span> <span class="na">id</span><span class="pi">:</span> <span class="s">coverage</span>
+        <span class="na">name</span><span class="pi">:</span> <span class="s">Check coverage</span>
+        <span class="na">entry</span><span class="pi">:</span> <span class="s">pytest --cov=transform --cov-fail-under=90 -q</span>
+        <span class="na">language</span><span class="pi">:</span> <span class="s">system</span>
+        <span class="na">pass_filenames</span><span class="pi">:</span> <span class="no">false</span>
+        <span class="na">always_run</span><span class="pi">:</span> <span class="no">true</span>
+</code></pre></div></div>
+
+<h2 id="-anti-patterns-e-como-evitar">🚨 Anti-Patterns e Como Evitar</h2>
+
+<h3 id="-anti-pattern-testes-que-testam-implementação">❌ Anti-Pattern: Testes que Testam Implementação</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Ruim: Testa detalhes internos
+</span><span class="k">def</span> <span class="nf">test_uses_pandas_dataframe</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">processor</span><span class="p">.</span><span class="n">transform_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">pd</span><span class="p">.</span><span class="n">DataFrame</span><span class="p">)</span>
+</code></pre></div></div>
+
+<h3 id="-pattern-testes-que-testam-comportamento">✅ Pattern: Testes que Testam Comportamento</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Bom: Testa resultado/comportamento
+</span><span class="k">def</span> <span class="nf">test_should_normalize_currency_values</span><span class="p">():</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[{</span><span class="s">"value"</span><span class="p">:</span> <span class="s">"R$ 1.000,50"</span><span class="p">},</span> <span class="p">{</span><span class="s">"value"</span><span class="p">:</span> <span class="s">"R$ 2.500,00"</span><span class="p">}]</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">processor</span><span class="p">.</span><span class="n">normalize_currency</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">expected</span> <span class="o">=</span> <span class="p">[{</span><span class="s">"value"</span><span class="p">:</span> <span class="mf">1000.5</span><span class="p">},</span> <span class="p">{</span><span class="s">"value"</span><span class="p">:</span> <span class="mf">2500.0</span><span class="p">}]</span>
+    <span class="k">assert</span> <span class="n">result</span> <span class="o">==</span> <span class="n">expected</span>
+</code></pre></div></div>
+
+<h3 id="-anti-pattern-um-teste-para-múltiplos-comportamentos">❌ Anti-Pattern: Um Teste para Múltiplos Comportamentos</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Ruim: Teste faz muitas coisas
+</span><span class="k">def</span> <span class="nf">test_complete_etl_process</span><span class="p">():</span>
+    <span class="c1"># Testa extração
+</span>    <span class="n">data</span> <span class="o">=</span> <span class="n">extractor</span><span class="p">.</span><span class="n">extract</span><span class="p">()</span>
+    <span class="k">assert</span> <span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+    
+    <span class="c1"># Testa transformação  
+</span>    <span class="n">clean_data</span> <span class="o">=</span> <span class="n">transformer</span><span class="p">.</span><span class="n">clean</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">clean_data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    
+    <span class="c1"># Testa carga
+</span>    <span class="n">result</span> <span class="o">=</span> <span class="n">loader</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">clean_data</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="p">.</span><span class="n">success</span>
+</code></pre></div></div>
+
+<h3 id="-pattern-um-comportamento-por-teste">✅ Pattern: Um Comportamento por Teste</h3>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Bom: Cada teste tem uma responsabilidade
+</span><span class="k">def</span> <span class="nf">test_should_extract_data_successfully</span><span class="p">():</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">extractor</span><span class="p">.</span><span class="n">extract</span><span class="p">()</span>
+    <span class="k">assert</span> <span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+<span class="k">def</span> <span class="nf">test_should_clean_invalid_records</span><span class="p">():</span>
+    <span class="n">dirty_data</span> <span class="o">=</span> <span class="p">[{</span><span class="s">"valid"</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span> <span class="p">{</span><span class="s">"valid"</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span> <span class="p">{}]</span>
+    <span class="n">clean_data</span> <span class="o">=</span> <span class="n">transformer</span><span class="p">.</span><span class="n">clean</span><span class="p">(</span><span class="n">dirty_data</span><span class="p">)</span> 
+    <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">record</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="s">"valid"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">clean_data</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">test_should_confirm_successful_load</span><span class="p">():</span>
+    <span class="n">sample_data</span> <span class="o">=</span> <span class="p">[{</span><span class="s">"id"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s">"value"</span><span class="p">:</span> <span class="s">"test"</span><span class="p">}]</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">loader</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">sample_data</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="p">.</span><span class="n">success</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="p">.</span><span class="n">records_loaded</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">sample_data</span><span class="p">)</span>
+</code></pre></div></div>
+
+<h2 id="-cicd-integration">📈 CI/CD Integration</h2>
+
+<h3 id="github-actions-workflow">GitHub Actions Workflow</h3>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># .github/workflows/tdd.yml</span>
+<span class="na">name</span><span class="pi">:</span> <span class="s">TDD Workflow</span>
+<span class="na">on</span><span class="pi">:</span> <span class="pi">[</span><span class="nv">push</span><span class="pi">,</span> <span class="nv">pull_request</span><span class="pi">]</span>
+
+<span class="na">jobs</span><span class="pi">:</span>
+  <span class="na">test</span><span class="pi">:</span>
+    <span class="na">runs-on</span><span class="pi">:</span> <span class="s">ubuntu-latest</span>
+    <span class="na">steps</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">uses</span><span class="pi">:</span> <span class="s">actions/checkout@v3</span>
+      <span class="pi">-</span> <span class="na">uses</span><span class="pi">:</span> <span class="s">actions/setup-python@v4</span>
+        <span class="na">with</span><span class="pi">:</span>
+          <span class="na">python-version</span><span class="pi">:</span> <span class="s1">'</span><span class="s">3.9'</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Install dependencies</span>
+        <span class="na">run</span><span class="pi">:</span> <span class="pi">|</span>
+          <span class="s">pip install poetry</span>
+          <span class="s">poetry install</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Run TDD tests</span>
+        <span class="na">run</span><span class="pi">:</span> <span class="pi">|</span>
+          <span class="s">poetry run pytest --cov=transform --cov-fail-under=90</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Upload coverage</span>
+        <span class="na">uses</span><span class="pi">:</span> <span class="s">codecov/codecov-action@v3</span>
+</code></pre></div></div>
+
+<h2 id="-recursos-e-referências">🎓 Recursos e Referências</h2>
+
+<h3 id="leitura-recomendada">Leitura Recomendada</h3>
+<ul>
+  <li><strong>“Test Driven Development: By Example”</strong> - Kent Beck</li>
+  <li><strong>“Growing Object-Oriented Software, Guided by Tests”</strong> - Freeman &amp; Pryce</li>
+  <li><strong>“Clean Code”</strong> - Robert C. Martin (Capítulos sobre testes)</li>
+</ul>
+
+<h3 id="ferramentas-do-ecossistema">Ferramentas do Ecossistema</h3>
+<ul>
+  <li><strong>pytest</strong>: Framework de teste principal</li>
+  <li><strong>pytest-cov</strong>: Coverage reporting</li>
+  <li><strong>pytest-mock</strong>: Mocking utilities</li>
+  <li><strong>factory_boy</strong>: Test data factories</li>
+  <li><strong>freezegun</strong>: Time mocking for data pipelines</li>
+  <li><strong>responses</strong>: HTTP request mocking</li>
+</ul>
+
+<hr />
+
+<p><strong>Última atualização</strong>: 2024-01-09<br />
+<strong>Status</strong>: Documento vivo - atualizar conforme evolução do projeto<br />
+<strong>Responsável</strong>: Equipe de Desenvolvimento ETL Debrito</p>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/etl_debrito/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">ETL Debrito - Project Dashboard</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">{&quot;name&quot;=&gt;&quot;David Cantidio&quot;, &quot;email&quot;=&gt;&quot;david@example.com&quot;}</li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%.</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

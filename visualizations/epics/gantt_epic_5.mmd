@@ -1,0 +1,30 @@
+gantt
+    title Epic 5: Cache Management Specifics
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
+
+    section Analysis Phase
+    Analisar BIParamLookup.invalidate() existente e co    :, task-5.1a, 2025-08-10, 1d
+    Analisar mecanismo de clear_cache() em SheetsFetch    :, task-5.2a, 2025-08-11, 1d
+    Analisar coordenação entre caches (multi-class inv    :, task-5.3a, 2025-08-12, 1d
+
+    section Red Phase
+    should_invalidate_biparam_cache_and_reload_o    :crit, task-5.1b.1, 2025-08-13, 1d
+    should_clear_sheetsfetcher_cache_and_not_exc    :crit, task-5.2b.1, 2025-08-14, 1d
+    should_invalidate_all_caches_when_triggered_    :crit, task-5.3b.1, 2025-08-15, 1d
+    should_propagate_chain_invalidation_across_c    :crit, task-5.4b.1, 2025-08-16, 1d
+    should_report_cache_statistics_correctly    :crit, task-5.5b.1, 2025-08-17, 1d
+
+    section Green Phase
+    minimal invalidate() for BIParamLookup    :active, task-5.1b.2, 2025-08-18, 1d
+    minimal clear_cache() for SheetsFetcher    :active, task-5.2b.2, 2025-08-19, 1d
+    minimal CacheController for coordinated inva    :active, task-5.3b.2, 2025-08-20, 1d
+    implement chain invalidation triggers    :active, task-5.4b.2, 2025-08-21, 1d
+    add stats tracking to caches    :active, task-5.5b.2, 2025-08-22, 1d
+
+    section Refactor Phase
+    isolate cache and add timestamp to BIPar    :done, task-5.1b.3, 2025-08-23, 1d
+    extract cache logic in SheetsFetcher to     :done, task-5.2b.3, 2025-08-24, 1d
+    add plugin architecture to CacheControll    :done, task-5.3b.3, 2025-08-25, 1d
+    provide event-based invalidation hooks    :done, task-5.4b.3, 2025-08-26, 1d
+    centralize metrics and expose monitoring    :done, task-5.5b.3, 2025-08-27, 1d

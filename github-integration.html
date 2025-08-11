@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>🔗 GitHub Integration - ETL Debrito Gantt Charts | ETL Debrito - Project Dashboard</title>
+<meta name="generator" content="Jekyll v3.9.5" />
+<meta property="og:title" content="🔗 GitHub Integration - ETL Debrito Gantt Charts" />
+<meta name="author" content="David Cantidio" />
+<meta property="og:locale" content="pt_BR" />
+<meta name="description" content="Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%." />
+<meta property="og:description" content="Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%." />
+<link rel="canonical" href="https://davidcantidio.github.io/etl_debrito/github-integration.html" />
+<meta property="og:url" content="https://davidcantidio.github.io/etl_debrito/github-integration.html" />
+<meta property="og:site_name" content="ETL Debrito - Project Dashboard" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="🔗 GitHub Integration - ETL Debrito Gantt Charts" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebPage","author":{"@type":"Person","name":"David Cantidio"},"description":"Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%.","headline":"🔗 GitHub Integration - ETL Debrito Gantt Charts","url":"https://davidcantidio.github.io/etl_debrito/github-integration.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/etl_debrito/assets/main.css"><link type="application/atom+xml" rel="alternate" href="https://davidcantidio.github.io/etl_debrito/feed.xml" title="ETL Debrito - Project Dashboard" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/etl_debrito/">ETL Debrito - Project Dashboard</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/etl_debrito/">ETL Debrito - Project Dashboard</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <h1 id="-github-integration---etl-debrito-gantt-charts">🔗 GitHub Integration - ETL Debrito Gantt Charts</h1>
+
+<h2 id="-visão-geral">🎯 Visão Geral</h2>
+
+<p>Este documento descreve a integração completa entre os diagramas Gantt do ETL Debrito e o GitHub, criando um sistema de project management profissional com links interativos, status automático e workflows de automação.</p>
+
+<h2 id="-features-implementadas">🚀 Features Implementadas</h2>
+
+<h3 id="-1-links-interativos">✅ 1. Links Interativos</h3>
+<ul>
+  <li><strong>Epic → Issues</strong>: Cada épico conecta automaticamente a uma Issue do GitHub</li>
+  <li><strong>Milestones</strong>: Épicos críticos conectam a GitHub Milestones</li>
+  <li><strong>Click Navigation</strong>: Clique no épico → abre Issue correspondente</li>
+  <li><strong>URL Generation</strong>: URLs automáticas baseadas em mapeamento configurável</li>
+</ul>
+
+<h3 id="-2-status-tags-profissionais">✅ 2. Status Tags Profissionais</h3>
+<ul>
+  <li><strong><code class="language-plaintext highlighter-rouge">done</code></strong>: Épicos completados (Epic 0 - Foundation)</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">active</code></strong>: Épicos em desenvolvimento ativo (Epic 0.5)</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">crit</code></strong>: Critical path - épicos de alta prioridade (Epics 2, 3, 5)</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">milestone</code></strong>: Tasks que representam marcos importantes</li>
+  <li><strong>Weekend exclusions</strong>: Timeline realista com fins de semana excluídos</li>
+</ul>
+
+<h3 id="-3-automação-github-actions">✅ 3. Automação GitHub Actions</h3>
+<ul>
+  <li><strong>Auto-update</strong>: Diagramas atualizados automaticamente em push/issues</li>
+  <li><strong>Issue Comments</strong>: Comentários automáticos quando diagramas são atualizados</li>
+  <li><strong>Artifact Upload</strong>: Backup automático dos arquivos .mmd gerados</li>
+  <li><strong>Multi-trigger</strong>: Push, Issues, Milestones, manual dispatch</li>
+</ul>
+
+<h3 id="-4-professional-timeline">✅ 4. Professional Timeline</h3>
+<ul>
+  <li><strong>Vertical Markers</strong>: Marcadores para datas importantes (hoje, sprint start)</li>
+  <li><strong>Real Dependencies</strong>: Dependências explícitas entre épicos usando <code class="language-plaintext highlighter-rouge">after</code></li>
+  <li><strong>Milestone Tasks</strong>: Tasks importantes marcadas como milestones reais</li>
+  <li><strong>Critical Path</strong>: Tasks críticas baseadas em duração e importância</li>
+</ul>
+
+<h2 id="-mapeamento-github">📊 Mapeamento GitHub</h2>
+
+<h3 id="epic--issue-mapping">Epic → Issue Mapping</h3>
+<p>| Epic ID | Issue # | Epic Name |
+|———|———|———–|
+| 0 | #1 | Environment &amp; Production Safety |
+| 0.5 | #2 | Integration Architecture Fixes |
+| 2 | #3 | Discovery &amp; Compatibility |
+| 3 | #4 | Interactive Warning Resolution System |
+| 4 | #5 | TDAH Tooling Implementation |
+| 5 | #6 | Cache Management Specifics |
+| 6 | #7 | Data Migration &amp; Issues Integration |
+| 7 | #8 | Missing Caches Integration |
+| 8 | #9 | Task Time Monitoring &amp; Analytics |</p>
+
+<h3 id="epic--milestone-mapping">Epic → Milestone Mapping</h3>
+<p>| Epic ID | Milestone # | Description |
+|———|————-|————-|
+| 0 | #1 | Foundation Complete |
+| 3 | #2 | Core System Ready |
+| 8 | #3 | Analytics &amp; Monitoring Live |</p>
+
+<h2 id="️-arquivos-de-configuração">🛠️ Arquivos de Configuração</h2>
+
+<h3 id="githubworkflowsupdate-ganttyml"><code class="language-plaintext highlighter-rouge">.github/workflows/update-gantt.yml</code></h3>
+<p>Workflow automático que:</p>
+<ul>
+  <li>Executa em mudanças de épicos</li>
+  <li>Gera diagramas com integração GitHub</li>
+  <li>Comita mudanças automaticamente</li>
+  <li>Adiciona comentários em Issues</li>
+</ul>
+
+<h3 id="githubgantt-configyml"><code class="language-plaintext highlighter-rouge">.github/gantt-config.yml</code></h3>
+<p>Configurações centralizadas:</p>
+<ul>
+  <li>Mapeamentos Epic↔Issue↔Milestone</li>
+  <li>Status rules automáticos</li>
+  <li>Timeline e visual settings</li>
+  <li>Automation triggers</li>
+</ul>
+
+<h3 id="githubissue_templateepicyml"><code class="language-plaintext highlighter-rouge">.github/ISSUE_TEMPLATE/epic.yml</code></h3>
+<p>Template profissional para Issues de épicos:</p>
+<ul>
+  <li>Form estruturado para épicos</li>
+  <li>Campos TDD (Red-Green-Refactor)</li>
+  <li>Acceptance criteria</li>
+  <li>Links automáticos para diagramas</li>
+</ul>
+
+<h2 id="-exemplo-de-gantt-gerado">📈 Exemplo de Gantt Gerado</h2>
+
+<pre><code class="language-mermaid">gantt
+  title ETL Debrito — Cronograma TDD Profissional com GitHub Integration
+  dateFormat YYYY-MM-DD
+  axisFormat %d/%m
+  excludes weekends
+  
+  section Fundações
+    Epic 0: Environment &amp; Production Safet...   :done, e0, 2025-08-11, 1d
+  click e0 href "https://github.com/davidcantidio/etl_debrito/issues/1"
+  %% Milestone: https://github.com/davidcantidio/etl_debrito/milestone/1
+    Epic 0.5: Integration Architecture Fixes    :active, e0_5, 2025-08-12, 1d
+  click e0_5 href "https://github.com/davidcantidio/etl_debrito/issues/2"
+
+  section Núcleo
+    Epic 3: Interactive Warning Resolution...   :crit, e3, 2025-08-14, 1d
+  click e3 href "https://github.com/davidcantidio/etl_debrito/issues/4"
+  %% Milestone: https://github.com/davidcantidio/etl_debrito/milestone/2
+  
+  %% Vertical markers for important dates
+  Today        :vert, today, 2025-08-09, 0d
+  Sprint Start :vert, sprint, 2025-08-11, 0d
+</code></pre>
+
+<h2 id="-como-usar">🎮 Como Usar</h2>
+
+<h3 id="1-executar-localmente">1. Executar Localmente</h3>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Gerar diagramas com integração GitHub</span>
+python generate_all_diagrams.py <span class="nt">--github-repo</span> davidcantidio/etl_debrito
+
+<span class="c"># Especificar diretório de saída</span>
+python generate_all_diagrams.py <span class="nt">--github-repo</span> owner/repo <span class="nt">--output-dir</span> docs
+</code></pre></div></div>
+
+<h3 id="2-visualizar-diagramas">2. Visualizar Diagramas</h3>
+<ul>
+  <li><strong>Local</strong>: Arquivos em <code class="language-plaintext highlighter-rouge">docs/*.mmd</code></li>
+  <li><strong>Interativo</strong>: Cole conteúdo em https://mermaid.live/</li>
+  <li><strong>GitHub</strong>: Visualização automática em Issues/PRs</li>
+</ul>
+
+<h3 id="3-workflow-automático">3. Workflow Automático</h3>
+<ul>
+  <li><strong>Push changes</strong>: Auto-update em mudanças de <code class="language-plaintext highlighter-rouge">epico_*.json</code></li>
+  <li><strong>Issue events</strong>: Update quando Issues são abertas/fechadas</li>
+  <li><strong>Manual</strong>: Dispatch manual via GitHub Actions</li>
+</ul>
+
+<h3 id="4-integração-com-issues">4. Integração com Issues</h3>
+<ol>
+  <li>Use template <code class="language-plaintext highlighter-rouge">epic.yml</code> para criar Issues dos épicos</li>
+  <li>Issues automaticamente linkadas aos diagramas Gantt</li>
+  <li>Status da Issue reflete no timeline do projeto</li>
+  <li>Comentários automáticos quando diagramas são atualizados</li>
+</ol>
+
+<h2 id="-customização">🔧 Customização</h2>
+
+<h3 id="alterar-mapeamentos">Alterar Mapeamentos</h3>
+<p>Edite <code class="language-plaintext highlighter-rouge">.github/gantt-config.yml</code>:</p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">epic_issue_mapping</span><span class="pi">:</span>
+  <span class="s2">"</span><span class="s">0"</span><span class="err">:</span> <span class="m">1</span>      <span class="c1"># Epic 0 → Issue #1</span>
+  <span class="s2">"</span><span class="s">3"</span><span class="err">:</span> <span class="m">4</span>      <span class="c1"># Epic 3 → Issue #4</span>
+  <span class="c1"># ...</span>
+</code></pre></div></div>
+
+<h3 id="adicionar-status-rules">Adicionar Status Rules</h3>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">epic_status_rules</span><span class="pi">:</span>
+  <span class="na">foundation</span><span class="pi">:</span>
+    <span class="na">epics</span><span class="pi">:</span> <span class="pi">[</span><span class="s2">"</span><span class="s">0"</span><span class="pi">,</span> <span class="s2">"</span><span class="s">0.5"</span><span class="pi">]</span>
+    <span class="na">status</span><span class="pi">:</span> <span class="s2">"</span><span class="s">done"</span>
+    <span class="na">critical</span><span class="pi">:</span> <span class="no">false</span>
+</code></pre></div></div>
+
+<h3 id="configurar-vertical-markers">Configurar Vertical Markers</h3>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">vertical_markers</span><span class="pi">:</span>
+  <span class="na">today</span><span class="pi">:</span>
+    <span class="na">label</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Today"</span>
+    <span class="na">dynamic</span><span class="pi">:</span> <span class="no">true</span>
+  <span class="na">mvp_deadline</span><span class="pi">:</span>
+    <span class="na">label</span><span class="pi">:</span> <span class="s2">"</span><span class="s">MVP</span><span class="nv"> </span><span class="s">Target"</span>
+    <span class="na">date</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2025-08-25"</span>
+</code></pre></div></div>
+
+<h2 id="-benefícios-da-integração">🏆 Benefícios da Integração</h2>
+
+<h3 id="para-desenvolvimento">Para Desenvolvimento</h3>
+<ul>
+  <li>✅ <strong>Visual Project Tracking</strong>: Timeline visual conectado a Issues reais</li>
+  <li>✅ <strong>Automated Updates</strong>: Diagramas sempre atualizados sem esforço manual</li>
+  <li>✅ <strong>Professional Presentation</strong>: Gantt charts prontos para stakeholders</li>
+  <li>✅ <strong>Interactive Navigation</strong>: Click no épico → vai direto para Issue</li>
+</ul>
+
+<h3 id="para-project-management">Para Project Management</h3>
+<ul>
+  <li>✅ <strong>Real-time Status</strong>: Status automático baseado em dados reais</li>
+  <li>✅ <strong>Critical Path</strong>: Visualização clara do caminho crítico</li>
+  <li>✅ <strong>Milestone Tracking</strong>: Marcos conectados ao GitHub Milestones</li>
+  <li>✅ <strong>Team Coordination</strong>: Issues integradas ao timeline do projeto</li>
+</ul>
+
+<h3 id="para-stakeholders">Para Stakeholders</h3>
+<ul>
+  <li>✅ <strong>Executive Dashboard</strong>: Visão consolidada do progresso</li>
+  <li>✅ <strong>Clickable Timeline</strong>: Drill-down para detalhes específicos</li>
+  <li>✅ <strong>Professional Output</strong>: Diagramas adequados para apresentações</li>
+  <li>✅ <strong>Always Updated</strong>: Informação sempre atual via automação</li>
+</ul>
+
+<h2 id="-troubleshooting">🔍 Troubleshooting</h2>
+
+<h3 id="diagramas-não-atualizam-automaticamente">Diagramas não atualizam automaticamente</h3>
+<ol>
+  <li>Verificar se GitHub Actions estão habilitadas</li>
+  <li>Confirmar permissions de <code class="language-plaintext highlighter-rouge">contents: write</code></li>
+  <li>Validar sintaxe dos arquivos <code class="language-plaintext highlighter-rouge">epico_*.json</code></li>
+</ol>
+
+<h3 id="links-não-funcionam-no-github">Links não funcionam no GitHub</h3>
+<ol>
+  <li>Mermaid no GitHub não suporta click events em todas as visualizações</li>
+  <li>Use mermaid.live para funcionalidade completa</li>
+  <li>Links ainda aparecem como comentários nos arquivos .mmd</li>
+</ol>
+
+<h3 id="issues-não-encontradas">Issues não encontradas</h3>
+<ol>
+  <li>Verificar mapeamentos em <code class="language-plaintext highlighter-rouge">.github/gantt-config.yml</code></li>
+  <li>Confirmar numeração das Issues no repositório</li>
+  <li>Ajustar <code class="language-plaintext highlighter-rouge">epic_issue_mapping</code> conforme necessário</li>
+</ol>
+
+<h2 id="-referências">📚 Referências</h2>
+
+<ul>
+  <li><strong><a href="https://mermaid.js.org/syntax/gantt.html">Mermaid Gantt Documentation</a></strong></li>
+  <li><strong><a href="https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions">GitHub Actions Workflow Syntax</a></strong></li>
+  <li><strong><a href="https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests">GitHub Issue Templates</a></strong></li>
+  <li><strong><a href="https://mermaid.live/">Mermaid Live Editor</a></strong></li>
+</ul>
+
+<hr />
+
+<p>🎯 <strong>Sistema completo de Project Management com GitHub Integration implementado!</strong></p>
+
+<p><em>Agora o ETL Debrito possui um sistema profissional de tracking visual conectado diretamente ao GitHub, com automação completa e visualização interativa.</em></p>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/etl_debrito/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">ETL Debrito - Project Dashboard</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">{&quot;name&quot;=&gt;&quot;David Cantidio&quot;, &quot;email&quot;=&gt;&quot;david@example.com&quot;}</li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>Enhanced Gantt Progress Tracker with Real-time Commit Analysis. Ultra-optimized ETL pipeline reducing API calls by 93%.</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
