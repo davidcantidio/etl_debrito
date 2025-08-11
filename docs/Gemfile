@@ -1,0 +1,14 @@
+source "https://rubygems.org"
+
+# GitHub Pages compatible Jekyll
+gem "github-pages", group: :jekyll_plugins
+
+# Core Jekyll
+gem "jekyll", "~> 3.9.0"
+
+# GitHub Pages theme
+gem "minima"
+
+# Essential plugins
+gem "jekyll-feed"
+gem "jekyll-sitemap"

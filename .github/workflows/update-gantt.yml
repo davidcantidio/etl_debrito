@@ -12,6 +12,7 @@ on:
       - 'commit_helper.py'
       - '.github/workflows/update-gantt.yml'
       - 'trigger_workflow.txt'
+      - 'trigger_pages_rebuild.md'
   
   # Trigger em Issues relacionadas aos épicos  
   issues:
@@ -243,13 +244,30 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ github.ref }}
       
+      - name: 🏗️ Setup Ruby for Jekyll
+        if: steps.git-check.outputs.changes == 'true' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_deploy == 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+          working-directory: ./docs
+
+      - name: 🔧 Build Jekyll Site
+        if: steps.git-check.outputs.changes == 'true' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_deploy == 'true'
+        run: |
+          cd docs
+          bundle install
+          bundle exec jekyll build --destination _site
+          echo "✅ Jekyll site built successfully"
+          ls -la _site/
+
       - name: 🚀 Deploy to GitHub Pages
         if: steps.git-check.outputs.changes == 'true' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_deploy == 'true'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-          enable_jekyll: true
+          publish_dir: ./docs/_site
+          enable_jekyll: false
           commit_message: 'Deploy: ${{ github.event.head_commit.message }}'
           force_orphan: true
       
