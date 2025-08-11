@@ -2,7 +2,7 @@
 
 **Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
 **GitHub Repository:** davidcantidio/etl_debrito  
-**Commit:** e859f832ef761dc638b4cbe94bdc9e4bc205b826  
+**Commit:** 6bd5342ab1e8284f76dc702e834f0d388b775779  
 **Branch:** main
 **TDD Pattern:** ${USING_ENHANCED_TDD:-false}
 
