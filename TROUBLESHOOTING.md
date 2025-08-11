@@ -364,6 +364,107 @@ fetcher = SheetsFetcher(cache_ttl=ttl)
 
 ---
 
+## 🌐 GitHub Pages & Deployment Issues
+
+### 15. GitHub Pages 404 Error (Site Not Loading)
+**Symptom**: https://davidcantidio.github.io/etl_debrito/ returns 404  
+**Location**: GitHub Pages deployment  
+**Root Causes**: Jekyll build issues, stuck Pages build process, configuration problems
+
+#### Emergency Diagnostic Commands:
+```bash
+# Check Pages configuration status
+gh api repos/davidcantidio/etl_debrito/pages
+
+# Check recent Pages builds
+gh api repos/davidcantidio/etl_debrito/pages/builds | head -5
+
+# Check recent workflow runs
+gh run list --workflow="🎯 Update Project Gantt Charts" --limit=3
+
+# Check gh-pages branch content
+gh api repos/davidcantidio/etl_debrito/contents?ref=gh-pages
+
+# Test if site content exists (should work if deployed)
+curl -I https://davidcantidio.github.io/etl_debrito/
+```
+
+#### Common Root Causes & Solutions:
+
+**A. Stuck Pages Build Process**
+```json
+{"status":"building","duration":25380117} // 7+ hours stuck
+```
+**Solution**: Switch to official GitHub Pages actions
+```yaml
+# Replace third-party action with official ones
+- uses: actions/configure-pages@v4
+- uses: actions/upload-pages-artifact@v3  
+- uses: actions/deploy-pages@v4
+```
+
+**B. Jekyll Build Failure** 
+```yaml
+# Missing Gemfile in docs/ directory
+```
+**Solution**: Create `docs/Gemfile`:
+```ruby
+source "https://rubygems.org"
+gem "github-pages", group: :jekyll_plugins
+gem "jekyll", "~> 3.9.0"
+gem "minima"
+```
+
+**C. Workflow Configuration Issues**
+```yaml
+# Missing Pages environment
+```
+**Solution**: Add proper environment to workflow:
+```yaml
+environment:
+  name: github-pages
+  url: ${{ steps.deployment.outputs.page_url }}
+permissions:
+  pages: write
+  id-token: write
+```
+
+#### Proven Fix Sequence (GitHub Pages 404):
+1. **Force fresh workflow**: `gh workflow run "🎯 Update Project Gantt Charts" --field force_deploy=true`
+2. **Wait 2-3 minutes** for deployment
+3. **Check build status**: `gh api repos/davidcantidio/etl_debrito/pages/builds | head -1`
+4. **Verify site**: `curl -I https://davidcantidio.github.io/etl_debrito/`
+5. **If still 404**: Switch to official GitHub Pages actions (see docs/github-pages-setup.md)
+
+---
+
+## 🔧 Workflow Debugging
+
+### Quick Workflow Status:
+```bash
+# Check if workflow is running
+gh run list --limit=3
+
+# Watch current run
+gh run watch $(gh run list --limit=1 --json databaseId --jq .[0].databaseId)
+
+# View specific job logs
+gh run view --log --job=JOB_ID
+```
+
+### Jekyll Build Debugging:
+```bash
+# Test Jekyll build locally (if Ruby installed)
+cd docs
+bundle install
+bundle exec jekyll build --destination _site
+
+# Check for Jekyll errors in workflow
+gh run view --log | grep -A 10 -B 10 "Jekyll\|bundle"
+```
+
+---
+
 **🆘 If all else fails**: Check `logs/pipeline_debug.log` for the exact error location and compare with working patterns in CLAUDE.md files.
 
-**Last Updated**: 2025-01-09
+**Last Updated**: 2025-08-11
